@@ -2,8 +2,11 @@ module Main exposing (..)
 
 import Browser
 import Cmd.Extra exposing (pure)
-import Html exposing (Html, div, text)
-import Html.Attributes exposing (style)
+import Html exposing (Html, div, label, text)
+import Html.Attributes exposing (style, value)
+import Html.Events exposing (onInput)
+import Random
+import UUID exposing (UUID)
 
 
 
@@ -25,13 +28,15 @@ type Either a b
 
 
 type alias Note =
-    { title : String
+    { id : UUID
+    , title : String
     , content : Either String (List String)
     }
 
 
 type alias Model =
     { notes : List Note
+    , newTitle : String
     }
 
 
@@ -41,6 +46,7 @@ type alias Model =
 
 type Msg
     = NoOp
+    | NewTitleChange String
 
 
 
@@ -50,13 +56,20 @@ type Msg
 init : () -> ( Model, Cmd Msg )
 init _ =
     ( { notes =
-            [ { title = "My first note"
+            [ { id =
+                    Random.step UUID.generator (Random.initialSeed 12345)
+                        |> Tuple.first
+              , title = "My first note"
               , content = LeftType "This is my first note"
               }
-            , { title = "My second note"
+            , { id =
+                    Random.step UUID.generator (Random.initialSeed 54321)
+                        |> Tuple.first
+              , title = "My second note"
               , content = LeftType "Second note here"
               }
             ]
+      , newTitle = ""
       }
     , Cmd.none
     )
@@ -82,35 +95,50 @@ update msg model =
         NoOp ->
             model |> pure
 
+        NewTitleChange s ->
+            { model | newTitle = s }
+                |> pure
+
 
 
 -- VIEW
 
 
-view : Model -> Html msg
+view : Model -> Html Msg
 view model =
     div []
-        (List.map
-            (\note ->
-                div
-                    [ style "border" "1px solid black"
-                    , style "margin" "10px"
-                    , style "padding" "10px"
-                    , style "display" "flex"
-                    , style "flex-direction" "column"
-                    ]
-                    [ div [] [ text note.title ]
-                    , div []
-                        [ text
-                            (case note.content of
-                                LeftType s ->
-                                    s
-
-                                RightType l ->
-                                    String.join "\n" l
-                            )
+        [ div
+            []
+            (List.map
+                (\note ->
+                    div
+                        [ style "border" "1px solid black"
+                        , style "margin" "10px"
+                        , style "padding" "10px"
+                        , style "display" "flex"
+                        , style "flex-direction" "column"
                         ]
-                    ]
+                        [ div [] [ text note.title ]
+                        , div []
+                            [ text
+                                (case note.content of
+                                    LeftType s ->
+                                        s
+
+                                    RightType l ->
+                                        String.join "\n" l
+                                )
+                            ]
+                        ]
+                )
+                model.notes
             )
-            model.notes
-        )
+        , div []
+            [ label [ Html.Attributes.for "note text" ] []
+            , Html.input
+                [ onInput NewTitleChange
+                , value model.newTitle
+                ]
+                []
+            ]
+        ]
