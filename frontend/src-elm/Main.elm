@@ -37,6 +37,7 @@ type alias Note =
 type alias Model =
     { notes : List Note
     , newTitle : String
+    , newContent : String
     }
 
 
@@ -47,6 +48,7 @@ type alias Model =
 type Msg
     = NoOp
     | NewTitleChange String
+    | NewContentChange String
 
 
 
@@ -70,6 +72,7 @@ init _ =
               }
             ]
       , newTitle = ""
+      , newContent = ""
       }
     , Cmd.none
     )
@@ -97,6 +100,10 @@ update msg model =
 
         NewTitleChange s ->
             { model | newTitle = s }
+                |> pure
+
+        NewContentChange s ->
+            { model | newContent = s }
                 |> pure
 
 
@@ -134,9 +141,17 @@ view model =
                 model.notes
             )
         , div []
-            [ label [ Html.Attributes.for "note text" ] []
+            [ label [] [ text "Title: " ]
             , Html.input
                 [ onInput NewTitleChange
+                , value model.newTitle
+                ]
+                []
+            ]
+        , div []
+            [ label [] [ text "Content: " ]
+            , Html.input
+                [ onInput NewContentChange
                 , value model.newTitle
                 ]
                 []
