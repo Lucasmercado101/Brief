@@ -1,0 +1,1 @@
+elm make src-elm/Main.elm --output public/elm.js --debug

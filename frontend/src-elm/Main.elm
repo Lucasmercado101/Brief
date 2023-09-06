@@ -1,12 +1,24 @@
-module Main exposing (..)
+port module Main exposing (..)
 
 import Browser
 import Cmd.Extra exposing (pure)
 import Html exposing (Html, div, label, text)
-import Html.Attributes exposing (style, value)
-import Html.Events exposing (onInput)
+import Html.Attributes exposing (style, type_, value)
+import Html.Events exposing (onClick, onInput)
 import Random
-import UUID exposing (UUID)
+import Random.Char
+import Random.Extra
+import Random.String
+
+
+
+-- PORTS
+
+
+port requestRandomValues : () -> Cmd msg
+
+
+port receiveRandomValues : (List Int -> msg) -> Sub msg
 
 
 
@@ -15,11 +27,15 @@ import UUID exposing (UUID)
 
 subscriptions : Model -> Sub Msg
 subscriptions _ =
-    Sub.none
+    receiveRandomValues ReceivedRandomValues
 
 
 
 -- MODEL
+
+
+type alias UID =
+    String
 
 
 type Either a b
@@ -28,16 +44,19 @@ type Either a b
 
 
 type alias Note =
-    { id : UUID
+    { id : UID
     , title : String
     , content : Either String (List String)
     }
 
 
 type alias Model =
-    { notes : List Note
+    { seeds : List Random.Seed
+    , notes : List Note
     , newTitle : String
-    , newContent : String
+    , newContent : Either String (List String)
+    , isNewNoteAList : Bool
+    , isAwaitingRandomValues : Bool
     }
 
 
@@ -49,36 +68,44 @@ type Msg
     = NoOp
     | NewTitleChange String
     | NewContentChange String
+    | NewNoteIsListChange Bool
+    | AddNote
+    | ReceivedRandomValues (List Int)
 
 
 
 -- INIT
 
 
-init : () -> ( Model, Cmd Msg )
-init _ =
-    ( { notes =
+type alias Flags =
+    { seeds : List Int }
+
+
+init : Flags -> ( Model, Cmd Msg )
+init flags =
+    let
+        seeds =
+            List.map Random.initialSeed flags.seeds
+    in
+    ( { seeds = seeds
+      , notes =
             [ { id =
-                    Random.step UUID.generator (Random.initialSeed 12345)
+                    generateUID seeds
                         |> Tuple.first
               , title = "My first note"
               , content = LeftType "This is my first note"
               }
-            , { id =
-                    Random.step UUID.generator (Random.initialSeed 54321)
-                        |> Tuple.first
-              , title = "My second note"
-              , content = LeftType "Second note here"
-              }
             ]
       , newTitle = ""
-      , newContent = ""
+      , newContent = LeftType ""
+      , isNewNoteAList = False
+      , isAwaitingRandomValues = False
       }
     , Cmd.none
     )
 
 
-main : Program () Model Msg
+main : Program Flags Model Msg
 main =
     Browser.element
         { init = init
@@ -103,7 +130,48 @@ update msg model =
                 |> pure
 
         NewContentChange s ->
-            { model | newContent = s }
+            { model | newContent = LeftType s }
+                |> pure
+
+        NewNoteIsListChange v ->
+            { model
+                | isNewNoteAList = v
+
+                -- , newContent = RightType (String.split "\n" model.newContent)
+            }
+                |> pure
+
+        AddNote ->
+            -- TODO: check if note is empty
+            -- TODO: no iAwaitingRandomValues, instead a compact type
+            ( { model
+                | isAwaitingRandomValues = True
+              }
+            , requestRandomValues ()
+            )
+
+        ReceivedRandomValues values ->
+            { model | seeds = List.map Random.initialSeed values }
+                |> (\m ->
+                        if model.isAwaitingRandomValues then
+                            { m
+                                | isAwaitingRandomValues = False
+                                , newTitle = ""
+                                , newContent = LeftType ""
+                                , isNewNoteAList = False
+                                , notes =
+                                    { id =
+                                        generateUID m.seeds
+                                            |> Tuple.first
+                                    , title = m.newTitle
+                                    , content = m.newContent
+                                    }
+                                        :: m.notes
+                            }
+
+                        else
+                            m
+                   )
                 |> pure
 
 
@@ -141,6 +209,15 @@ view model =
                 model.notes
             )
         , div []
+            [ label [] [ text "Is new note a list? " ]
+            , Html.input
+                [ type_ "checkbox"
+                , onClick (NewNoteIsListChange True)
+                , value model.newTitle
+                ]
+                []
+            ]
+        , div []
             [ label [] [ text "Title: " ]
             , Html.input
                 [ onInput NewTitleChange
@@ -156,4 +233,31 @@ view model =
                 ]
                 []
             ]
+        , div
+            []
+            [ Html.button
+                [ onClick AddNote ]
+                [ text "Add note" ]
+            ]
         ]
+
+
+
+-- UID Lib
+-- https://github.com/elm/random/issues/2
+
+
+generateUID : List Random.Seed -> ( UID, List Random.Seed )
+generateUID seeds =
+    List.map (Random.step (alphaNumericGenerator 5)) seeds
+        |> List.unzip
+        |> Tuple.mapFirst (String.join "")
+
+
+alphaNumericGenerator : Int -> Random.Generator String
+alphaNumericGenerator strLength =
+    Random.Extra.choices (Random.Char.char 48 57)
+        [ Random.Char.char 97 122
+        , Random.Char.char 65 90
+        ]
+        |> Random.String.string strLength
