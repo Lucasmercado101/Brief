@@ -4,7 +4,7 @@ import Browser
 import Cmd.Extra exposing (pure)
 import Css exposing (..)
 import Html.Styled exposing (Html, button, div, input, label, text)
-import Html.Styled.Attributes exposing (css, id, style, type_, value)
+import Html.Styled.Attributes exposing (css, id, placeholder, style, type_, value)
 import Html.Styled.Events exposing (onClick, onInput)
 import Random
 import Random.Char
@@ -188,9 +188,28 @@ view model =
             [ backgroundColor (rgb 24 129 106)
             , width (pct 100)
             , height (pct 100)
+
+            -- temp
+            , padding (px 25)
             ]
         ]
-        [ div
+        [ div [ css [ width (pct 100), displayFlex ] ]
+            [ div [ css [ margin2 (px 0) auto, width (px 500) ] ]
+                [ input
+                    [ css
+                        [ border3 (px 2) solid (rgb 0 0 0)
+                        , publicSans
+                        , fontWeight bold
+                        , padding (px 8)
+                        , margin2 (px 0) auto
+                        , width (pct 100)
+                        ]
+                    , placeholder "TAKE A NEW NOTE"
+                    ]
+                    []
+                ]
+            ]
+        , div
             [ -- TODO: give the tiled effect of google keep
               -- using translate and transitions
               css
@@ -246,6 +265,10 @@ note data =
             , maxWidth (px 240)
             , minWidth (px 240)
             , backgroundColor (rgb 255 203 127)
+            , hover
+                [ boxShadow4 (px 6) (px 6) (px 0) (rgb 0 0 0)
+                , cursor pointer
+                ]
             ]
         ]
         [ div [ css [ publicSans ] ] [ text data.title ]
