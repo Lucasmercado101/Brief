@@ -190,7 +190,9 @@ view model =
             , height (pct 100)
             ]
         ]
-        [ div [] (List.map note model.notes)
+        [ -- TODO: give the tiled effect of google keep
+          -- using translate and transitions
+          div [] (List.map note model.notes)
         , div []
             [ label [] [ text "Is new note a list? " ]
             , input
