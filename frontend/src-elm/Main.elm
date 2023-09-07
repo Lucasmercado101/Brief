@@ -190,39 +190,7 @@ view model =
             , height (pct 100)
             ]
         ]
-        [ div
-            []
-            (List.map
-                (\note ->
-                    div
-                        [ --     style "border" "1px solid black"
-                          -- , style "margin" "10px"
-                          -- , style "padding" "10px"
-                          -- , style "display" "flex"
-                          -- , style "flex-direction" "column"
-                          css
-                            [ border3 (px 1) solid (rgb 255 255 255)
-                            , margin (px 10)
-                            , padding (px 10)
-                            , displayFlex
-                            , flexDirection column
-                            ]
-                        ]
-                        [ div [] [ text note.title ]
-                        , div []
-                            [ text
-                                (case note.content of
-                                    LeftType s ->
-                                        s
-
-                                    RightType l ->
-                                        String.join "\n" l
-                                )
-                            ]
-                        ]
-                )
-                model.notes
-            )
+        [ div [] (List.map note model.notes)
         , div []
             [ label [] [ text "Is new note a list? " ]
             , input
@@ -253,6 +221,32 @@ view model =
             [ button
                 [ onClick AddNote ]
                 [ text "Add note" ]
+            ]
+        ]
+
+
+note : Note -> Html Msg
+note data =
+    div
+        [ css
+            [ border3 (px 2) solid (rgb 0 0 0)
+            , margin (px 10)
+            , padding (px 10)
+            , displayFlex
+            , flexDirection column
+            , backgroundColor (rgb 255 203 127)
+            ]
+        ]
+        [ div [] [ text data.title ]
+        , div []
+            [ text
+                (case data.content of
+                    LeftType s ->
+                        s
+
+                    RightType l ->
+                        String.join "\n" l
+                )
             ]
         ]
 
