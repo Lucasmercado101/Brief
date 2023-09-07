@@ -248,8 +248,8 @@ note data =
             , backgroundColor (rgb 255 203 127)
             ]
         ]
-        [ div [] [ text data.title ]
-        , div []
+        [ div [ css [ publicSans ] ] [ text data.title ]
+        , div [ css [ publicSans ] ]
             [ text
                 (case data.content of
                     LeftType s ->
@@ -260,6 +260,11 @@ note data =
                 )
             ]
         ]
+
+
+publicSans : Style
+publicSans =
+    fontFamilies [ "Public Sans", .value sansSerif ]
 
 
 
