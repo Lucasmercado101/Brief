@@ -190,9 +190,16 @@ view model =
             , height (pct 100)
             ]
         ]
-        [ -- TODO: give the tiled effect of google keep
-          -- using translate and transitions
-          div [] (List.map note model.notes)
+        [ div
+            [ -- TODO: give the tiled effect of google keep
+              -- using translate and transitions
+              css
+                [ displayFlex
+                , flexDirection row
+                , flexWrap wrap
+                ]
+            ]
+            (List.map note model.notes)
         , div []
             [ label [] [ text "Is new note a list? " ]
             , input
@@ -236,6 +243,8 @@ note data =
             , padding (px 10)
             , displayFlex
             , flexDirection column
+            , maxWidth (px 240)
+            , minWidth (px 240)
             , backgroundColor (rgb 255 203 127)
             ]
         ]
