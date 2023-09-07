@@ -3,7 +3,7 @@ port module Main exposing (..)
 import Browser
 import Cmd.Extra exposing (pure)
 import Css exposing (..)
-import Html.Styled exposing (Html, button, div, input, label, text)
+import Html.Styled exposing (Html, br, button, div, input, label, p, text)
 import Html.Styled.Attributes exposing (css, id, placeholder, style, type_, value)
 import Html.Styled.Events exposing (onClick, onInput)
 import Random
@@ -312,16 +312,39 @@ note data =
             ]
         ]
         [ div [ css [ publicSans ] ] [ text data.title ]
-        , div [ css [ publicSans ] ]
-            [ text
-                (case data.content of
-                    LeftType s ->
-                        s
+        , br [] []
+        , p [ css [ publicSans ] ]
+            (let
+                -- \n don't break into a newline without this
+                makeParagraph : List (Html msg) -> List String -> List (Html msg)
+                makeParagraph total next =
+                    case next of
+                        [] ->
+                            total
 
-                    RightType l ->
-                        String.join "\n" l
-                )
-            ]
+                        x :: xs ->
+                            makeParagraph (total ++ [ br [] [], text x ]) xs
+             in
+             case data.content of
+                LeftType s ->
+                    s
+                        |> String.split "\n"
+                        |> (\r ->
+                                case r of
+                                    [] ->
+                                        [ text s ]
+
+                                    h :: t ->
+                                        if List.length t > 0 then
+                                            makeParagraph [ text h ] t
+
+                                        else
+                                            [ text h ]
+                           )
+
+                RightType l ->
+                    [ text (String.join "\n" l) ]
+            )
         ]
 
 
