@@ -2,9 +2,10 @@ port module Main exposing (..)
 
 import Browser
 import Cmd.Extra exposing (pure)
-import Html exposing (Html, div, label, text)
-import Html.Attributes exposing (style, type_, value)
-import Html.Events exposing (onClick, onInput)
+import Css exposing (..)
+import Html.Styled exposing (Html, button, div, input, label, text)
+import Html.Styled.Attributes exposing (css, id, style, type_, value)
+import Html.Styled.Events exposing (onClick, onInput)
 import Random
 import Random.Char
 import Random.Extra
@@ -109,7 +110,7 @@ main : Program Flags Model Msg
 main =
     Browser.element
         { init = init
-        , view = view
+        , view = view >> Html.Styled.toUnstyled
         , update = update
         , subscriptions = subscriptions
         }
@@ -181,17 +182,31 @@ update msg model =
 
 view : Model -> Html Msg
 view model =
-    div []
+    div
+        [ id "full-container"
+        , css
+            [ backgroundColor (rgb 24 129 106)
+            , width (pct 100)
+            , height (pct 100)
+            ]
+        ]
         [ div
             []
             (List.map
                 (\note ->
                     div
-                        [ style "border" "1px solid black"
-                        , style "margin" "10px"
-                        , style "padding" "10px"
-                        , style "display" "flex"
-                        , style "flex-direction" "column"
+                        [ --     style "border" "1px solid black"
+                          -- , style "margin" "10px"
+                          -- , style "padding" "10px"
+                          -- , style "display" "flex"
+                          -- , style "flex-direction" "column"
+                          css
+                            [ border3 (px 1) solid (rgb 255 255 255)
+                            , margin (px 10)
+                            , padding (px 10)
+                            , displayFlex
+                            , flexDirection column
+                            ]
                         ]
                         [ div [] [ text note.title ]
                         , div []
@@ -210,7 +225,7 @@ view model =
             )
         , div []
             [ label [] [ text "Is new note a list? " ]
-            , Html.input
+            , input
                 [ type_ "checkbox"
                 , onClick (NewNoteIsListChange True)
                 , value model.newTitle
@@ -219,7 +234,7 @@ view model =
             ]
         , div []
             [ label [] [ text "Title: " ]
-            , Html.input
+            , input
                 [ onInput NewTitleChange
                 , value model.newTitle
                 ]
@@ -227,7 +242,7 @@ view model =
             ]
         , div []
             [ label [] [ text "Content: " ]
-            , Html.input
+            , input
                 [ onInput NewContentChange
                 , value model.newTitle
                 ]
@@ -235,7 +250,7 @@ view model =
             ]
         , div
             []
-            [ Html.button
+            [ button
                 [ onClick AddNote ]
                 [ text "Add note" ]
             ]
