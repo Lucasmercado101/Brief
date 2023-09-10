@@ -16,50 +16,62 @@ import Random.String
 import Svg.Styled
 
 
+dummyNotes : List Note
 dummyNotes =
     [ { id = "1"
       , title = "Project Kickoff Meeting"
       , content = LeftType "Agenda:\n- Introductions\n- Project goals and objectives\n- Team roles and responsibilities\n- Timeline and milestones"
+      , pinned = False
       }
     , { id = "2"
       , title = "Travel Packing List"
       , content = LeftType "Clothing:\n- T-shirts\n- Jeans\n- Sweater\n\nToiletries:\n- Toothbrush\n- Shampoo\n- Razor\n\nElectronics:\n- Laptop\n- Charger\n- Headphones"
+      , pinned = False
       }
     , { id = "3"
       , title = "Reading List"
       , content = LeftType "Books to Read:\n1. 'The Great Gatsby' by F. Scott Fitzgerald\n2. 'The Hobbit' by J.R.R. Tolkien\n3. 'The Alchemist' by Paulo Coelho"
+      , pinned = False
       }
     , { id = "4"
       , title = "Fitness Goals"
       , content = LeftType "Weekly Workout Plan:\n- Monday: Cardio (30 minutes)\n- Wednesday: Strength training\n- Friday: Yoga (45 minutes)"
+      , pinned = False
       }
     , { id = "5"
       , title = "Recipe - Chicken Stir-Fry"
       , content = LeftType "Ingredients:\n- Chicken breast\n- Bell peppers\n- Broccoli\n- Soy sauce\n- Rice\n\nInstructions:..."
+      , pinned = False
       }
     , { id = "6"
       , title = "Tech Conference Notes"
       , content = LeftType "Keynote Speaker: John Smith\n- Discussed latest trends in AI\n- Highlighted the importance of data privacy"
+      , pinned = False
       }
     , { id = "7"
       , title = "Meeting Notes"
       , content = LeftType "Discussed project milestones and assigned tasks to team members."
+      , pinned = False
       }
     , { id = "8"
       , title = "Grocery List"
       , content = LeftType "Milk, eggs, bread, and fruits."
+      , pinned = False
       }
     , { id = "9"
       , title = "Book Recommendations"
       , content = LeftType "1. 'The Catcher in the Rye' by J.D. Salinger\n2. 'To Kill a Mockingbird' by Harper Lee\n3. '1984' by George Orwell"
+      , pinned = False
       }
     , { id = "0"
       , title = "Trip Itinerary"
       , content = LeftType "Day 1: Explore the city\nDay 2: Visit museums and art galleries\nDay 3: Hike in the mountains\nDay 4: Relax at the beach"
+      , pinned = False
       }
     , { id = "012"
       , title = "Recipe - Spaghetti Bolognese"
       , content = LeftType "Ingredients:\n- Ground beef\n- Onion\n- Garlic\n- Tomatoes\n- Pasta\n\nInstructions:..."
+      , pinned = False
       }
     ]
 
@@ -100,6 +112,7 @@ type alias Note =
     { id : UID
     , title : String
     , content : Either String (List String)
+    , pinned : Bool
     }
 
 
@@ -211,6 +224,7 @@ update msg model =
                                             |> Tuple.first
                                     , title = m.newTitle
                                     , content = m.newContent
+                                    , pinned = False
                                     }
                                         :: m.notes
                             }
