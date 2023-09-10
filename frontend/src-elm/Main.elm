@@ -6,10 +6,14 @@ import Css exposing (..)
 import Html.Styled exposing (Html, br, button, div, input, label, nav, p, text)
 import Html.Styled.Attributes exposing (css, id, placeholder, style, type_, value)
 import Html.Styled.Events exposing (onClick, onInput)
+import Material.Icons as Filled
+import Material.Icons.Outlined as Outlined
+import Material.Icons.Types exposing (Coloring(..))
 import Random
 import Random.Char
 import Random.Extra
 import Random.String
+import Svg.Styled
 
 
 dummyNotes =
@@ -234,75 +238,79 @@ view model =
             -- , padding (px 25)
             ]
         ]
-        [ nav
-            [ css
-                [ backgroundColor (rgb 140 20 254)
-                , color (rgb 255 255 255)
-                , padding2 (px 10) (px 30)
-                , publicSans
-                , fontWeight bolder
-                , fontSize (px 25)
-                , borderBottom3 (px 3) solid (rgb 0 0 0)
+        [ div [ css [ height (pct 100), overflow auto ] ]
+            [ nav
+                [ css
+                    [ backgroundColor (rgb 140 20 254)
+                    , color (rgb 255 255 255)
+                    , padding2 (px 10) (px 30)
+                    , publicSans
+                    , fontWeight bolder
+                    , fontSize (px 25)
+                    , borderBottom3 (px 3) solid (rgb 0 0 0)
+                    , position sticky
+                    , top (px 0)
+                    ]
                 ]
-            ]
-            [ text "Notes" ]
-        , div [ css [ width (pct 100), displayFlex, marginTop (px 30) ] ]
-            [ div [ css [ margin2 (px 0) auto, width (px 500) ] ]
-                [ input
-                    [ css
-                        [ border3 (px 2) solid (rgb 0 0 0)
-                        , publicSans
-                        , fontWeight bold
-                        , padding (px 8)
-                        , margin2 (px 0) auto
-                        , width (pct 100)
+                [ text "Notes" ]
+            , div [ css [ width (pct 100), displayFlex, marginTop (px 30) ] ]
+                [ div [ css [ margin2 (px 0) auto, width (px 500) ] ]
+                    [ input
+                        [ css
+                            [ border3 (px 2) solid (rgb 0 0 0)
+                            , publicSans
+                            , fontWeight bold
+                            , padding (px 8)
+                            , margin2 (px 0) auto
+                            , width (pct 100)
+                            ]
+                        , placeholder "TAKE A NEW NOTE"
                         ]
-                    , placeholder "TAKE A NEW NOTE"
+                        []
+                    ]
+                ]
+            , div
+                [ -- TODO: give the tiled effect of google keep
+                  -- using translate and transitions
+                  css
+                    [ displayFlex
+                    , flexDirection row
+                    , flexWrap wrap
+                    , marginTop (px 30)
+                    ]
+                ]
+                (List.map note model.notes)
+            , div []
+                [ label [] [ text "Is new note a list? " ]
+                , input
+                    [ type_ "checkbox"
+                    , onClick (NewNoteIsListChange True)
+                    , value model.newTitle
                     ]
                     []
                 ]
-            ]
-        , div
-            [ -- TODO: give the tiled effect of google keep
-              -- using translate and transitions
-              css
-                [ displayFlex
-                , flexDirection row
-                , flexWrap wrap
-                , marginTop (px 30)
+            , div []
+                [ label [] [ text "Title: " ]
+                , input
+                    [ onInput NewTitleChange
+                    , value model.newTitle
+                    ]
+                    []
                 ]
-            ]
-            (List.map note model.notes)
-        , div []
-            [ label [] [ text "Is new note a list? " ]
-            , input
-                [ type_ "checkbox"
-                , onClick (NewNoteIsListChange True)
-                , value model.newTitle
+            , div []
+                [ label [] [ text "Content: " ]
+                , input
+                    [ onInput NewContentChange
+                    , value model.newTitle
+                    ]
+                    []
                 ]
+            , div
                 []
-            ]
-        , div []
-            [ label [] [ text "Title: " ]
-            , input
-                [ onInput NewTitleChange
-                , value model.newTitle
+                [ button
+                    [ onClick AddNote ]
+                    [ text "Add note" ]
                 ]
-                []
-            ]
-        , div []
-            [ label [] [ text "Content: " ]
-            , input
-                [ onInput NewContentChange
-                , value model.newTitle
-                ]
-                []
-            ]
-        , div
-            []
-            [ button
-                [ onClick AddNote ]
-                [ text "Add note" ]
             ]
         ]
 
@@ -313,7 +321,6 @@ note data =
         [ css
             [ border3 (px 3) solid (rgb 0 0 0)
             , margin (px 10)
-            , padding (px 10)
             , displayFlex
             , flexDirection column
             , maxWidth (px 240)
@@ -324,40 +331,56 @@ note data =
                 ]
             ]
         ]
-        [ div [ css [ publicSans ] ] [ text data.title ]
-        , br [] []
-        , p [ css [ publicSans ] ]
-            (let
-                -- \n don't break into a newline without this
-                makeParagraph : List (Html msg) -> List String -> List (Html msg)
-                makeParagraph total next =
-                    case next of
-                        [] ->
-                            total
+        [ div
+            [ css
+                [ backgroundColor (hex "#052b9a")
+                , color (rgb 255 255 255)
+                , padding4 (px 0) (px 0) (px 0) (px 3)
+                , height (px 36)
+                , displayFlex
+                , justifyContent spaceBetween
+                ]
+            ]
+            [ --  button [ css [ height (px 36), padding (px 0), margin (px 0) ] ] [ Filled.visibility 32 Inherit |> Svg.Styled.fromUnstyled ]
+              Filled.visibility 32 Inherit |> Svg.Styled.fromUnstyled
+            , Filled.close 32 Inherit |> Svg.Styled.fromUnstyled
+            ]
+        , div [ css [ padding (px 10) ] ]
+            [ div [ css [ publicSans ] ] [ text data.title ]
+            , br [] []
+            , p [ css [ publicSans ] ]
+                (let
+                    -- \n don't break into a newline without this
+                    makeParagraph : List (Html msg) -> List String -> List (Html msg)
+                    makeParagraph total next =
+                        case next of
+                            [] ->
+                                total
 
-                        x :: xs ->
-                            makeParagraph (total ++ [ br [] [], text x ]) xs
-             in
-             case data.content of
-                LeftType s ->
-                    s
-                        |> String.split "\n"
-                        |> (\r ->
-                                case r of
-                                    [] ->
-                                        [ text s ]
+                            x :: xs ->
+                                makeParagraph (total ++ [ br [] [], text x ]) xs
+                 in
+                 case data.content of
+                    LeftType s ->
+                        s
+                            |> String.split "\n"
+                            |> (\r ->
+                                    case r of
+                                        [] ->
+                                            [ text s ]
 
-                                    h :: t ->
-                                        if List.length t > 0 then
-                                            makeParagraph [ text h ] t
+                                        h :: t ->
+                                            if List.length t > 0 then
+                                                makeParagraph [ text h ] t
 
-                                        else
-                                            [ text h ]
-                           )
+                                            else
+                                                [ text h ]
+                               )
 
-                RightType l ->
-                    [ text (String.join "\n" l) ]
-            )
+                    RightType l ->
+                        [ text (String.join "\n" l) ]
+                )
+            ]
         ]
 
 
