@@ -307,6 +307,8 @@ view model =
                         []
                     ]
                 ]
+
+            -- TODO: add no notes empty state design
             , div
                 [ -- TODO: give the tiled effect of google keep
                   -- using translate and transitions
