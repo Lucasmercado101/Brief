@@ -333,17 +333,32 @@ note data =
         ]
         [ div
             [ css
-                [ backgroundColor (hex "#052b9a")
-                , color (rgb 255 255 255)
-                , padding4 (px 0) (px 0) (px 0) (px 3)
+                [ backgroundColor (rgb 117 93 39)
+                , color (hex "fff")
                 , height (px 36)
                 , displayFlex
                 , justifyContent spaceBetween
+                , borderBottom3 (px 3) solid (rgb 0 0 0)
                 ]
             ]
             [ --  button [ css [ height (px 36), padding (px 0), margin (px 0) ] ] [ Filled.visibility 32 Inherit |> Svg.Styled.fromUnstyled ]
-              Filled.visibility 32 Inherit |> Svg.Styled.fromUnstyled
-            , Filled.close 32 Inherit |> Svg.Styled.fromUnstyled
+              div
+                [ css
+                    [ borderRight3 (px 5) solid (rgb 11 14 17)
+                    , hover [ backgroundColor (hex "000"), cursor pointer ]
+                    , paddingRight (px 4)
+                    , paddingLeft (px 4)
+                    , paddingTop (px 3)
+                    ]
+                ]
+                [ Filled.push_pin 28 Inherit |> Svg.Styled.fromUnstyled ]
+            , div
+                [ css
+                    [ borderLeft3 (px 5) solid (rgb 11 14 17)
+                    , hover [ backgroundColor (hex "ff0000"), cursor pointer ]
+                    ]
+                ]
+                [ Filled.close 32 Inherit |> Svg.Styled.fromUnstyled ]
             ]
         , div [ css [ padding (px 10) ] ]
             [ div [ css [ publicSans ] ] [ text data.title ]
