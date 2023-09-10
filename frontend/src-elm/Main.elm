@@ -137,6 +137,7 @@ type Msg
     | NewNoteIsListChange Bool
     | AddNote
     | ReceivedRandomValues (List Int)
+    | TogglePinNote UID
 
 
 
@@ -208,6 +209,21 @@ update msg model =
               }
             , requestRandomValues ()
             )
+
+        TogglePinNote uid ->
+            { model
+                | notes =
+                    List.map
+                        (\n ->
+                            if n.id == uid then
+                                { n | pinned = not n.pinned }
+
+                            else
+                                n
+                        )
+                        model.notes
+            }
+                |> pure
 
         ReceivedRandomValues values ->
             { model | seeds = List.map Random.initialSeed values }
@@ -293,7 +309,7 @@ view model =
                     , marginTop (px 30)
                     ]
                 ]
-                (List.map note model.notes)
+                (List.map note (model.notes |> prioritizePinned))
             , div []
                 [ label [] [ text "Is new note a list? " ]
                 , input
@@ -355,21 +371,33 @@ note data =
                 , borderBottom3 (px 3) solid (rgb 0 0 0)
                 ]
             ]
-            [ --  button [ css [ height (px 36), padding (px 0), margin (px 0) ] ] [ Filled.visibility 32 Inherit |> Svg.Styled.fromUnstyled ]
-              div
+            [ button
                 [ css
-                    [ borderRight3 (px 5) solid (rgb 11 14 17)
+                    [ border (px 0)
+                    , borderRight3 (px 3) solid (rgb 11 14 17)
+                    , backgroundColor
+                        (if data.pinned == True then
+                            hex "000"
+
+                         else
+                            rgb 117 93 39
+                        )
+                    , color (hex "fff")
                     , hover [ backgroundColor (hex "000"), cursor pointer ]
                     , paddingRight (px 4)
                     , paddingLeft (px 4)
                     , paddingTop (px 3)
                     ]
+                , onClick (TogglePinNote data.id)
                 ]
                 [ Filled.push_pin 28 Inherit |> Svg.Styled.fromUnstyled ]
-            , div
+            , button
                 [ css
-                    [ borderLeft3 (px 5) solid (rgb 11 14 17)
+                    [ border (px 0)
+                    , borderLeft3 (px 3) solid (rgb 11 14 17)
                     , hover [ backgroundColor (hex "ff0000"), cursor pointer ]
+                    , backgroundColor inherit
+                    , color (hex "fff")
                     ]
                 ]
                 [ Filled.close 32 Inherit |> Svg.Styled.fromUnstyled ]
@@ -416,6 +444,18 @@ note data =
 publicSans : Style
 publicSans =
     fontFamilies [ "Public Sans", .value sansSerif ]
+
+
+prioritizePinned : List Note -> List Note
+prioritizePinned notes =
+    let
+        pinned =
+            List.filter (\n -> n.pinned == True) notes
+
+        unpinned =
+            List.filter (\n -> n.pinned == False) notes
+    in
+    pinned ++ unpinned
 
 
 
