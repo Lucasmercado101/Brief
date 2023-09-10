@@ -298,7 +298,7 @@ note : Note -> Html Msg
 note data =
     div
         [ css
-            [ border3 (px 2) solid (rgb 0 0 0)
+            [ border3 (px 3) solid (rgb 0 0 0)
             , margin (px 10)
             , padding (px 10)
             , displayFlex
