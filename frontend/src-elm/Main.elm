@@ -138,6 +138,7 @@ type Msg
     | AddNote
     | ReceivedRandomValues (List Int)
     | TogglePinNote UID
+    | DeleteNote UID
 
 
 
@@ -209,6 +210,13 @@ update msg model =
               }
             , requestRandomValues ()
             )
+
+        DeleteNote uid ->
+            { model
+                | notes =
+                    List.filter (\n -> n.id /= uid) model.notes
+            }
+                |> pure
 
         TogglePinNote uid ->
             { model
@@ -399,6 +407,7 @@ note data =
                     , backgroundColor inherit
                     , color (hex "fff")
                     ]
+                , onClick (DeleteNote data.id)
                 ]
                 [ Filled.close 32 Inherit |> Svg.Styled.fromUnstyled ]
             ]
