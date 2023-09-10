@@ -3,7 +3,7 @@ port module Main exposing (..)
 import Browser
 import Cmd.Extra exposing (pure)
 import Css exposing (..)
-import Html.Styled exposing (Html, br, button, div, input, label, p, text)
+import Html.Styled exposing (Html, br, button, div, input, label, nav, p, text)
 import Html.Styled.Attributes exposing (css, id, placeholder, style, type_, value)
 import Html.Styled.Events exposing (onClick, onInput)
 import Random
@@ -231,10 +231,22 @@ view model =
             , height (pct 100)
 
             -- temp
-            , padding (px 25)
+            -- , padding (px 25)
             ]
         ]
-        [ div [ css [ width (pct 100), displayFlex ] ]
+        [ nav
+            [ css
+                [ backgroundColor (rgb 140 20 254)
+                , color (rgb 255 255 255)
+                , padding2 (px 10) (px 30)
+                , publicSans
+                , fontWeight bolder
+                , fontSize (px 25)
+                , borderBottom3 (px 3) solid (rgb 0 0 0)
+                ]
+            ]
+            [ text "Notes" ]
+        , div [ css [ width (pct 100), displayFlex, marginTop (px 30) ] ]
             [ div [ css [ margin2 (px 0) auto, width (px 500) ] ]
                 [ input
                     [ css
@@ -257,6 +269,7 @@ view model =
                 [ displayFlex
                 , flexDirection row
                 , flexWrap wrap
+                , marginTop (px 30)
                 ]
             ]
             (List.map note model.notes)
