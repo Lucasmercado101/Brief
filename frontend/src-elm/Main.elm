@@ -369,7 +369,8 @@ view model =
                                     ]
                                 , onSubmit FinishWritingNewNote
                                 ]
-                                [ input
+                                [ -- TODO: Add focus on input task
+                                  input
                                     [ css
                                         [ publicSans
                                         , border (px 0)
