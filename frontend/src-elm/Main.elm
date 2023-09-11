@@ -3,9 +3,9 @@ port module Main exposing (..)
 import Browser
 import Cmd.Extra exposing (pure)
 import Css exposing (..)
-import Html.Styled exposing (Html, br, button, div, input, label, nav, p, text, textarea)
+import Html.Styled exposing (Html, br, button, div, form, input, label, nav, p, text, textarea)
 import Html.Styled.Attributes exposing (css, id, placeholder, style, type_, value)
-import Html.Styled.Events exposing (onClick, onInput)
+import Html.Styled.Events exposing (onClick, onInput, onSubmit)
 import Material.Icons as Filled
 import Material.Icons.Outlined as Outlined
 import Material.Icons.Types exposing (Coloring(..))
@@ -149,6 +149,7 @@ type Msg
     | TogglePinNote UID
     | DeleteNote UID
     | BeginWritingNewNote
+    | FinishWritingNewNote
 
 
 
@@ -279,6 +280,20 @@ update msg model =
             }
                 |> pure
 
+        FinishWritingNewNote ->
+            { model
+                | isWritingANewNote = None
+                , notes =
+                    model.notes
+                        ++ [ { id = generateUID model.seeds |> Tuple.first
+                             , title = model.newTitle
+                             , content = model.newContent
+                             , pinned = False
+                             }
+                           ]
+            }
+                |> pure
+
 
 
 -- VIEW
@@ -335,14 +350,14 @@ view model =
                             ]
                         ]
 
-                    NewNoteData data ->
+                    NewNoteData _ ->
                         [ div
                             [ css
                                 [ displayFlex
                                 , marginTop (px 30)
                                 ]
                             ]
-                            [ div
+                            [ form
                                 [ css
                                     [ displayFlex
                                     , margin2 auto auto
@@ -352,6 +367,7 @@ view model =
                                     , margin2 (px 0) auto
                                     , minWidth (px 500)
                                     ]
+                                , onSubmit FinishWritingNewNote
                                 ]
                                 [ input
                                     [ css
@@ -364,6 +380,7 @@ view model =
                                         , width (pct 100)
                                         ]
                                     , placeholder "Grocery List"
+                                    , onInput NewTitleChange
                                     ]
                                     []
                                 , textarea
@@ -379,8 +396,10 @@ view model =
                                         , minHeight (px 150)
                                         ]
                                     , placeholder "Milk, eggs, bread, and fruits."
+                                    , onInput NewContentChange
                                     ]
                                     []
+                                , button [ css [ padding (px 15), fontSize (px 16) ] ] [ text "Create note" ]
                                 ]
                             ]
                         ]
