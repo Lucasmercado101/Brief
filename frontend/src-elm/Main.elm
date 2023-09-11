@@ -3,7 +3,7 @@ port module Main exposing (..)
 import Browser
 import Cmd.Extra exposing (pure)
 import Css exposing (..)
-import Html.Styled exposing (Html, br, button, div, input, label, nav, p, text)
+import Html.Styled exposing (Html, br, button, div, input, label, nav, p, text, textarea)
 import Html.Styled.Attributes exposing (css, id, placeholder, style, type_, value)
 import Html.Styled.Events exposing (onClick, onInput)
 import Material.Icons as Filled
@@ -123,7 +123,16 @@ type alias Model =
     , newContent : Either String (List String)
     , isNewNoteAList : Bool
     , isAwaitingRandomValues : Bool
+    , isWritingANewNote : NewNote
     }
+
+
+type NewNote
+    = None
+    | NewNoteData
+        { title : String
+        , content : Either String (List String)
+        }
 
 
 
@@ -139,6 +148,7 @@ type Msg
     | ReceivedRandomValues (List Int)
     | TogglePinNote UID
     | DeleteNote UID
+    | BeginWritingNewNote
 
 
 
@@ -161,6 +171,7 @@ init flags =
       , newContent = LeftType ""
       , isNewNoteAList = False
       , isAwaitingRandomValues = False
+      , isWritingANewNote = None
       }
     , Cmd.none
     )
@@ -258,6 +269,16 @@ update msg model =
                    )
                 |> pure
 
+        BeginWritingNewNote ->
+            { model
+                | isWritingANewNote =
+                    NewNoteData
+                        { title = ""
+                        , content = LeftType ""
+                        }
+            }
+                |> pure
+
 
 
 -- VIEW
@@ -291,22 +312,79 @@ view model =
                     ]
                 ]
                 [ text "Notes" ]
-            , div [ css [ width (pct 100), displayFlex, marginTop (px 30) ] ]
-                [ div [ css [ margin2 (px 0) auto, width (px 500) ] ]
-                    [ input
-                        [ css
-                            [ border3 (px 2) solid (rgb 0 0 0)
-                            , publicSans
-                            , fontWeight bold
-                            , padding (px 8)
-                            , margin2 (px 0) auto
-                            , width (pct 100)
+            , div []
+                (case model.isWritingANewNote of
+                    None ->
+                        [ div [ css [ width (pct 100), displayFlex, marginTop (px 30) ] ]
+                            [ div [ css [ margin2 (px 0) auto, width (px 500) ] ]
+                                [ input
+                                    [ onClick BeginWritingNewNote
+                                    , css
+                                        [ border3 (px 3) solid (rgb 0 0 0)
+                                        , publicSans
+                                        , fontWeight bold
+                                        , padding (px 8)
+                                        , margin2 (px 0) auto
+                                        , width (pct 100)
+                                        , backgroundColor (rgb 255 203 127)
+                                        ]
+                                    , placeholder "TAKE A NEW NOTE"
+                                    ]
+                                    []
+                                ]
                             ]
-                        , placeholder "TAKE A NEW NOTE"
                         ]
-                        []
-                    ]
-                ]
+
+                    NewNoteData data ->
+                        [ div
+                            [ css
+                                [ displayFlex
+                                , marginTop (px 30)
+                                ]
+                            ]
+                            [ div
+                                [ css
+                                    [ displayFlex
+                                    , margin2 auto auto
+                                    , flexDirection column
+                                    , border3 (px 3) solid (rgb 0 0 0)
+                                    , hover [ boxShadow4 (px 6) (px 6) (px 0) (rgb 0 0 0) ]
+                                    , margin2 (px 0) auto
+                                    , minWidth (px 500)
+                                    ]
+                                ]
+                                [ input
+                                    [ css
+                                        [ publicSans
+                                        , border (px 0)
+                                        , backgroundColor (rgb 255 203 127)
+                                        , padding (px 8)
+                                        , fontSize (px 16)
+                                        , margin2 (px 0) auto
+                                        , width (pct 100)
+                                        ]
+                                    , placeholder "Grocery List"
+                                    ]
+                                    []
+                                , textarea
+                                    [ css
+                                        [ backgroundColor (rgb 255 203 127)
+                                        , border (px 0)
+                                        , publicSans
+                                        , padding (px 8)
+                                        , fontSize (px 16)
+                                        , margin2 (px 0) auto
+                                        , width (pct 100)
+                                        , minWidth (px 494)
+                                        , minHeight (px 150)
+                                        ]
+                                    , placeholder "Milk, eggs, bread, and fruits."
+                                    ]
+                                    []
+                                ]
+                            ]
+                        ]
+                )
 
             -- TODO: add no notes empty state design
             , div
@@ -413,10 +491,16 @@ note data =
                 ]
                 [ Filled.close 32 Inherit |> Svg.Styled.fromUnstyled ]
             ]
-        , div [ css [ padding (px 10) ] ]
-            [ div [ css [ publicSans ] ] [ text data.title ]
-            , br [] []
-            , p [ css [ publicSans ] ]
+        , div []
+            [ div
+                [ css
+                    [ publicSans
+                    , borderBottom3 (px 1) solid (rgb 0 0 0)
+                    , padding4 (px 10) (px 10) (px 10) (px 10)
+                    ]
+                ]
+                [ text data.title ]
+            , p [ css [ publicSans, padding4 (px 10) (px 10) (px 10) (px 10) ] ]
                 (let
                     -- \n don't break into a newline without this
                     makeParagraph : List (Html msg) -> List String -> List (Html msg)
