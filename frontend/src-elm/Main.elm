@@ -281,7 +281,7 @@ update msg model =
                 |> pure
 
         FinishWritingNewNote ->
-            { model
+            ( { model
                 | isWritingANewNote = None
                 , notes =
                     model.notes
@@ -291,8 +291,9 @@ update msg model =
                              , pinned = False
                              }
                            ]
-            }
-                |> pure
+              }
+            , requestRandomValues ()
+            )
 
 
 
