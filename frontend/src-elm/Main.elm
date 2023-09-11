@@ -419,37 +419,6 @@ view model =
                     ]
                 ]
                 (List.map note (model.notes |> prioritizePinned))
-            , div []
-                [ label [] [ text "Is new note a list? " ]
-                , input
-                    [ type_ "checkbox"
-                    , onClick (NewNoteIsListChange True)
-                    , value model.newTitle
-                    ]
-                    []
-                ]
-            , div []
-                [ label [] [ text "Title: " ]
-                , input
-                    [ onInput NewTitleChange
-                    , value model.newTitle
-                    ]
-                    []
-                ]
-            , div []
-                [ label [] [ text "Content: " ]
-                , input
-                    [ onInput NewContentChange
-                    , value model.newTitle
-                    ]
-                    []
-                ]
-            , div
-                []
-                [ button
-                    [ onClick AddNote ]
-                    [ text "Add note" ]
-                ]
             ]
         ]
 
