@@ -76,6 +76,35 @@ dummyNotes =
     ]
 
 
+dummyLabels : List String
+dummyLabels =
+    [ "Work"
+    , "Personal"
+    , "Shopping"
+    , "Health"
+    , "Home"
+    , "Meeting"
+    , "Urgent"
+    , "Important"
+    , "Fitness"
+    , "Study"
+    , "Family"
+    , "Friends"
+    , "Groceries"
+    , "Movies"
+    , "Travel"
+    , "Bills"
+    , "Chores"
+    , "Goals"
+    , "Hobbies"
+    , "Calls"
+    , "Books"
+    , "Music"
+    , "Gifts"
+    , "Tech"
+    ]
+
+
 
 -- PORTS
 
@@ -93,6 +122,15 @@ port receiveRandomValues : (List Int -> msg) -> Sub msg
 subscriptions : Model -> Sub Msg
 subscriptions _ =
     receiveRandomValues ReceivedRandomValues
+
+
+dummyNewNote : Maybe NewNoteData
+dummyNewNote =
+    Just
+        { title = "My title"
+        , content = LeftType "note"
+        , labels = Nothing
+        }
 
 
 
@@ -123,16 +161,20 @@ type alias Model =
     , newContent : Either String (List String)
     , isNewNoteAList : Bool
     , isAwaitingRandomValues : Bool
-    , isWritingANewNote : NewNote
+    , isWritingANewNote : Maybe NewNoteData
+    , labels : List String
     }
 
 
-type NewNote
-    = None
-    | NewNoteData
-        { title : String
-        , content : Either String (List String)
-        }
+type alias NewNoteData =
+    { title : String
+    , content : Either String (List String)
+    , labels :
+        Maybe
+            { labels : List String
+            , labelsSearchQuery : String
+            }
+    }
 
 
 
@@ -150,6 +192,10 @@ type Msg
     | DeleteNote UID
     | BeginWritingNewNote
     | FinishWritingNewNote
+    | BeginAddingNewNoteLabels
+    | SearchLabelsQueryChange String
+    | AddLabelToNewNote String
+    | RemoveLabelFromNewNote String
 
 
 
@@ -172,7 +218,10 @@ init flags =
       , newContent = LeftType ""
       , isNewNoteAList = False
       , isAwaitingRandomValues = False
-      , isWritingANewNote = None
+
+      -- TODO:  , isWritingANewNote = Nothing
+      , isWritingANewNote = dummyNewNote
+      , labels = dummyLabels
       }
     , Cmd.none
     )
@@ -273,27 +322,121 @@ update msg model =
         BeginWritingNewNote ->
             { model
                 | isWritingANewNote =
-                    NewNoteData
+                    Just
                         { title = ""
                         , content = LeftType ""
+                        , labels = Nothing
                         }
             }
                 |> pure
 
+        SearchLabelsQueryChange s ->
+            { model
+                | isWritingANewNote =
+                    Maybe.map
+                        (\data ->
+                            { data
+                                | labels =
+                                    Maybe.map
+                                        (\{ labels } ->
+                                            { labels = labels
+                                            , labelsSearchQuery = s
+                                            }
+                                        )
+                                        data.labels
+                            }
+                        )
+                        model.isWritingANewNote
+            }
+                |> pure
+
+        AddLabelToNewNote newLabel ->
+            { model
+                | isWritingANewNote =
+                    Maybe.map
+                        (\data ->
+                            { data
+                                | labels =
+                                    Maybe.map
+                                        (\{ labelsSearchQuery, labels } ->
+                                            { labels = newLabel :: labels
+                                            , labelsSearchQuery = labelsSearchQuery
+                                            }
+                                        )
+                                        data.labels
+                            }
+                        )
+                        model.isWritingANewNote
+            }
+                |> pure
+
+        RemoveLabelFromNewNote label ->
+            { model
+                | isWritingANewNote =
+                    Maybe.map
+                        (\data ->
+                            { data
+                                | labels =
+                                    Maybe.map
+                                        (\{ labelsSearchQuery, labels } ->
+                                            { labels = labels |> List.filter (\l -> l /= label)
+                                            , labelsSearchQuery = labelsSearchQuery
+                                            }
+                                        )
+                                        data.labels
+                            }
+                        )
+                        model.isWritingANewNote
+            }
+                |> pure
+
         FinishWritingNewNote ->
-            ( { model
-                | isWritingANewNote = None
-                , notes =
-                    model.notes
-                        ++ [ { id = generateUID model.seeds |> Tuple.first
-                             , title = model.newTitle
-                             , content = model.newContent
-                             , pinned = False
-                             }
-                           ]
-              }
+            ( case model.newContent of
+                LeftType content ->
+                    if not <| String.isEmpty content then
+                        { model
+                            | isWritingANewNote = Nothing
+                            , notes =
+                                model.notes
+                                    ++ [ { id = generateUID model.seeds |> Tuple.first
+                                         , title = model.newTitle
+                                         , content = model.newContent
+                                         , pinned = False
+                                         }
+                                       ]
+                        }
+
+                    else
+                        model
+
+                RightType content ->
+                    if List.length content == 0 then
+                        model
+
+                    else
+                        model
             , requestRandomValues ()
             )
+
+        BeginAddingNewNoteLabels ->
+            case model.isWritingANewNote of
+                Just data ->
+                    { model
+                        | isWritingANewNote =
+                            Just
+                                { data
+                                    | labels =
+                                        Just
+                                            { labels = []
+                                            , labelsSearchQuery = ""
+                                            }
+                                }
+                    }
+                        |> pure
+
+                Nothing ->
+                    model
+                        |> pure
 
 
 
@@ -306,11 +449,8 @@ view model =
         [ id "full-container"
         , css
             [ backgroundColor (rgb 24 129 106)
-            , width (pct 100)
+            , fullWidth
             , height (pct 100)
-
-            -- temp
-            -- , padding (px 25)
             ]
         ]
         [ div [ css [ height (pct 100), overflow auto ] ]
@@ -330,8 +470,8 @@ view model =
                 [ text "Notes" ]
             , div []
                 (case model.isWritingANewNote of
-                    None ->
-                        [ div [ css [ width (pct 100), displayFlex, marginTop (px 30) ] ]
+                    Nothing ->
+                        [ div [ css [ fullWidth, displayFlex, marginTop (px 30) ] ]
                             [ div [ css [ margin2 (px 0) auto, width (px 500) ] ]
                                 [ input
                                     [ onClick BeginWritingNewNote
@@ -341,7 +481,7 @@ view model =
                                         , fontWeight bold
                                         , padding (px 8)
                                         , margin2 (px 0) auto
-                                        , width (pct 100)
+                                        , fullWidth
                                         , backgroundColor (rgb 255 203 127)
                                         ]
                                     , placeholder "TAKE A NEW NOTE"
@@ -351,7 +491,7 @@ view model =
                             ]
                         ]
 
-                    NewNoteData _ ->
+                    Just data ->
                         [ div
                             [ css
                                 [ displayFlex
@@ -379,7 +519,7 @@ view model =
                                         , padding (px 8)
                                         , fontSize (px 16)
                                         , margin2 (px 0) auto
-                                        , width (pct 100)
+                                        , fullWidth
                                         ]
                                     , placeholder "Grocery List"
                                     , onInput NewTitleChange
@@ -393,7 +533,7 @@ view model =
                                         , padding (px 8)
                                         , fontSize (px 16)
                                         , margin2 (px 0) auto
-                                        , width (pct 100)
+                                        , fullWidth
                                         , minWidth (px 494)
                                         , minHeight (px 150)
                                         ]
@@ -401,7 +541,59 @@ view model =
                                     , onInput NewContentChange
                                     ]
                                     []
-                                , button [ css [ padding (px 15), fontSize (px 16) ] ] [ text "Create note" ]
+                                , case data.labels of
+                                    Just { labels, labelsSearchQuery } ->
+                                        div [ css [ marginTop (px 8) ] ]
+                                            [ label [ css [ color (hex "fff"), mx (px 15) ] ] [ text "Labels:" ]
+                                            , input [ placeholder "Search label", value labelsSearchQuery, onInput SearchLabelsQueryChange ] []
+                                            , div
+                                                []
+                                                -- TODO: fix styles
+                                                (List.map
+                                                    (\l ->
+                                                        button
+                                                            [ css [ margin (px 5), padding2 (px 5) (px 10) ]
+                                                            , onClick (AddLabelToNewNote l)
+                                                            ]
+                                                            [ text l ]
+                                                    )
+                                                    (model.labels
+                                                        |> List.filter (\l -> List.any (\j -> j == l) labels |> not)
+                                                        |> List.filter (String.toLower >> String.contains labelsSearchQuery)
+                                                    )
+                                                )
+                                            , div [ css [ color (hex "fff"), mx (px 15) ] ] [ text "Selected labels:" ]
+                                            , div
+                                                []
+                                                (List.map
+                                                    (\l ->
+                                                        button
+                                                            [ css
+                                                                [ margin (px 5), padding2 (px 5) (px 10) ]
+                                                            , onClick (RemoveLabelFromNewNote l)
+                                                            ]
+                                                            [ text l ]
+                                                    )
+                                                    labels
+                                                )
+                                            ]
+
+                                    Nothing ->
+                                        div []
+                                            [ button
+                                                [ -- TODO: style
+                                                  css [ padding (px 15) ]
+                                                , onClick BeginAddingNewNoteLabels
+                                                ]
+                                                [ text "Add label" ]
+                                            ]
+                                , button
+                                    [ css
+                                        [ padding (px 15)
+                                        , fontSize (px 16)
+                                        ]
+                                    ]
+                                    [ text "Create note" ]
                                 ]
                             ]
                         ]
@@ -531,6 +723,11 @@ publicSans =
     fontFamilies [ "Public Sans", .value sansSerif ]
 
 
+fullWidth : Style
+fullWidth =
+    width (pct 100)
+
+
 prioritizePinned : List Note -> List Note
 prioritizePinned notes =
     let
@@ -562,3 +759,43 @@ alphaNumericGenerator strLength =
         , Random.Char.char 65 90
         ]
         |> Random.String.string strLength
+
+
+
+-- Helpers
+
+
+displayGrid : Style
+displayGrid =
+    property "display" "grid"
+
+
+gridTemplateColumns : String -> Style
+gridTemplateColumns =
+    property "grid-template-columns"
+
+
+gap : Int -> Style
+gap i =
+    property "gap" <|
+        String.fromInt i
+            ++ "px"
+
+
+gap2 : Int -> Int -> Style
+gap2 i j =
+    property "gap" <|
+        String.fromInt i
+            ++ "px "
+            ++ String.fromInt j
+            ++ "px"
+
+
+mx : Css.LengthOrAuto a -> Style
+mx l =
+    Css.batch [ Css.marginLeft l, Css.marginRight l ]
+
+
+my : Css.LengthOrAuto a -> Style
+my l =
+    Css.batch [ Css.marginTop l, Css.marginBottom l ]
