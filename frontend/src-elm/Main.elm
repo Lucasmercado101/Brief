@@ -25,6 +25,12 @@ dummyNotes =
       , pinned = False
       , labels = []
       }
+    , { id = "011"
+      , title = ""
+      , content = Left "Don't forget to read this"
+      , pinned = False
+      , labels = []
+      }
     , { id = "2"
       , title = "Travel Packing List"
       , content = Left "Clothing:\n- T-shirts\n- Jeans\n- Sweater\n\nToiletries:\n- Toothbrush\n- Shampoo\n- Razor\n\nElectronics:\n- Laptop\n- Charger\n- Headphones"
@@ -44,7 +50,7 @@ dummyNotes =
       , labels = []
       }
     , { id = "4"
-      , title = "Fitness Goals"
+      , title = ""
       , content = Left "Weekly Workout Plan:\n- Monday: Cardio (30 minutes)\n- Wednesday: Strength training\n- Friday: Yoga (45 minutes)"
       , pinned = False
       , labels = [ "Home" ]
@@ -74,7 +80,7 @@ dummyNotes =
       , labels = []
       }
     , { id = "9"
-      , title = "Book Recommendations"
+      , title = ""
       , content = Left "1. 'The Catcher in the Rye' by J.D. Salinger\n2. 'To Kill a Mockingbird' by Harper Lee\n3. '1984' by George Orwell"
       , pinned = False
       , labels = []
@@ -705,14 +711,18 @@ note data =
                 [ Filled.close 32 Inherit |> Svg.Styled.fromUnstyled ]
             ]
         , div []
-            [ div
-                [ css
-                    [ publicSans
-                    , borderBottom3 (px 1) solid (rgb 0 0 0)
-                    , padding (px 10)
+            [ if String.length data.title == 0 then
+                div [] []
+
+              else
+                div
+                    [ css
+                        [ publicSans
+                        , borderBottom3 (px 1) solid (rgb 0 0 0)
+                        , padding (px 10)
+                        ]
                     ]
-                ]
-                [ text data.title ]
+                    [ text data.title ]
             , p [ css [ publicSans, padding (px 10) ] ]
                 (let
                     -- NOTE: \n doesn't break into a newline so I do this
