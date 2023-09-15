@@ -219,6 +219,7 @@ type Msg
     | SearchLabelsQueryChange String
     | AddLabelToNewNote String
     | RemoveLabelFromNewNote String
+    | RemoveNoteLabel ( UID, String )
 
 
 
@@ -262,6 +263,21 @@ main =
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
+        RemoveNoteLabel ( id, label ) ->
+            { model
+                | notes =
+                    List.map
+                        (\n ->
+                            if n.id == id then
+                                { n | labels = List.filter (\l -> l /= label) n.labels }
+
+                            else
+                                n
+                        )
+                        model.notes
+            }
+                |> pure
+
         NewNoteIsListChange v ->
             { model
                 | isNewNoteAList = v
@@ -792,6 +808,7 @@ note data =
                                             , color (hex "fff")
                                             ]
                                         , type_ "button"
+                                        , onClick (RemoveNoteLabel ( data.id, l ))
                                         ]
                                         [ text "X" ]
                                     ]
