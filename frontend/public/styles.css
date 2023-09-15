@@ -1,0 +1,6 @@
+.note-label-remove-button {
+  display: none;
+}
+.note-label:hover .note-label-remove-button {
+  display: block;
+}

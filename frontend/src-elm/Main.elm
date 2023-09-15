@@ -5,7 +5,7 @@ import Cmd.Extra exposing (pure)
 import Css exposing (..)
 import Either exposing (Either(..))
 import Html.Styled exposing (Html, br, button, div, form, input, label, nav, p, text, textarea)
-import Html.Styled.Attributes exposing (css, disabled, id, placeholder, style, type_, value)
+import Html.Styled.Attributes exposing (class, css, disabled, id, placeholder, style, type_, value)
 import Html.Styled.Events exposing (onClick, onInput, onSubmit)
 import Material.Icons as Filled
 import Material.Icons.Outlined as Outlined
@@ -29,7 +29,13 @@ dummyNotes =
       , title = "Travel Packing List"
       , content = Left "Clothing:\n- T-shirts\n- Jeans\n- Sweater\n\nToiletries:\n- Toothbrush\n- Shampoo\n- Razor\n\nElectronics:\n- Laptop\n- Charger\n- Headphones"
       , pinned = False
-      , labels = []
+      , labels =
+            [ "Fitness"
+            , "Study"
+            , "Family"
+            , "Friends"
+            , "Groceries"
+            ]
       }
     , { id = "3"
       , title = "Reading List"
@@ -41,7 +47,7 @@ dummyNotes =
       , title = "Fitness Goals"
       , content = Left "Weekly Workout Plan:\n- Monday: Cardio (30 minutes)\n- Wednesday: Strength training\n- Friday: Yoga (45 minutes)"
       , pinned = False
-      , labels = []
+      , labels = [ "Home" ]
       }
     , { id = "5"
       , title = "Recipe - Chicken Stir-Fry"
@@ -53,7 +59,7 @@ dummyNotes =
       , title = "Tech Conference Notes"
       , content = Left "Keynote Speaker: John Smith\n- Discussed latest trends in AI\n- Highlighted the importance of data privacy"
       , pinned = False
-      , labels = []
+      , labels = [ "Home", "Goals" ]
       }
     , { id = "7"
       , title = "Meeting Notes"
@@ -77,13 +83,20 @@ dummyNotes =
       , title = "Trip Itinerary"
       , content = Left "Day 1: Explore the city\nDay 2: Visit museums and art galleries\nDay 3: Hike in the mountains\nDay 4: Relax at the beach"
       , pinned = False
-      , labels = []
+      , labels =
+            [ "Calls"
+            , "Books"
+            ]
       }
     , { id = "012"
       , title = "Recipe - Spaghetti Bolognese"
       , content = Left "Ingredients:\n- Ground beef\n- Onion\n- Garlic\n- Tomatoes\n- Pasta\n\nInstructions:..."
       , pinned = False
-      , labels = []
+      , labels =
+            [ "Urgent"
+            , "Important"
+            , "Fitness"
+            ]
       }
     ]
 
@@ -219,9 +232,7 @@ init flags =
     ( { seeds = seeds
       , notes = dummyNotes
       , isNewNoteAList = False
-
-      -- TODO:  , isWritingANewNote = Nothing
-      , isWritingANewNote = dummyNewNote
+      , isWritingANewNote = Nothing
       , labels = dummyLabels
       }
     , Cmd.none
@@ -698,13 +709,13 @@ note data =
                 [ css
                     [ publicSans
                     , borderBottom3 (px 1) solid (rgb 0 0 0)
-                    , padding4 (px 10) (px 10) (px 10) (px 10)
+                    , padding (px 10)
                     ]
                 ]
                 [ text data.title ]
-            , p [ css [ publicSans, padding4 (px 10) (px 10) (px 10) (px 10) ] ]
+            , p [ css [ publicSans, padding (px 10) ] ]
                 (let
-                    -- \n don't break into a newline without this
+                    -- NOTE: \n doesn't break into a newline so I do this
                     makeParagraph : List (Html msg) -> List String -> List (Html msg)
                     makeParagraph total next =
                         case next of
@@ -734,6 +745,49 @@ note data =
                     Right l ->
                         [ text (String.join "\n" l) ]
                 )
+            , case data.labels of
+                [] ->
+                    div [] []
+
+                labels ->
+                    div
+                        [ css
+                            [ borderTop3 (px 1) solid (rgb 0 0 0)
+                            , padding (px 10)
+                            , displayFlex
+                            , flexWrap wrap
+                            , gap 5
+                            ]
+                        ]
+                        (List.map
+                            (\l ->
+                                div
+                                    [ css
+                                        [ backgroundColor (hex "#6ac0ff")
+                                        , padding (px 2)
+                                        , border3 (px 1) solid (rgb 0 0 0)
+                                        , hover [ boxShadow4 (px 3) (px 3) (px 0) (rgb 0 0 0) ]
+                                        , displayFlex
+                                        ]
+                                    , class "note-label"
+                                    ]
+                                    [ text l
+                                    , button
+                                        [ class "note-label-remove-button"
+                                        , css
+                                            [ border3 (px 1) solid (rgb 0 0 0)
+                                            , padding2 (px 0) (px 2)
+                                            , marginLeft (px 3)
+                                            , backgroundColor (hex "ff0000")
+                                            , color (hex "fff")
+                                            ]
+                                        , type_ "button"
+                                        ]
+                                        [ text "X" ]
+                                    ]
+                            )
+                            labels
+                        )
             ]
         ]
 
