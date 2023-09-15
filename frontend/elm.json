@@ -15,7 +15,8 @@
             "elm/svg": "1.0.1",
             "elm-community/random-extra": "3.2.0",
             "icidasset/elm-material-icons": "11.0.0",
-            "rtfeldman/elm-css": "18.0.0"
+            "rtfeldman/elm-css": "18.0.0",
+            "toastal/either": "3.6.3"
         },
         "indirect": {
             "elm/json": "1.1.3",

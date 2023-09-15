@@ -3,8 +3,9 @@ port module Main exposing (..)
 import Browser
 import Cmd.Extra exposing (pure)
 import Css exposing (..)
+import Either exposing (Either(..))
 import Html.Styled exposing (Html, br, button, div, form, input, label, nav, p, text, textarea)
-import Html.Styled.Attributes exposing (css, id, placeholder, style, type_, value)
+import Html.Styled.Attributes exposing (css, disabled, id, placeholder, style, type_, value)
 import Html.Styled.Events exposing (onClick, onInput, onSubmit)
 import Material.Icons as Filled
 import Material.Icons.Outlined as Outlined
@@ -20,58 +21,69 @@ dummyNotes : List Note
 dummyNotes =
     [ { id = "1"
       , title = "Project Kickoff Meeting"
-      , content = LeftType "Agenda:\n- Introductions\n- Project goals and objectives\n- Team roles and responsibilities\n- Timeline and milestones"
+      , content = Left "Agenda:\n- Introductions\n- Project goals and objectives\n- Team roles and responsibilities\n- Timeline and milestones"
       , pinned = False
+      , labels = []
       }
     , { id = "2"
       , title = "Travel Packing List"
-      , content = LeftType "Clothing:\n- T-shirts\n- Jeans\n- Sweater\n\nToiletries:\n- Toothbrush\n- Shampoo\n- Razor\n\nElectronics:\n- Laptop\n- Charger\n- Headphones"
+      , content = Left "Clothing:\n- T-shirts\n- Jeans\n- Sweater\n\nToiletries:\n- Toothbrush\n- Shampoo\n- Razor\n\nElectronics:\n- Laptop\n- Charger\n- Headphones"
       , pinned = False
+      , labels = []
       }
     , { id = "3"
       , title = "Reading List"
-      , content = LeftType "Books to Read:\n1. 'The Great Gatsby' by F. Scott Fitzgerald\n2. 'The Hobbit' by J.R.R. Tolkien\n3. 'The Alchemist' by Paulo Coelho"
+      , content = Left "Books to Read:\n1. 'The Great Gatsby' by F. Scott Fitzgerald\n2. 'The Hobbit' by J.R.R. Tolkien\n3. 'The Alchemist' by Paulo Coelho"
       , pinned = False
+      , labels = []
       }
     , { id = "4"
       , title = "Fitness Goals"
-      , content = LeftType "Weekly Workout Plan:\n- Monday: Cardio (30 minutes)\n- Wednesday: Strength training\n- Friday: Yoga (45 minutes)"
+      , content = Left "Weekly Workout Plan:\n- Monday: Cardio (30 minutes)\n- Wednesday: Strength training\n- Friday: Yoga (45 minutes)"
       , pinned = False
+      , labels = []
       }
     , { id = "5"
       , title = "Recipe - Chicken Stir-Fry"
-      , content = LeftType "Ingredients:\n- Chicken breast\n- Bell peppers\n- Broccoli\n- Soy sauce\n- Rice\n\nInstructions:..."
+      , content = Left "Ingredients:\n- Chicken breast\n- Bell peppers\n- Broccoli\n- Soy sauce\n- Rice\n\nInstructions:..."
       , pinned = False
+      , labels = []
       }
     , { id = "6"
       , title = "Tech Conference Notes"
-      , content = LeftType "Keynote Speaker: John Smith\n- Discussed latest trends in AI\n- Highlighted the importance of data privacy"
+      , content = Left "Keynote Speaker: John Smith\n- Discussed latest trends in AI\n- Highlighted the importance of data privacy"
       , pinned = False
+      , labels = []
       }
     , { id = "7"
       , title = "Meeting Notes"
-      , content = LeftType "Discussed project milestones and assigned tasks to team members."
+      , content = Left "Discussed project milestones and assigned tasks to team members."
       , pinned = False
+      , labels = []
       }
     , { id = "8"
       , title = "Grocery List"
-      , content = LeftType "Milk, eggs, bread, and fruits."
+      , content = Left "Milk, eggs, bread, and fruits."
       , pinned = False
+      , labels = []
       }
     , { id = "9"
       , title = "Book Recommendations"
-      , content = LeftType "1. 'The Catcher in the Rye' by J.D. Salinger\n2. 'To Kill a Mockingbird' by Harper Lee\n3. '1984' by George Orwell"
+      , content = Left "1. 'The Catcher in the Rye' by J.D. Salinger\n2. 'To Kill a Mockingbird' by Harper Lee\n3. '1984' by George Orwell"
       , pinned = False
+      , labels = []
       }
     , { id = "0"
       , title = "Trip Itinerary"
-      , content = LeftType "Day 1: Explore the city\nDay 2: Visit museums and art galleries\nDay 3: Hike in the mountains\nDay 4: Relax at the beach"
+      , content = Left "Day 1: Explore the city\nDay 2: Visit museums and art galleries\nDay 3: Hike in the mountains\nDay 4: Relax at the beach"
       , pinned = False
+      , labels = []
       }
     , { id = "012"
       , title = "Recipe - Spaghetti Bolognese"
-      , content = LeftType "Ingredients:\n- Ground beef\n- Onion\n- Garlic\n- Tomatoes\n- Pasta\n\nInstructions:..."
+      , content = Left "Ingredients:\n- Ground beef\n- Onion\n- Garlic\n- Tomatoes\n- Pasta\n\nInstructions:..."
       , pinned = False
+      , labels = []
       }
     ]
 
@@ -127,8 +139,8 @@ subscriptions _ =
 dummyNewNote : Maybe NewNoteData
 dummyNewNote =
     Just
-        { title = "My title"
-        , content = LeftType "note"
+        { title = ""
+        , content = Left ""
         , labels = Nothing
         }
 
@@ -141,26 +153,19 @@ type alias UID =
     String
 
 
-type Either a b
-    = LeftType a
-    | RightType b
-
-
 type alias Note =
     { id : UID
     , title : String
     , content : Either String (List String)
     , pinned : Bool
+    , labels : List String
     }
 
 
 type alias Model =
     { seeds : List Random.Seed
     , notes : List Note
-    , newTitle : String
-    , newContent : Either String (List String)
     , isNewNoteAList : Bool
-    , isAwaitingRandomValues : Bool
     , isWritingANewNote : Maybe NewNoteData
     , labels : List String
     }
@@ -182,9 +187,8 @@ type alias NewNoteData =
 
 
 type Msg
-    = NoOp
-    | NewTitleChange String
-    | NewContentChange String
+    = NewTitleChange String
+    | NewNotePlainTextContentChange String
     | NewNoteIsListChange Bool
     | AddNote
     | ReceivedRandomValues (List Int)
@@ -214,10 +218,7 @@ init flags =
     in
     ( { seeds = seeds
       , notes = dummyNotes
-      , newTitle = ""
-      , newContent = LeftType ""
       , isNewNoteAList = False
-      , isAwaitingRandomValues = False
 
       -- TODO:  , isWritingANewNote = Nothing
       , isWritingANewNote = dummyNewNote
@@ -244,31 +245,18 @@ main =
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
-        NoOp ->
-            model |> pure
-
-        NewTitleChange s ->
-            { model | newTitle = s }
-                |> pure
-
-        NewContentChange s ->
-            { model | newContent = LeftType s }
-                |> pure
-
         NewNoteIsListChange v ->
             { model
                 | isNewNoteAList = v
 
-                -- , newContent = RightType (String.split "\n" model.newContent)
+                -- , newContent = Right (String.split "\n" model.newContent)
             }
                 |> pure
 
         AddNote ->
             -- TODO: check if note is empty
             -- TODO: no iAwaitingRandomValues, instead a compact type
-            ( { model
-                | isAwaitingRandomValues = True
-              }
+            ( model
             , requestRandomValues ()
             )
 
@@ -296,27 +284,6 @@ update msg model =
 
         ReceivedRandomValues values ->
             { model | seeds = List.map Random.initialSeed values }
-                |> (\m ->
-                        if model.isAwaitingRandomValues then
-                            { m
-                                | isAwaitingRandomValues = False
-                                , newTitle = ""
-                                , newContent = LeftType ""
-                                , isNewNoteAList = False
-                                , notes =
-                                    { id =
-                                        generateUID m.seeds
-                                            |> Tuple.first
-                                    , title = m.newTitle
-                                    , content = m.newContent
-                                    , pinned = False
-                                    }
-                                        :: m.notes
-                            }
-
-                        else
-                            m
-                   )
                 |> pure
 
         BeginWritingNewNote ->
@@ -324,9 +291,33 @@ update msg model =
                 | isWritingANewNote =
                     Just
                         { title = ""
-                        , content = LeftType ""
+                        , content = Left ""
                         , labels = Nothing
                         }
+            }
+                |> pure
+
+        NewTitleChange s ->
+            { model
+                | isWritingANewNote =
+                    Maybe.map
+                        (\data ->
+                            { data
+                                | title = s
+                            }
+                        )
+                        model.isWritingANewNote
+            }
+                |> pure
+
+        NewNotePlainTextContentChange s ->
+            { model
+                | isWritingANewNote =
+                    Maybe.map
+                        (\data ->
+                            { data | content = Either.mapLeft (always s) data.content }
+                        )
+                        model.isWritingANewNote
             }
                 |> pure
 
@@ -391,32 +382,42 @@ update msg model =
                 |> pure
 
         FinishWritingNewNote ->
-            ( case model.newContent of
-                LeftType content ->
-                    if not <| String.isEmpty content then
-                        { model
+            case model.isWritingANewNote of
+                Nothing ->
+                    model |> pure
+
+                Just newNoteData ->
+                    if
+                        case newNoteData.content of
+                            Left s ->
+                                String.length s == 0
+
+                            Right l ->
+                                List.all (\s -> String.length s == 0) l
+                    then
+                        model |> pure
+
+                    else
+                        ( { model
                             | isWritingANewNote = Nothing
                             , notes =
                                 model.notes
                                     ++ [ { id = generateUID model.seeds |> Tuple.first
-                                         , title = model.newTitle
-                                         , content = model.newContent
+                                         , title = newNoteData.title
+                                         , content = newNoteData.content
                                          , pinned = False
+                                         , labels =
+                                            case newNoteData.labels of
+                                                Just { labels } ->
+                                                    labels
+
+                                                Nothing ->
+                                                    []
                                          }
                                        ]
-                        }
-
-                    else
-                        model
-
-                RightType content ->
-                    if List.length content == 0 then
-                        model
-
-                    else
-                        model
-            , requestRandomValues ()
-            )
+                          }
+                        , requestRandomValues ()
+                        )
 
         BeginAddingNewNoteLabels ->
             case model.isWritingANewNote of
@@ -523,24 +524,31 @@ view model =
                                         ]
                                     , placeholder "Grocery List"
                                     , onInput NewTitleChange
+                                    , value data.title
                                     ]
                                     []
-                                , textarea
-                                    [ css
-                                        [ backgroundColor (rgb 255 203 127)
-                                        , border (px 0)
-                                        , publicSans
-                                        , padding (px 8)
-                                        , fontSize (px 16)
-                                        , margin2 (px 0) auto
-                                        , fullWidth
-                                        , minWidth (px 494)
-                                        , minHeight (px 150)
-                                        ]
-                                    , placeholder "Milk, eggs, bread, and fruits."
-                                    , onInput NewContentChange
-                                    ]
-                                    []
+                                , case data.content of
+                                    Left content ->
+                                        textarea
+                                            [ css
+                                                [ backgroundColor (rgb 255 203 127)
+                                                , border (px 0)
+                                                , publicSans
+                                                , padding (px 8)
+                                                , fontSize (px 16)
+                                                , margin2 (px 0) auto
+                                                , fullWidth
+                                                , minWidth (px 494)
+                                                , minHeight (px 150)
+                                                ]
+                                            , placeholder "Milk, eggs, bread, and fruits."
+                                            , onInput NewNotePlainTextContentChange
+                                            , value content
+                                            ]
+                                            []
+
+                                    Right _ ->
+                                        div [] [ text "TODO" ]
                                 , case data.labels of
                                     Just { labels, labelsSearchQuery } ->
                                         div [ css [ marginTop (px 8) ] ]
@@ -554,6 +562,7 @@ view model =
                                                         button
                                                             [ css [ margin (px 5), padding2 (px 5) (px 10) ]
                                                             , onClick (AddLabelToNewNote l)
+                                                            , type_ "button"
                                                             ]
                                                             [ text l ]
                                                     )
@@ -571,6 +580,7 @@ view model =
                                                             [ css
                                                                 [ margin (px 5), padding2 (px 5) (px 10) ]
                                                             , onClick (RemoveLabelFromNewNote l)
+                                                            , type_ "button"
                                                             ]
                                                             [ text l ]
                                                     )
@@ -584,6 +594,7 @@ view model =
                                                 [ -- TODO: style
                                                   css [ padding (px 15) ]
                                                 , onClick BeginAddingNewNoteLabels
+                                                , type_ "button"
                                                 ]
                                                 [ text "Add label" ]
                                             ]
@@ -592,6 +603,15 @@ view model =
                                         [ padding (px 15)
                                         , fontSize (px 16)
                                         ]
+                                    , type_ "submit"
+                                    , Html.Styled.Attributes.disabled
+                                        (case data.content of
+                                            Left s ->
+                                                String.length s == 0
+
+                                            Right l ->
+                                                List.all (\s -> String.length s == 0) l
+                                        )
                                     ]
                                     [ text "Create note" ]
                                 ]
@@ -695,7 +715,7 @@ note data =
                                 makeParagraph (total ++ [ br [] [], text x ]) xs
                  in
                  case data.content of
-                    LeftType s ->
+                    Left s ->
                         s
                             |> String.split "\n"
                             |> (\r ->
@@ -711,7 +731,7 @@ note data =
                                                 [ text h ]
                                )
 
-                    RightType l ->
+                    Right l ->
                         [ text (String.join "\n" l) ]
                 )
             ]
