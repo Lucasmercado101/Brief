@@ -1,6 +1,7 @@
 import { Elysia, t } from "elysia";
-import { PrismaClient } from "@prisma/client";
+import { Prisma, PrismaClient } from "@prisma/client";
 import { logger } from "./logger";
+import PrismaError from "./prismaErrorCodes";
 
 const prisma = new PrismaClient();
 
@@ -12,16 +13,36 @@ new Elysia({
     sign: ["user"]
   }
 })
+  .onError(({ error, set }) => {
+    // TODO: better
+    console.log("ERROR\n");
+    console.log(error);
+    console.log("\nERROR END");
+    set.status = 500;
+    return "An unexpected error has occurred.";
+  })
   .use(logger())
   .post(
     "/register",
-    async () => {
-      return await prisma.user.create({
-        data: {
-          email: "test@gmail.com",
-          password: Bun.password.hashSync("test")
+    async ({ set }) => {
+      let user;
+      try {
+        await prisma.user.create({
+          data: {
+            email: "test@gmail.com",
+            password: Bun.password.hashSync("test")
+          }
+        });
+      } catch (e) {
+        if (e instanceof Prisma.PrismaClientKnownRequestError) {
+          // "There is a unique constraint violation, a new user cannot be created with this email"
+          if (e.code === PrismaError.P2002) {
+            set.status = 409;
+            return "A User with that email already exists.";
+          }
         }
-      });
+        throw e;
+      }
     },
     {
       body: t.Object({
@@ -34,7 +55,6 @@ new Elysia({
     user.value = { something: "abcasd" };
     return "logged in";
   })
-  .get("/", () => "Hello Elysia")
   .listen(PORT, (server) => {
     console.log(`🦊 Elysia is running at ${server?.hostname}:${server?.port} `);
   });
