@@ -14,13 +14,12 @@ const prisma = new PrismaClient();
 
 const PORT = process.env.PORT || 4000;
 
-const cookieSessionDTO = t.Object({
-  userID: t.Number()
-});
+//NOTE: t.Number() === userID in this case:
+const cookieSessionDTO = t.Number();
 
 const cookieSecret = {
   secrets: process.env.COOKIE_SECRETS || "Fischl von Luftschloss Narfidort",
-  sign: ["profile"]
+  sign: ["session"]
 };
 
 const requiredCookieSession = t.Cookie(
@@ -114,7 +113,7 @@ new Elysia()
         return "User or password is incorrect";
       }
 
-      session.value = { userID: userExists.id };
+      session.value = userExists.id;
       session.maxAge = COOKIE_MAX_AGE;
 
       return "Logged in";
@@ -137,7 +136,7 @@ new Elysia()
     async ({ body, cookie: { session } }) => {
       return await prisma.note.create({
         data: {
-          userId: session.value.userID,
+          userId: session.value,
           title: body.title,
           content: body.content
         }
@@ -160,7 +159,7 @@ new Elysia()
     async ({ body, cookie: { session } }) => {
       return await prisma.note.createMany({
         data: body.map((data) => ({
-          userId: session.value.userID,
+          userId: session.value,
           title: data.title,
           content: data.content
         }))
@@ -183,7 +182,7 @@ new Elysia()
     async ({ cookie: { session } }) => {
       return await prisma.note.findMany({
         where: {
-          userId: session.value.userID
+          userId: session.value
         }
       });
     },
@@ -196,7 +195,7 @@ new Elysia()
     async ({ body, set, cookie: { session } }) => {
       if (body.noteID) {
         const note = await prisma.note.findUnique({
-          where: { id: body.noteID, userId: session.value.userID }
+          where: { id: body.noteID, userId: session.value }
         });
         if (!note) {
           set.status = 404;
@@ -209,7 +208,7 @@ new Elysia()
           data: {
             name: body.name,
             noteId: body.noteID,
-            ownerId: session.value.userID
+            ownerId: session.value
           }
         });
       } catch (e) {
@@ -235,7 +234,7 @@ new Elysia()
     "/labels",
     ({ cookie: { session } }) =>
       prisma.label.findMany({
-        where: { ownerId: session.value.userID }
+        where: { ownerId: session.value }
       }),
     { cookie: requiredCookieSession }
   )
@@ -243,7 +242,7 @@ new Elysia()
     "/label/:id",
     async ({ params: { id }, set, cookie: { session } }) => {
       const label = await prisma.label.findFirst({
-        where: { id: id, ownerId: session.value.userID }
+        where: { id: id, ownerId: session.value }
       });
 
       if (!label) {
