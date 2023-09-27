@@ -8,10 +8,10 @@ const prisma = new PrismaClient();
 const PORT = process.env.PORT || 4000;
 
 new Elysia({
-  cookie: {
-    secrets: process.env.COOKIE_SECRETS || "Fischl von Luftschloss Narfidort",
-    sign: ["user"]
-  }
+  // cookie: {
+  //   secrets: process.env.COOKIE_SECRETS || "Fischl von Luftschloss Narfidort",
+  //   sign: ["session"]
+  // }
 })
   .onError(({ error, set, code }) => {
     switch (code) {
@@ -21,8 +21,10 @@ new Elysia({
       case "NOT_FOUND":
         set.status = 404;
         return "Endpoint not found.";
-      case "PARSE":
       case "INVALID_COOKIE_SIGNATURE":
+        set.status = 401;
+        return error.message;
+      case "PARSE":
       case "UNKNOWN":
         // TODO: better
         console.log("ERROR\n");
@@ -66,10 +68,39 @@ new Elysia({
       })
     }
   )
-  .post("/login", async ({ cookie: { user } }) => {
-    user.value = { something: "abcasd" };
-    return "logged in";
-  })
+  .post(
+    "/login",
+    async ({ set, cookie: { session }, body }) => {
+      const userExists = await prisma.user.findUnique({
+        where: {
+          email: body.email
+        }
+      });
+
+      if (!userExists) {
+        set.status = 404;
+        return "User or password is incorrect";
+      }
+
+      const passwordCorrect = await Bun.password.verify(
+        body.password,
+        userExists.password
+      );
+
+      if (!passwordCorrect) {
+        set.status = 404;
+        return "User or password is incorrect";
+      }
+      // session.value = { now: Date.now() };
+      return "Logged in";
+    },
+    {
+      body: t.Object({
+        email: t.String(),
+        password: t.String()
+      })
+    }
+  )
   .listen(PORT, (server) => {
     console.log(`🦊 Elysia is running at ${server?.hostname}:${server?.port} `);
   });
