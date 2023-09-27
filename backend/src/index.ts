@@ -13,13 +13,27 @@ new Elysia({
     sign: ["user"]
   }
 })
-  .onError(({ error, set }) => {
-    // TODO: better
-    console.log("ERROR\n");
-    console.log(error);
-    console.log("\nERROR END");
-    set.status = 500;
-    return "An unexpected error has occurred.";
+  .onError(({ error, set, code }) => {
+    switch (code) {
+      case "VALIDATION":
+        set.status = 400;
+        return error.message;
+      case "NOT_FOUND":
+        set.status = 404;
+        return "Endpoint not found.";
+      case "PARSE":
+      case "INVALID_COOKIE_SIGNATURE":
+      case "UNKNOWN":
+        // TODO: better
+        console.log("ERROR\n");
+        console.log(error);
+        console.log("\nERROR END");
+        set.status = 500;
+        return error.message;
+      case "INTERNAL_SERVER_ERROR":
+        set.status = 500;
+        return "An unexpected error has occurred.";
+    }
   })
   .use(logger())
   .post(
@@ -46,7 +60,7 @@ new Elysia({
     },
     {
       body: t.Object({
-        email: t.String({ format: "email" }),
+        email: t.String(),
         password: t.String()
       })
     }
