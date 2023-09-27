@@ -155,7 +155,8 @@ new Elysia()
           title: t.Optional(t.String()),
           content: t.String(),
           labels: t.Optional(t.Array(t.String()))
-        })
+        }),
+        { minItems: 1 }
       ),
       cookie: requiredCookieSession
     }
