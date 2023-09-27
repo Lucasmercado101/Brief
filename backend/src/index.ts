@@ -8,13 +8,20 @@ const prisma = new PrismaClient();
 const PORT = process.env.PORT || 4000;
 
 const cookieSessionDTO = t.Object({
-  userID: t.String()
+  userID: t.Number()
 });
 
 const cookieSecret = {
   secrets: process.env.COOKIE_SECRETS || "Fischl von Luftschloss Narfidort",
   sign: ["profile"]
 };
+
+const requiredCookieSession = t.Cookie(
+  {
+    session: cookieSessionDTO
+  },
+  cookieSecret
+);
 
 new Elysia()
   .onError(({ error, set, code }) => {
@@ -95,7 +102,7 @@ new Elysia()
         set.status = 404;
         return "User or password is incorrect";
       }
-      session.value = { userID: "a" };
+      session.value = { userID: userExists.id };
       return "Logged in";
     },
     {
@@ -113,10 +120,10 @@ new Elysia()
   )
   .post(
     "/note",
-    async ({ body }) => {
-      prisma.note.create({
+    async ({ body, cookie: { session } }) => {
+      return await prisma.note.create({
         data: {
-          userId: 1,
+          userId: session.value.userID,
           title: body.title,
           content: body.content
         }
@@ -127,7 +134,21 @@ new Elysia()
         title: t.Optional(t.String()),
         content: t.String(),
         labels: t.Optional(t.Array(t.String()))
-      })
+      }),
+      cookie: requiredCookieSession
+    }
+  )
+  .get(
+    "/notes",
+    async ({ cookie: { session } }) => {
+      return await prisma.note.findMany({
+        where: {
+          userId: session.value.userID
+        }
+      });
+    },
+    {
+      cookie: requiredCookieSession
     }
   )
   .listen(PORT, (server) => {
