@@ -38,6 +38,10 @@ new Elysia()
       // TODO: better
       case "PARSE":
       case "UNKNOWN":
+        if (error.message.includes("JSON Parse error")) {
+          set.status = 400;
+          return "Invalid JSON.";
+        }
       case "INTERNAL_SERVER_ERROR":
       default:
         console.log("ERROR\n");
@@ -171,6 +175,75 @@ new Elysia()
       });
     },
     {
+      cookie: requiredCookieSession
+    }
+  )
+  .post(
+    "/label",
+    async ({ body, set, cookie: { session } }) => {
+      if (body.noteID) {
+        const note = await prisma.note.findUnique({
+          where: { id: body.noteID, userId: session.value.userID }
+        });
+        if (!note) {
+          set.status = 404;
+          return "Note not found";
+        }
+      }
+
+      try {
+        return await prisma.label.create({
+          data: {
+            name: body.name,
+            noteId: body.noteID,
+            ownerId: session.value.userID
+          }
+        });
+      } catch (e) {
+        if (e instanceof Prisma.PrismaClientKnownRequestError) {
+          // "Unique constraint failed on the fields: (`name`,`ownerId`)"
+          if (e.code === PrismaError.P2002) {
+            set.status = 409;
+            return "A label with that name already exists.";
+          }
+        }
+        throw e;
+      }
+    },
+    {
+      body: t.Object({
+        name: t.String(),
+        noteID: t.Optional(t.Number())
+      }),
+      cookie: requiredCookieSession
+    }
+  )
+  .get(
+    "/labels",
+    ({ cookie: { session } }) =>
+      prisma.label.findMany({
+        where: { ownerId: session.value.userID }
+      }),
+    { cookie: requiredCookieSession }
+  )
+  .get(
+    "/label/:id",
+    async ({ params: { id }, set, cookie: { session } }) => {
+      const label = await prisma.label.findFirst({
+        where: { id: id, ownerId: session.value.userID }
+      });
+
+      if (!label) {
+        set.status = 404;
+        return "Label not found";
+      }
+
+      return label;
+    },
+    {
+      params: t.Object({
+        id: t.Numeric()
+      }),
       cookie: requiredCookieSession
     }
   )
