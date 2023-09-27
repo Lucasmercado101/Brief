@@ -38,15 +38,16 @@ new Elysia({
   .use(logger())
   .post(
     "/register",
-    async ({ set }) => {
-      let user;
+    async ({ set, body }) => {
       try {
+        const passwordHashed = await Bun.password.hash(body.password);
         await prisma.user.create({
           data: {
-            email: "test@gmail.com",
-            password: Bun.password.hashSync("test")
+            email: body.email,
+            password: passwordHashed
           }
         });
+        return "User created";
       } catch (e) {
         if (e instanceof Prisma.PrismaClientKnownRequestError) {
           // "There is a unique constraint violation, a new user cannot be created with this email"
