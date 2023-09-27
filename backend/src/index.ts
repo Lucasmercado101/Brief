@@ -35,15 +35,15 @@ new Elysia()
       case "INVALID_COOKIE_SIGNATURE":
         set.status = 401;
         return error.message;
+      // TODO: better
       case "PARSE":
       case "UNKNOWN":
-        // TODO: better
+      case "INTERNAL_SERVER_ERROR":
+      default:
         console.log("ERROR\n");
+        console.log("CODE:", code);
         console.log(error);
         console.log("\nERROR END");
-        set.status = 500;
-        return error.message;
-      case "INTERNAL_SERVER_ERROR":
         set.status = 500;
         return "An unexpected error has occurred.";
     }
@@ -135,6 +135,28 @@ new Elysia()
         content: t.String(),
         labels: t.Optional(t.Array(t.String()))
       }),
+      cookie: requiredCookieSession
+    }
+  )
+  .post(
+    "/notes",
+    async ({ body, cookie: { session } }) => {
+      return await prisma.note.createMany({
+        data: body.map((data) => ({
+          userId: session.value.userID,
+          title: data.title,
+          content: data.content
+        }))
+      });
+    },
+    {
+      body: t.Array(
+        t.Object({
+          title: t.Optional(t.String()),
+          content: t.String(),
+          labels: t.Optional(t.Array(t.String()))
+        })
+      ),
       cookie: requiredCookieSession
     }
   )
