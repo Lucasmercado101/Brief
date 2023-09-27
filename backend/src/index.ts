@@ -3,6 +3,13 @@ import { Prisma, PrismaClient } from "@prisma/client";
 import { logger } from "./logger";
 import PrismaError from "./prismaErrorCodes";
 
+// in seconds
+const MINUTE = 60;
+const HOUR = MINUTE * 60;
+const DAY = HOUR * 24;
+
+const COOKIE_MAX_AGE = DAY * 14;
+
 const prisma = new PrismaClient();
 
 const PORT = process.env.PORT || 4000;
@@ -106,7 +113,10 @@ new Elysia()
         set.status = 404;
         return "User or password is incorrect";
       }
+
       session.value = { userID: userExists.id };
+      session.maxAge = COOKIE_MAX_AGE;
+
       return "Logged in";
     },
     {
@@ -134,6 +144,9 @@ new Elysia()
       });
     },
     {
+      beforeHandle({ cookie: { session } }) {
+        session.maxAge = COOKIE_MAX_AGE;
+      },
       body: t.Object({
         title: t.Optional(t.String()),
         content: t.String(),
