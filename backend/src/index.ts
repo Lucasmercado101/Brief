@@ -11,6 +11,11 @@ const cookieSessionDTO = t.Object({
   userID: t.String()
 });
 
+const cookieSecret = {
+  secrets: process.env.COOKIE_SECRETS || "Fischl von Luftschloss Narfidort",
+  sign: ["profile"]
+};
+
 new Elysia()
   .onError(({ error, set, code }) => {
     switch (code) {
@@ -100,13 +105,9 @@ new Elysia()
       }),
       cookie: t.Cookie(
         {
-          profile: t.Optional(cookieSessionDTO)
+          session: t.Optional(cookieSessionDTO)
         },
-        {
-          secrets:
-            process.env.COOKIE_SECRETS || "Fischl von Luftschloss Narfidort",
-          sign: ["profile"]
-        }
+        cookieSecret
       )
     }
   )
