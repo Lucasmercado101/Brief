@@ -7,12 +7,11 @@ const prisma = new PrismaClient();
 
 const PORT = process.env.PORT || 4000;
 
-new Elysia({
-  // cookie: {
-  //   secrets: process.env.COOKIE_SECRETS || "Fischl von Luftschloss Narfidort",
-  //   sign: ["session"]
-  // }
-})
+const cookieSessionDTO = t.Object({
+  userID: t.String()
+});
+
+new Elysia()
   .onError(({ error, set, code }) => {
     switch (code) {
       case "VALIDATION":
@@ -91,13 +90,42 @@ new Elysia({
         set.status = 404;
         return "User or password is incorrect";
       }
-      // session.value = { now: Date.now() };
+      session.value = { userID: "a" };
       return "Logged in";
     },
     {
       body: t.Object({
         email: t.String(),
         password: t.String()
+      }),
+      cookie: t.Cookie(
+        {
+          profile: t.Optional(cookieSessionDTO)
+        },
+        {
+          secrets:
+            process.env.COOKIE_SECRETS || "Fischl von Luftschloss Narfidort",
+          sign: ["profile"]
+        }
+      )
+    }
+  )
+  .post(
+    "/note",
+    async ({ body }) => {
+      prisma.note.create({
+        data: {
+          userId: 1,
+          title: body.title,
+          content: body.content
+        }
+      });
+    },
+    {
+      body: t.Object({
+        title: t.Optional(t.String()),
+        content: t.String(),
+        labels: t.Optional(t.Array(t.String()))
       })
     }
   )
