@@ -30,6 +30,30 @@ const requiredCookieSession = t.Cookie(
 );
 
 new Elysia()
+  .use(logger())
+  // NOTE: CORS -----------
+  // TODO: currently allows any origin
+  .options("/*", ({ set, request }) => {
+    const origin = request.headers.get("Origin") ?? "";
+    set.headers["Vary"] = origin;
+    set.headers["Access-Control-Allow-Origin"] = origin;
+    set.headers["Access-Control-Allow-Credentials"] = "true";
+    set.headers["Access-Control-Allow-Headers"] = "content-type";
+    set.headers["Access-Control-Allow-Method"] = "POST";
+    // default max age
+    set.headers["Access-Control-Max-Age"] = "5";
+    set.status = 204;
+  })
+  .onRequest(({ set, request }) => {
+    const origin = request.headers.get("Origin") ?? "";
+    set.headers["Access-Control-Allow-Origin"] = origin;
+    set.headers["Access-Control-Allow-Credentials"] = "true";
+    set.headers["Access-Control-Allow-Headers"] = "content-type";
+    set.headers["Access-Control-Allow-Method"] = "POST";
+    // default max age
+    set.headers["Access-Control-Max-Age"] = "5";
+  })
+  // NOTE: CORS END -------
   .onError(({ error, set, code }) => {
     switch (code) {
       case "VALIDATION":
@@ -58,7 +82,6 @@ new Elysia()
         return "An unexpected error has occurred.";
     }
   })
-  .use(logger())
   .post(
     "/register",
     async ({ set, body }) => {
@@ -115,6 +138,8 @@ new Elysia()
 
       session.value = userExists.id;
       session.maxAge = COOKIE_MAX_AGE;
+      session.sameSite = "none";
+      session.secure = true;
 
       return "Logged in";
     },
