@@ -143,7 +143,7 @@ new Elysia()
       session.sameSite = "none";
       session.secure = true;
 
-      return "Logged in";
+      return userExists.id;
     },
     {
       body: t.Object({
