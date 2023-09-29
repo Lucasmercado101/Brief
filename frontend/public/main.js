@@ -7,7 +7,10 @@ const hasSessionCookie = document.cookie.match(
 );
 
 const app = Elm.Main.init({
-  flags: { seeds: Array.from(self.crypto.getRandomValues(new Uint32Array(4))) },
+  flags: {
+    seeds: Array.from(self.crypto.getRandomValues(new Uint32Array(4))),
+    hasSessionCookie: !!hasSessionCookie
+  },
   node: document.getElementById("root")
 });
 
