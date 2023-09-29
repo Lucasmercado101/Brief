@@ -210,6 +210,16 @@ new Elysia()
       return await prisma.note.findMany({
         where: {
           userId: session.value
+        },
+        include: {
+          labels: {
+            select: {
+              name: true,
+              id: true,
+              createdAt: true,
+              updatedAt: true
+            }
+          }
         }
       });
     },
