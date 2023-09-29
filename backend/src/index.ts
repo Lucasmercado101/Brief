@@ -112,6 +112,8 @@ new Elysia()
       })
     }
   )
+  // TODO: handle user having tampered cookie
+  // error when unsigning doesn't let me reassign and resign
   .post(
     "/login",
     async ({ set, cookie: { session }, body }) => {
