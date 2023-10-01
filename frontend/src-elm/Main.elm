@@ -20,125 +20,6 @@ import Random.String
 import Svg.Styled
 
 
-dummyNotes : List Note
-dummyNotes =
-    [ { id = "1"
-      , title = "Project Kickoff Meeting"
-      , content = "Agenda:\n- Introductions\n- Project goals and objectives\n- Team roles and responsibilities\n- Timeline and milestones"
-      , pinned = False
-      , labels = []
-      }
-    , { id = "011"
-      , title = ""
-      , content = "Don't forget to read this"
-      , pinned = False
-      , labels = []
-      }
-    , { id = "2"
-      , title = "Travel Packing List"
-      , content = "Clothing:\n- T-shirts\n- Jeans\n- Sweater\n\nToiletries:\n- Toothbrush\n- Shampoo\n- Razor\n\nElectronics:\n- Laptop\n- Charger\n- Headphones"
-      , pinned = False
-      , labels =
-            [ "Fitness"
-            , "Study"
-            , "Family"
-            , "Friends"
-            , "Groceries"
-            ]
-      }
-    , { id = "3"
-      , title = "Reading List"
-      , content = "Books to Read:\n1. 'The Great Gatsby' by F. Scott Fitzgerald\n2. 'The Hobbit' by J.R.R. Tolkien\n3. 'The Alchemist' by Paulo Coelho"
-      , pinned = False
-      , labels = []
-      }
-    , { id = "4"
-      , title = ""
-      , content = "Weekly Workout Plan:\n- Monday: Cardio (30 minutes)\n- Wednesday: Strength training\n- Friday: Yoga (45 minutes)"
-      , pinned = False
-      , labels = [ "Home" ]
-      }
-    , { id = "5"
-      , title = "Recipe - Chicken Stir-Fry"
-      , content = "Ingredients:\n- Chicken breast\n- Bell peppers\n- Broccoli\n- Soy sauce\n- Rice\n\nInstructions:..."
-      , pinned = False
-      , labels = []
-      }
-    , { id = "6"
-      , title = "Tech Conference Notes"
-      , content = "Keynote Speaker: John Smith\n- Discussed latest trends in AI\n- Highlighted the importance of data privacy"
-      , pinned = False
-      , labels = [ "Home", "Goals" ]
-      }
-    , { id = "7"
-      , title = "Meeting Notes"
-      , content = "Discussed project milestones and assigned tasks to team members."
-      , pinned = False
-      , labels = []
-      }
-    , { id = "8"
-      , title = "Grocery List"
-      , content = "Milk, eggs, bread, and fruits."
-      , pinned = False
-      , labels = []
-      }
-    , { id = "9"
-      , title = ""
-      , content = "1. 'The Catcher in the Rye' by J.D. Salinger\n2. 'To Kill a Mockingbird' by Harper Lee\n3. '1984' by George Orwell"
-      , pinned = False
-      , labels = []
-      }
-    , { id = "0"
-      , title = "Trip Itinerary"
-      , content = "Day 1: Explore the city\nDay 2: Visit museums and art galleries\nDay 3: Hike in the mountains\nDay 4: Relax at the beach"
-      , pinned = False
-      , labels =
-            [ "Calls"
-            , "Books"
-            ]
-      }
-    , { id = "012"
-      , title = "Recipe - Spaghetti Bolognese"
-      , content = "Ingredients:\n- Ground beef\n- Onion\n- Garlic\n- Tomatoes\n- Pasta\n\nInstructions:..."
-      , pinned = False
-      , labels =
-            [ "Urgent"
-            , "Important"
-            , "Fitness"
-            ]
-      }
-    ]
-
-
-dummyLabels : List String
-dummyLabels =
-    [ "Work"
-    , "Personal"
-    , "Shopping"
-    , "Health"
-    , "Home"
-    , "Meeting"
-    , "Urgent"
-    , "Important"
-    , "Fitness"
-    , "Study"
-    , "Family"
-    , "Friends"
-    , "Groceries"
-    , "Movies"
-    , "Travel"
-    , "Bills"
-    , "Chores"
-    , "Goals"
-    , "Hobbies"
-    , "Calls"
-    , "Books"
-    , "Music"
-    , "Gifts"
-    , "Tech"
-    ]
-
-
 
 -- PORTS
 
@@ -171,16 +52,45 @@ dummyNewNote =
 -- MODEL
 
 
-type alias UID =
-    String
+type ID
+    = -- Not synced with DB yet,
+      -- generated ID offline
+      OfflineID String
+      -- Synced with DB,
+      -- using DB's ID
+    | DatabaseID Api.ID
+
+
+idDiff : ID -> ID -> Bool
+idDiff a b =
+    case ( a, b ) of
+        ( OfflineID c, OfflineID d ) ->
+            c /= d
+
+        ( DatabaseID c, DatabaseID d ) ->
+            c /= d
+
+        _ ->
+            True
+
+
+sameId : ID -> ID -> Bool
+sameId a b =
+    not (idDiff a b)
 
 
 type alias Note =
-    { id : UID
+    { id : ID
     , title : String
     , content : String
     , pinned : Bool
-    , labels : List String
+    , labels : List ID
+    }
+
+
+type alias Label =
+    { id : ID
+    , name : String
     }
 
 
@@ -201,7 +111,7 @@ type alias Model =
     , notes : List Note
     , isNewNoteAList : Bool
     , isWritingANewNote : Maybe NewNoteData
-    , labels : List String
+    , labels : List Label
     , user : User
     }
 
@@ -211,7 +121,7 @@ type alias NewNoteData =
     , content : String
     , labels :
         Maybe
-            { labels : List String
+            { labels : List ID
             , labelsSearchQuery : String
             }
     }
@@ -236,15 +146,15 @@ type Msg
     | NewNoteIsListChange Bool
     | AddNote
     | ReceivedRandomValues (List Int)
-    | TogglePinNote UID
-    | DeleteNote UID
+    | TogglePinNote ID
+    | DeleteNote ID
     | BeginWritingNewNote
     | FinishWritingNewNote
     | BeginAddingNewNoteLabels
     | SearchLabelsQueryChange String
-    | AddLabelToNewNote String
-    | RemoveLabelFromNewNote String
-    | RemoveNoteLabel ( UID, String )
+    | AddLabelToNewNote ID
+    | RemoveLabelFromNewNote ID
+    | RemoveLabelFromNote { noteID : ID, labelID : ID }
 
 
 
@@ -262,10 +172,10 @@ init flags =
             List.map Random.initialSeed flags.seeds
     in
     ( { seeds = seeds
-      , notes = dummyNotes
+      , notes = []
       , isNewNoteAList = False
       , isWritingANewNote = Nothing
-      , labels = dummyLabels
+      , labels = []
       , user =
             if flags.hasSessionCookie then
                 LoggedIn
@@ -341,6 +251,7 @@ update msg model =
                     model |> pure
 
         CheckingSessionValidity ->
+            -- TODO:
             model |> pure
 
         LoggedIn ->
@@ -357,13 +268,13 @@ update msg model =
                         Err v ->
                             model |> pure
 
-                RemoveNoteLabel ( id, label ) ->
+                RemoveLabelFromNote { noteID, labelID } ->
                     { model
                         | notes =
                             List.map
                                 (\n ->
-                                    if n.id == id then
-                                        { n | labels = List.filter (\l -> l /= label) n.labels }
+                                    if sameId n.id noteID then
+                                        { n | labels = n.labels |> List.filter (idDiff labelID) }
 
                                     else
                                         n
@@ -390,7 +301,7 @@ update msg model =
                 DeleteNote uid ->
                     { model
                         | notes =
-                            List.filter (\n -> n.id /= uid) model.notes
+                            List.filter (\n -> idDiff n.id uid) model.notes
                     }
                         |> pure
 
@@ -488,23 +399,23 @@ update msg model =
                     }
                         |> pure
 
-                RemoveLabelFromNewNote label ->
+                RemoveLabelFromNewNote labelID ->
                     { model
                         | isWritingANewNote =
-                            Maybe.map
-                                (\data ->
-                                    { data
-                                        | labels =
-                                            Maybe.map
-                                                (\{ labelsSearchQuery, labels } ->
-                                                    { labels = labels |> List.filter (\l -> l /= label)
-                                                    , labelsSearchQuery = labelsSearchQuery
-                                                    }
-                                                )
+                            model.isWritingANewNote
+                                |> Maybe.map
+                                    (\data ->
+                                        { data
+                                            | labels =
                                                 data.labels
-                                    }
-                                )
-                                model.isWritingANewNote
+                                                    |> Maybe.map
+                                                        (\{ labelsSearchQuery, labels } ->
+                                                            { labels = labels |> List.filter (idDiff labelID)
+                                                            , labelsSearchQuery = labelsSearchQuery
+                                                            }
+                                                        )
+                                        }
+                                    )
                     }
                         |> pure
 
@@ -514,15 +425,7 @@ update msg model =
                             model |> pure
 
                         Just newNoteData ->
-                            if
-                                -- TODO: when note text can be checkbox list
-                                -- case newNoteData.content of
-                                --     Left s ->
-                                --         String.length s == 0
-                                --     Right l ->
-                                --         List.all (\s -> String.length s == 0) l
-                                String.length newNoteData.content == 0
-                            then
+                            if String.length newNoteData.content == 0 then
                                 model |> pure
 
                             else
@@ -530,7 +433,7 @@ update msg model =
                                     | isWritingANewNote = Nothing
                                     , notes =
                                         model.notes
-                                            ++ [ { id = generateUID model.seeds |> Tuple.first
+                                            ++ [ { id = OfflineID (generateUID model.seeds |> Tuple.first)
                                                  , title = newNoteData.title
                                                  , content = newNoteData.content
                                                  , pinned = False
@@ -693,14 +596,14 @@ view model =
                                                             (\l ->
                                                                 button
                                                                     [ css [ margin (px 5), padding2 (px 5) (px 10) ]
-                                                                    , onClick (AddLabelToNewNote l)
+                                                                    , onClick (AddLabelToNewNote l.id)
                                                                     , type_ "button"
                                                                     ]
-                                                                    [ text l ]
+                                                                    [ text l.name ]
                                                             )
                                                             (model.labels
-                                                                |> List.filter (\l -> List.any (\j -> j == l) labels |> not)
-                                                                |> List.filter (String.toLower >> String.contains labelsSearchQuery)
+                                                                |> List.filter (\l -> List.any (\j -> j == l.id) labels |> not)
+                                                                |> List.filter (.name >> String.toLower >> String.contains labelsSearchQuery)
                                                             )
                                                         )
                                                     , div [ css [ color (hex "fff"), mx (px 15) ] ] [ text "Selected labels:" ]
@@ -711,12 +614,12 @@ view model =
                                                                 button
                                                                     [ css
                                                                         [ margin (px 5), padding2 (px 5) (px 10) ]
-                                                                    , onClick (RemoveLabelFromNewNote l)
+                                                                    , onClick (RemoveLabelFromNewNote l.id)
                                                                     , type_ "button"
                                                                     ]
-                                                                    [ text l ]
+                                                                    [ text l.name ]
                                                             )
-                                                            labels
+                                                            (List.filter (\r -> List.any (\e -> e == r.id) labels) model.labels)
                                                         )
                                                     ]
 
@@ -755,7 +658,7 @@ view model =
                             , marginTop (px 30)
                             ]
                         ]
-                        (List.map note (model.notes |> prioritizePinned))
+                        (List.map (note model) (model.notes |> prioritizePinned))
                     ]
         ]
 
@@ -772,8 +675,8 @@ logInView { username, password } =
         ]
 
 
-note : Note -> Html Msg
-note data =
+note : Model -> Note -> Html Msg
+note model data =
     div
         [ css
             [ border3 (px 3) solid (rgb 0 0 0)
@@ -869,23 +772,6 @@ note data =
                                     else
                                         [ text h ]
                        )
-                 -- TODO: if it's checkbox note
-                 --  case data.content of
-                 --     Left s ->
-                 --         s
-                 --             |> String.split "\n"
-                 --             |> (\r ->
-                 --                     case r of
-                 --                         [] ->
-                 --                             [ text s ]
-                 --                         h :: t ->
-                 --                             if List.length t > 0 then
-                 --                                 makeParagraph [ text h ] t
-                 --                             else
-                 --                                 [ text h ]
-                 --                )
-                 -- Right l ->
-                 --     [ text (String.join "\n" l) ]
                 )
             , case data.labels of
                 [] ->
@@ -913,7 +799,7 @@ note data =
                                         ]
                                     , class "note-label"
                                     ]
-                                    [ text l
+                                    [ text l.name
                                     , button
                                         [ class "note-label-remove-button"
                                         , css
@@ -924,12 +810,17 @@ note data =
                                             , color (hex "fff")
                                             ]
                                         , type_ "button"
-                                        , onClick (RemoveNoteLabel ( data.id, l ))
+                                        , onClick
+                                            (RemoveLabelFromNote
+                                                { noteID = data.id
+                                                , labelID = l.id
+                                                }
+                                            )
                                         ]
                                         [ text "X" ]
                                     ]
                             )
-                            labels
+                            (model.labels |> List.filter (\e -> List.any (\r -> r == e.id) labels))
                         )
             ]
         ]
@@ -962,7 +853,7 @@ prioritizePinned notes =
 -- https://github.com/elm/random/issues/2
 
 
-generateUID : List Random.Seed -> ( UID, List Random.Seed )
+generateUID : List Random.Seed -> ( String, List Random.Seed )
 generateUID seeds =
     List.map (Random.step (alphaNumericGenerator 5)) seeds
         |> List.unzip
