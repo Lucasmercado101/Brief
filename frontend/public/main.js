@@ -1,5 +1,17 @@
 "use strict";
 
+// DB
+
+if ("indexedDB" in self) {
+  const openReq = indexedDB.open("notes", 1);
+
+  openReq.onsuccess = function () {
+    console.log("open success");
+  };
+}
+
+// DB end ------
+
 const cookieName = "session";
 // regex obtained from: https://stackoverflow.com/a/25617724
 const hasSessionCookie = document.cookie.match(
