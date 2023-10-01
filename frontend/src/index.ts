@@ -1,13 +1,50 @@
 // DB
 
 if ("indexedDB" in self) {
-  const openReq = indexedDB.open("notes", 1);
+  let db: undefined | IDBDatabase;
+  const openReq = indexedDB.open("notesDB", 1);
 
   openReq.onupgradeneeded = function (event) {
     console.log("open success");
+    db = openReq.result;
     // const db = event.target.results;
-    // console.log(db.objectStoreNames.contains("notes"));
+    if (!db.objectStoreNames.contains("notes")) {
+      db.createObjectStore("notes", { keyPath: "id" });
+    }
   };
+
+  setTimeout(() => {
+    const note = {
+      id: 1,
+      title: "Note 1",
+      content: "Content 1",
+      pinned: false,
+      labels: ["label 1", "label 2"],
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+
+    const tx = db!.transaction("notes", "readwrite");
+
+    const store = tx.objectStore("notes");
+    const request = store.add(note);
+
+    tx.oncomplete = function (e) {
+      console.log("tx complete", e);
+    };
+
+    request.onsuccess = function (e) {
+      console.log("request success", e);
+    };
+
+    tx.onerror = function (event) {
+      console.log("tx error", event);
+    };
+
+    request.onerror = function (event) {
+      console.log("request error", event);
+    };
+  }, 5000);
 }
 
 // DB end ------

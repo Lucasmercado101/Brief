@@ -4,3 +4,4 @@ elm.js
 .vscode
 .env
 dev.db
+public/main.js
