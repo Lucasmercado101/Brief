@@ -1,7 +1,12 @@
 module Api exposing (..)
 
-import Http exposing (header, riskyRequest)
+import Http exposing (riskyRequest)
 import Json.Encode as JE
+import Time exposing (Posix)
+
+
+type alias ID =
+    Int
 
 
 baseUrl : String
@@ -28,3 +33,21 @@ logIn email password msg =
                 )
         , expect = Http.expectWhatever msg
         }
+
+
+type alias Note =
+    { id : ID
+    , title : Maybe String
+    , content : String
+    , createdAt : Posix
+    , updatedAt : Posix
+    , labels : List ID
+    }
+
+
+type alias Label =
+    { id : ID
+    , name : String
+    , createdAt : Posix
+    , updatedAt : Posix
+    }
