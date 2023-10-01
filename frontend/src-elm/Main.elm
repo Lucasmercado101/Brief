@@ -264,8 +264,28 @@ update msg model =
                 FullSyncResp res ->
                     case res of
                         -- TODO:
-                        Ok v ->
-                            model |> pure
+                        Ok ( notes, labels ) ->
+                            { model
+                                | labels = List.map (\e -> { name = e.name, id = DatabaseID e.id }) labels
+                                , notes =
+                                    List.map
+                                        (\l ->
+                                            { id = DatabaseID l.id
+                                            , title =
+                                                case l.title of
+                                                    Just val ->
+                                                        val
+
+                                                    Nothing ->
+                                                        ""
+                                            , content = l.content
+                                            , pinned = l.pinned
+                                            , labels = List.map DatabaseID l.labels
+                                            }
+                                        )
+                                        notes
+                            }
+                                |> pure
 
                         Err v ->
                             model |> pure
