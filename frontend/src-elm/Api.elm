@@ -1,8 +1,24 @@
 module Api exposing (..)
 
 import Http exposing (riskyRequest)
+import Json.Decode as JD exposing (Decoder, field, int, list, map2, map4, map6, maybe, string)
 import Json.Encode as JE
 import Time exposing (Posix)
+
+
+riskyGet : Http.Body -> Http.Expect msg -> Cmd msg
+riskyGet body expect =
+    riskyRequest
+        { url = baseUrl ++ "login"
+        , headers = []
+        , method = "GET"
+
+        -- TODO: timeout?
+        , timeout = Nothing
+        , tracker = Nothing
+        , body = body
+        , expect = expect
+        }
 
 
 type alias ID =
@@ -35,6 +51,22 @@ logIn email password msg =
         }
 
 
+type alias FullSyncResponse =
+    ( List Note, List Label )
+
+
+fullSync : (Result Http.Error FullSyncResponse -> msg) -> Cmd msg
+fullSync msg =
+    riskyGet Http.emptyBody (Http.expectJson msg fullSyncDecoder)
+
+
+fullSyncDecoder : Decoder FullSyncResponse
+fullSyncDecoder =
+    map2 (\a b -> ( a, b ))
+        (field "notes" (list noteDecoder))
+        (field "labels" (list labelDecoder))
+
+
 type alias Note =
     { id : ID
     , title : Maybe String
@@ -51,3 +83,28 @@ type alias Label =
     , createdAt : Posix
     , updatedAt : Posix
     }
+
+
+noteDecoder : Decoder Note
+noteDecoder =
+    map6 Note
+        (field "id" int)
+        (field "title" (maybe string))
+        (field "content" string)
+        (field "createdAt" posixTime)
+        (field "updatedAt" posixTime)
+        (field "labels" (list int))
+
+
+labelDecoder : Decoder Label
+labelDecoder =
+    map4 Label
+        (field "id" int)
+        (field "name" string)
+        (field "createdAt" posixTime)
+        (field "updatedAt" posixTime)
+
+
+posixTime : Decoder Posix
+posixTime =
+    int |> JD.map Time.millisToPosix
