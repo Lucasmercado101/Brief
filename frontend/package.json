@@ -1,8 +1,12 @@
 {
   "scripts": {
-    "dev": "elm-watch hot"
+    "dev": "concurrently --kill-others \"elm-watch hot\" \"tsc -w\""
   },
   "dependencies": {
     "elm-watch": "^1.2.0-beta.3"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.1",
+    "typescript": "^5.2.2"
   }
 }
