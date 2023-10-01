@@ -155,6 +155,7 @@ type Msg
     | AddLabelToNewNote ID
     | RemoveLabelFromNewNote ID
     | RemoveLabelFromNote { noteID : ID, labelID : ID }
+    | PostNewNoteResp (Result Http.Error Api.PostNewNoteResponse)
 
 
 
@@ -262,6 +263,7 @@ update msg model =
 
                 FullSyncResp res ->
                     case res of
+                        -- TODO:
                         Ok v ->
                             model |> pure
 
@@ -447,8 +449,27 @@ update msg model =
                                                  }
                                                ]
                                   }
-                                , requestRandomValues ()
+                                , Cmd.batch
+                                    [ requestRandomValues ()
+
+                                    -- TODO: sync with local db
+                                    , Api.postNewNote
+                                        { title =
+                                            if String.length newNoteData.title == 0 then
+                                                Nothing
+
+                                            else
+                                                Just newNoteData.title
+                                        , content = newNoteData.content
+                                        , pinned = Nothing
+                                        }
+                                        PostNewNoteResp
+                                    ]
                                 )
+
+                PostNewNoteResp res ->
+                    -- TODO:
+                    model |> pure
 
                 BeginAddingNewNoteLabels ->
                     case model.isWritingANewNote of
