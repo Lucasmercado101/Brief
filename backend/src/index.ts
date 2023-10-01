@@ -225,15 +225,24 @@ new Elysia()
         })
         .then((e) => {
           return e.map((n) => {
-            const retVal: Omit<Omit<typeof n, "createdAt">, "updatedAt"> & {
-              createdAt: number;
-              updatedAt: number;
-            } = {
+            const labels = n.labels.map((l) => {
+              const retVal: Omit<Omit<typeof l, "createdAt">, "updatedAt"> & {
+                createdAt: number;
+                updatedAt: number;
+              } = {
+                ...l,
+                createdAt: l.createdAt.valueOf(),
+                updatedAt: l.updatedAt.valueOf()
+              };
+              return retVal;
+            });
+
+            return {
               ...n,
               createdAt: n.createdAt.valueOf(),
-              updatedAt: n.updatedAt.valueOf()
+              updatedAt: n.updatedAt.valueOf(),
+              labels
             };
-            return retVal;
           });
         });
     },
