@@ -24,19 +24,19 @@ dummyNotes : List Note
 dummyNotes =
     [ { id = "1"
       , title = "Project Kickoff Meeting"
-      , content = Left "Agenda:\n- Introductions\n- Project goals and objectives\n- Team roles and responsibilities\n- Timeline and milestones"
+      , content = "Agenda:\n- Introductions\n- Project goals and objectives\n- Team roles and responsibilities\n- Timeline and milestones"
       , pinned = False
       , labels = []
       }
     , { id = "011"
       , title = ""
-      , content = Left "Don't forget to read this"
+      , content = "Don't forget to read this"
       , pinned = False
       , labels = []
       }
     , { id = "2"
       , title = "Travel Packing List"
-      , content = Left "Clothing:\n- T-shirts\n- Jeans\n- Sweater\n\nToiletries:\n- Toothbrush\n- Shampoo\n- Razor\n\nElectronics:\n- Laptop\n- Charger\n- Headphones"
+      , content = "Clothing:\n- T-shirts\n- Jeans\n- Sweater\n\nToiletries:\n- Toothbrush\n- Shampoo\n- Razor\n\nElectronics:\n- Laptop\n- Charger\n- Headphones"
       , pinned = False
       , labels =
             [ "Fitness"
@@ -48,49 +48,49 @@ dummyNotes =
       }
     , { id = "3"
       , title = "Reading List"
-      , content = Left "Books to Read:\n1. 'The Great Gatsby' by F. Scott Fitzgerald\n2. 'The Hobbit' by J.R.R. Tolkien\n3. 'The Alchemist' by Paulo Coelho"
+      , content = "Books to Read:\n1. 'The Great Gatsby' by F. Scott Fitzgerald\n2. 'The Hobbit' by J.R.R. Tolkien\n3. 'The Alchemist' by Paulo Coelho"
       , pinned = False
       , labels = []
       }
     , { id = "4"
       , title = ""
-      , content = Left "Weekly Workout Plan:\n- Monday: Cardio (30 minutes)\n- Wednesday: Strength training\n- Friday: Yoga (45 minutes)"
+      , content = "Weekly Workout Plan:\n- Monday: Cardio (30 minutes)\n- Wednesday: Strength training\n- Friday: Yoga (45 minutes)"
       , pinned = False
       , labels = [ "Home" ]
       }
     , { id = "5"
       , title = "Recipe - Chicken Stir-Fry"
-      , content = Left "Ingredients:\n- Chicken breast\n- Bell peppers\n- Broccoli\n- Soy sauce\n- Rice\n\nInstructions:..."
+      , content = "Ingredients:\n- Chicken breast\n- Bell peppers\n- Broccoli\n- Soy sauce\n- Rice\n\nInstructions:..."
       , pinned = False
       , labels = []
       }
     , { id = "6"
       , title = "Tech Conference Notes"
-      , content = Left "Keynote Speaker: John Smith\n- Discussed latest trends in AI\n- Highlighted the importance of data privacy"
+      , content = "Keynote Speaker: John Smith\n- Discussed latest trends in AI\n- Highlighted the importance of data privacy"
       , pinned = False
       , labels = [ "Home", "Goals" ]
       }
     , { id = "7"
       , title = "Meeting Notes"
-      , content = Left "Discussed project milestones and assigned tasks to team members."
+      , content = "Discussed project milestones and assigned tasks to team members."
       , pinned = False
       , labels = []
       }
     , { id = "8"
       , title = "Grocery List"
-      , content = Left "Milk, eggs, bread, and fruits."
+      , content = "Milk, eggs, bread, and fruits."
       , pinned = False
       , labels = []
       }
     , { id = "9"
       , title = ""
-      , content = Left "1. 'The Catcher in the Rye' by J.D. Salinger\n2. 'To Kill a Mockingbird' by Harper Lee\n3. '1984' by George Orwell"
+      , content = "1. 'The Catcher in the Rye' by J.D. Salinger\n2. 'To Kill a Mockingbird' by Harper Lee\n3. '1984' by George Orwell"
       , pinned = False
       , labels = []
       }
     , { id = "0"
       , title = "Trip Itinerary"
-      , content = Left "Day 1: Explore the city\nDay 2: Visit museums and art galleries\nDay 3: Hike in the mountains\nDay 4: Relax at the beach"
+      , content = "Day 1: Explore the city\nDay 2: Visit museums and art galleries\nDay 3: Hike in the mountains\nDay 4: Relax at the beach"
       , pinned = False
       , labels =
             [ "Calls"
@@ -99,7 +99,7 @@ dummyNotes =
       }
     , { id = "012"
       , title = "Recipe - Spaghetti Bolognese"
-      , content = Left "Ingredients:\n- Ground beef\n- Onion\n- Garlic\n- Tomatoes\n- Pasta\n\nInstructions:..."
+      , content = "Ingredients:\n- Ground beef\n- Onion\n- Garlic\n- Tomatoes\n- Pasta\n\nInstructions:..."
       , pinned = False
       , labels =
             [ "Urgent"
@@ -162,7 +162,7 @@ dummyNewNote : Maybe NewNoteData
 dummyNewNote =
     Just
         { title = ""
-        , content = Left ""
+        , content = ""
         , labels = Nothing
         }
 
@@ -178,7 +178,7 @@ type alias UID =
 type alias Note =
     { id : UID
     , title : String
-    , content : Either String (List String)
+    , content : String
     , pinned : Bool
     , labels : List String
     }
@@ -208,7 +208,7 @@ type alias Model =
 
 type alias NewNoteData =
     { title : String
-    , content : Either String (List String)
+    , content : String
     , labels :
         Maybe
             { labels : List String
@@ -230,6 +230,7 @@ type LoggedOutMsg
 
 type Msg
     = LoggedOutView LoggedOutMsg
+    | FullSyncResp (Result Http.Error Api.FullSyncResponse)
     | NewTitleChange String
     | NewNotePlainTextContentChange String
     | NewNoteIsListChange Bool
@@ -330,7 +331,7 @@ update msg model =
                         Resulted res ->
                             case res of
                                 Ok v ->
-                                    { model | user = LoggedIn } |> pure
+                                    ( { model | user = LoggedIn }, Api.fullSync FullSyncResp )
 
                                 Err v ->
                                     -- TODO: err handling
@@ -347,6 +348,14 @@ update msg model =
                 -- TODO: Change later
                 LoggedOutView _ ->
                     ( model, Cmd.none )
+
+                FullSyncResp res ->
+                    case res of
+                        Ok v ->
+                            model |> pure
+
+                        Err v ->
+                            model |> pure
 
                 RemoveNoteLabel ( id, label ) ->
                     { model
@@ -409,7 +418,7 @@ update msg model =
                         | isWritingANewNote =
                             Just
                                 { title = ""
-                                , content = Left ""
+                                , content = ""
                                 , labels = Nothing
                                 }
                     }
@@ -433,7 +442,7 @@ update msg model =
                         | isWritingANewNote =
                             Maybe.map
                                 (\data ->
-                                    { data | content = Either.mapLeft (always s) data.content }
+                                    { data | content = s }
                                 )
                                 model.isWritingANewNote
                     }
@@ -506,12 +515,13 @@ update msg model =
 
                         Just newNoteData ->
                             if
-                                case newNoteData.content of
-                                    Left s ->
-                                        String.length s == 0
-
-                                    Right l ->
-                                        List.all (\s -> String.length s == 0) l
+                                -- TODO: when note text can be checkbox list
+                                -- case newNoteData.content of
+                                --     Left s ->
+                                --         String.length s == 0
+                                --     Right l ->
+                                --         List.all (\s -> String.length s == 0) l
+                                String.length newNoteData.content == 0
                             then
                                 model |> pure
 
@@ -654,28 +664,23 @@ view model =
                                             , value data.title
                                             ]
                                             []
-                                        , case data.content of
-                                            Left content ->
-                                                textarea
-                                                    [ css
-                                                        [ backgroundColor (rgb 255 203 127)
-                                                        , border (px 0)
-                                                        , publicSans
-                                                        , padding (px 8)
-                                                        , fontSize (px 16)
-                                                        , margin2 (px 0) auto
-                                                        , fullWidth
-                                                        , minWidth (px 494)
-                                                        , minHeight (px 150)
-                                                        ]
-                                                    , placeholder "Milk, eggs, bread, and fruits."
-                                                    , onInput NewNotePlainTextContentChange
-                                                    , value content
-                                                    ]
-                                                    []
-
-                                            Right _ ->
-                                                div [] [ text "TODO" ]
+                                        , textarea
+                                            [ css
+                                                [ backgroundColor (rgb 255 203 127)
+                                                , border (px 0)
+                                                , publicSans
+                                                , padding (px 8)
+                                                , fontSize (px 16)
+                                                , margin2 (px 0) auto
+                                                , fullWidth
+                                                , minWidth (px 494)
+                                                , minHeight (px 150)
+                                                ]
+                                            , placeholder "Milk, eggs, bread, and fruits."
+                                            , onInput NewNotePlainTextContentChange
+                                            , value data.content
+                                            ]
+                                            []
                                         , case data.labels of
                                             Just { labels, labelsSearchQuery } ->
                                                 div [ css [ marginTop (px 8) ] ]
@@ -731,14 +736,7 @@ view model =
                                                 , fontSize (px 16)
                                                 ]
                                             , type_ "submit"
-                                            , Html.Styled.Attributes.disabled
-                                                (case data.content of
-                                                    Left s ->
-                                                        String.length s == 0
-
-                                                    Right l ->
-                                                        List.all (\s -> String.length s == 0) l
-                                                )
+                                            , Html.Styled.Attributes.disabled (String.length data.content == 0)
                                             ]
                                             [ text "Create note" ]
                                         ]
@@ -857,25 +855,37 @@ note data =
                             x :: xs ->
                                 makeParagraph (total ++ [ br [] [], text x ]) xs
                  in
-                 case data.content of
-                    Left s ->
-                        s
-                            |> String.split "\n"
-                            |> (\r ->
-                                    case r of
-                                        [] ->
-                                            [ text s ]
+                 data.content
+                    |> String.split "\n"
+                    |> (\r ->
+                            case r of
+                                [] ->
+                                    [ text data.content ]
 
-                                        h :: t ->
-                                            if List.length t > 0 then
-                                                makeParagraph [ text h ] t
+                                h :: t ->
+                                    if List.length t > 0 then
+                                        makeParagraph [ text h ] t
 
-                                            else
-                                                [ text h ]
-                               )
-
-                    Right l ->
-                        [ text (String.join "\n" l) ]
+                                    else
+                                        [ text h ]
+                       )
+                 -- TODO: if it's checkbox note
+                 --  case data.content of
+                 --     Left s ->
+                 --         s
+                 --             |> String.split "\n"
+                 --             |> (\r ->
+                 --                     case r of
+                 --                         [] ->
+                 --                             [ text s ]
+                 --                         h :: t ->
+                 --                             if List.length t > 0 then
+                 --                                 makeParagraph [ text h ] t
+                 --                             else
+                 --                                 [ text h ]
+                 --                )
+                 -- Right l ->
+                 --     [ text (String.join "\n" l) ]
                 )
             , case data.labels of
                 [] ->
