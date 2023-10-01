@@ -225,17 +225,11 @@ new Elysia()
         })
         .then((e) => {
           return e.map((n) => {
-            const labels = n.labels.map((l) => {
-              const retVal: Omit<Omit<typeof l, "createdAt">, "updatedAt"> & {
-                createdAt: number;
-                updatedAt: number;
-              } = {
-                ...l,
-                createdAt: l.createdAt.valueOf(),
-                updatedAt: l.updatedAt.valueOf()
-              };
-              return retVal;
-            });
+            const labels = n.labels.map((l) => ({
+              ...l,
+              createdAt: l.createdAt.valueOf(),
+              updatedAt: l.updatedAt.valueOf()
+            }));
 
             return {
               ...n,
@@ -267,7 +261,7 @@ new Elysia()
         return await prisma.label.create({
           data: {
             name: body.name,
-            noteId: body.noteID,
+            Note: { connect: { id: body.noteID } },
             ownerId: session.value
           }
         });
@@ -318,6 +312,51 @@ new Elysia()
       }),
       cookie: requiredCookieSession
     }
+  )
+  .get(
+    "/full-sync",
+    async ({ cookie: { session } }) => {
+      const userID = session.value;
+      const notes = await prisma.note
+        .findMany({
+          where: {
+            userId: userID
+          },
+          include: {
+            labels: {
+              select: {
+                id: true
+              }
+            }
+          }
+        })
+        .then((e) =>
+          e.map((l) => ({
+            ...l,
+            userId: undefined,
+            createdAt: l.createdAt.valueOf(),
+            updatedAt: l.updatedAt.valueOf(),
+            labels: l.labels.map((v) => v.id)
+          }))
+        );
+
+      const labels = await prisma.label.findMany({
+        where: {
+          ownerId: userID
+        }
+      });
+
+      return {
+        notes,
+        labels: labels.map((e) => ({
+          id: e.id,
+          name: e.name,
+          createdAt: e.createdAt.valueOf(),
+          updatedAt: e.updatedAt.valueOf()
+        }))
+      };
+    },
+    { cookie: requiredCookieSession }
   )
   .listen(PORT, (server) => {
     console.log(`🦊 Elysia is running at ${server?.hostname}:${server?.port} `);
