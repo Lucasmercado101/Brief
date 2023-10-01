@@ -6,10 +6,10 @@ import Json.Encode as JE
 import Time exposing (Posix)
 
 
-riskyGet : Http.Body -> Http.Expect msg -> Cmd msg
-riskyGet body expect =
+riskyGet : String -> Http.Body -> Http.Expect msg -> Cmd msg
+riskyGet endpoint body expect =
     riskyRequest
-        { url = baseUrl ++ "login"
+        { url = baseUrl ++ endpoint
         , headers = []
         , method = "GET"
 
@@ -57,7 +57,7 @@ type alias FullSyncResponse =
 
 fullSync : (Result Http.Error FullSyncResponse -> msg) -> Cmd msg
 fullSync msg =
-    riskyGet Http.emptyBody (Http.expectJson msg fullSyncDecoder)
+    riskyGet "full-sync" Http.emptyBody (Http.expectJson msg fullSyncDecoder)
 
 
 fullSyncDecoder : Decoder FullSyncResponse
