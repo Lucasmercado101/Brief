@@ -21,6 +21,21 @@ riskyGet endpoint body expect =
         }
 
 
+riskyPost : String -> Http.Body -> Http.Expect msg -> Cmd msg
+riskyPost endpoint body expect =
+    riskyRequest
+        { url = baseUrl ++ endpoint
+        , headers = []
+        , method = "POST"
+
+        -- TODO: timeout?
+        , timeout = Nothing
+        , tracker = Nothing
+        , body = body
+        , expect = expect
+        }
+
+
 type alias ID =
     Int
 
@@ -49,6 +64,66 @@ logIn email password msg =
                 )
         , expect = Http.expectWhatever msg
         }
+
+
+type alias PostNewNoteInput =
+    { title : Maybe String
+    , content : String
+    , pinned : Maybe Bool
+    }
+
+
+type alias PostNewNoteResponse =
+    { id : Int
+    , title : Maybe String
+    , content : String
+    , pinned : Bool
+    , createdAt : Posix
+    , updatedAt : Posix
+    , userId : Int
+    }
+
+
+postNewNoteDecoder : Decoder PostNewNoteResponse
+postNewNoteDecoder =
+    map7 PostNewNoteResponse
+        (field "id" int)
+        (field "title" (maybe string))
+        (field "content" string)
+        (field "pinned" bool)
+        (field "createdAt" posixTime)
+        (field "updatedAt" posixTime)
+        (field "userId" int)
+
+
+postNewNote : PostNewNoteInput -> (Result Http.Error PostNewNoteResponse -> msg) -> Cmd msg
+postNewNote inputData msg =
+    riskyPost "notes"
+        (Http.jsonBody
+            (JE.object
+                (( "content", JE.string inputData.content )
+                    :: (case inputData.title of
+                            Just title ->
+                                [ ( "title", JE.string title ) ]
+
+                            Nothing ->
+                                []
+                       )
+                    ++ (case inputData.pinned of
+                            Just pinned ->
+                                [ ( "pinned", JE.bool pinned ) ]
+
+                            Nothing ->
+                                []
+                       )
+                )
+            )
+        )
+        (Http.expectJson msg postNewNoteDecoder)
+
+
+
+--
 
 
 type alias FullSyncResponse =
