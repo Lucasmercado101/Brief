@@ -74,13 +74,13 @@ type alias PostNewNoteInput =
 
 
 type alias PostNewNoteResponse =
-    { id : Int
+    { id : ID
     , title : Maybe String
     , content : String
     , pinned : Bool
     , createdAt : Posix
     , updatedAt : Posix
-    , userId : Int
+    , userId : ID
     }
 
 
