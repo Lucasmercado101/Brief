@@ -1,7 +1,7 @@
 module Api exposing (..)
 
 import Http exposing (riskyRequest)
-import Json.Decode as JD exposing (Decoder, field, int, list, map2, map4, map6, maybe, string)
+import Json.Decode as JD exposing (Decoder, bool, field, int, list, map2, map4, map7, maybe, string)
 import Json.Encode as JE
 import Time exposing (Posix)
 
@@ -71,6 +71,7 @@ type alias Note =
     { id : ID
     , title : Maybe String
     , content : String
+    , pinned : Bool
     , createdAt : Posix
     , updatedAt : Posix
     , labels : List ID
@@ -87,10 +88,11 @@ type alias Label =
 
 noteDecoder : Decoder Note
 noteDecoder =
-    map6 Note
+    map7 Note
         (field "id" int)
         (field "title" (maybe string))
         (field "content" string)
+        (field "pinned" bool)
         (field "createdAt" posixTime)
         (field "updatedAt" posixTime)
         (field "labels" (list int))
