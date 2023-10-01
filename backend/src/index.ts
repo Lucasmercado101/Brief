@@ -207,21 +207,35 @@ new Elysia()
   .get(
     "/notes",
     async ({ cookie: { session } }) => {
-      return await prisma.note.findMany({
-        where: {
-          userId: session.value
-        },
-        include: {
-          labels: {
-            select: {
-              name: true,
-              id: true,
-              createdAt: true,
-              updatedAt: true
+      return await prisma.note
+        .findMany({
+          where: {
+            userId: session.value
+          },
+          include: {
+            labels: {
+              select: {
+                name: true,
+                id: true,
+                createdAt: true,
+                updatedAt: true
+              }
             }
           }
-        }
-      });
+        })
+        .then((e) => {
+          return e.map((n) => {
+            const retVal: Omit<Omit<typeof n, "createdAt">, "updatedAt"> & {
+              createdAt: number;
+              updatedAt: number;
+            } = {
+              ...n,
+              createdAt: n.createdAt.valueOf(),
+              updatedAt: n.updatedAt.valueOf()
+            };
+            return retVal;
+          });
+        });
     },
     {
       cookie: requiredCookieSession
