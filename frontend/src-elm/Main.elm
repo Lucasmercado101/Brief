@@ -328,12 +328,12 @@ update msg model =
                                 ( model, Api.logIn username password Resulted |> Cmd.map (\l -> LoggedOutView l) )
 
                         Resulted res ->
-                            case res of 
+                            case res of
                                 Ok v ->
-                                    let a = 1 |> Debug.log "a" in
-                                    model |> pure
+                                    { model | user = LoggedIn } |> pure
+
                                 Err v ->
-                                    let a = 1 |> Debug.log "b" in
+                                    -- TODO: err handling
                                     model |> pure
 
                 _ ->
