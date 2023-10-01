@@ -98,7 +98,7 @@ postNewNoteDecoder =
 
 postNewNote : PostNewNoteInput -> (Result Http.Error PostNewNoteResponse -> msg) -> Cmd msg
 postNewNote inputData msg =
-    riskyPost "notes"
+    riskyPost "note"
         (Http.jsonBody
             (JE.object
                 (( "content", JE.string inputData.content )
