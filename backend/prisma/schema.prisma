@@ -26,6 +26,7 @@ model Note {
   id        Int      @id @default(autoincrement())
   title     String?
   content   String
+  pinned    Boolean  @default(false)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   labels    Label[]

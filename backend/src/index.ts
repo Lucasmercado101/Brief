@@ -176,7 +176,8 @@ new Elysia()
       body: t.Object({
         title: t.Optional(t.String()),
         content: t.String(),
-        labels: t.Optional(t.Array(t.String()))
+        labels: t.Optional(t.Array(t.String())),
+        pinned: t.Optional(t.Boolean())
       }),
       cookie: requiredCookieSession
     }
