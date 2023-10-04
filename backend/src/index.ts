@@ -188,6 +188,53 @@ new Elysia()
       cookie: requiredCookieSession
     }
   )
+  .put(
+    "/note/:id",
+    async ({ body, params: { id: noteID }, set }) => {
+      const noteExists = await prisma.note.findUnique({
+        where: { id: noteID }
+      });
+
+      if (!noteExists) {
+        set.status = 404;
+        return "Note not found";
+      }
+
+      return prisma.note.update({
+        where: { id: noteID },
+        data: {
+          title: body.title,
+          content: body.content,
+          pinned: body.pinned,
+          ...(body.labels !== undefined
+            ? { labels: { set: body.labels!.map((i) => ({ id: i })) } }
+            : {})
+        },
+        include: {
+          labels: {
+            select: {
+              name: true,
+              id: true,
+              createdAt: true,
+              updatedAt: true
+            }
+          }
+        }
+      });
+    },
+    {
+      body: t.Object({
+        title: t.Optional(t.String()),
+        content: t.Optional(t.String()),
+        labels: t.Optional(t.Array(t.Numeric())),
+        pinned: t.Optional(t.Boolean())
+      }),
+      params: t.Object({
+        id: t.Numeric()
+      }),
+      cookie: requiredCookieSession
+    }
+  )
   .post(
     "/notes",
     async ({ body, cookie: { session } }) => {
