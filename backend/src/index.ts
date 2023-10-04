@@ -158,21 +158,27 @@ new Elysia()
       )
     }
   )
+  .onBeforeHandle(({ cookie: { session } }) => {
+    session.maxAge = COOKIE_MAX_AGE;
+  })
   .post(
     "/note",
     async ({ body, cookie: { session } }) => {
-      return await prisma.note.create({
-        data: {
-          userId: session.value,
-          title: body.title,
-          content: body.content
-        }
-      });
+      return await prisma.note
+        .create({
+          data: {
+            userId: session.value,
+            title: body.title,
+            content: body.content
+          }
+        })
+        .then((n) => ({
+          ...n,
+          createdAt: n.createdAt.valueOf(),
+          updatedAt: n.updatedAt.valueOf()
+        }));
     },
     {
-      beforeHandle({ cookie: { session } }) {
-        session.maxAge = COOKIE_MAX_AGE;
-      },
       body: t.Object({
         title: t.Optional(t.String()),
         content: t.String(),
