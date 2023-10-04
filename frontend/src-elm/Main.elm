@@ -36,7 +36,9 @@ port receiveRandomValues : (List Int -> msg) -> Sub msg
 
 subscriptions : Model -> Sub Msg
 subscriptions _ =
+    -- TODO: if case model is logged in?
     receiveRandomValues ReceivedRandomValues
+        |> Sub.map LoggedInView
 
 
 dummyNewNote : Maybe NewNoteData
@@ -138,15 +140,13 @@ type LoggedOutMsg
     | Resulted (Result Http.Error ())
 
 
-type Msg
-    = LoggedOutView LoggedOutMsg
-    | FullSyncResp (Result Http.Error Api.FullSyncResponse)
+type LoggedInMsg
+    = TogglePinNote ID
     | NewTitleChange String
     | NewNotePlainTextContentChange String
     | NewNoteIsListChange Bool
     | AddNote
     | ReceivedRandomValues (List Int)
-    | TogglePinNote ID
     | DeleteNote ID
     | BeginWritingNewNote
     | FinishWritingNewNote
@@ -156,6 +156,12 @@ type Msg
     | RemoveLabelFromNewNote ID
     | RemoveLabelFromNote { noteID : ID, labelID : ID }
     | PostNewNoteResp (Result Http.Error Api.PostNewNoteResponse)
+
+
+type Msg
+    = LoggedOutView LoggedOutMsg
+    | LoggedInView LoggedInMsg
+    | FullSyncResp (Result Http.Error Api.FullSyncResponse)
 
 
 
@@ -237,7 +243,7 @@ update msg model =
                                 model |> pure
 
                             else
-                                ( model, Api.logIn username password Resulted |> Cmd.map (\l -> LoggedOutView l) )
+                                ( model, Api.logIn username password Resulted |> Cmd.map LoggedOutView )
 
                         Resulted res ->
                             case res of
@@ -257,6 +263,229 @@ update msg model =
 
         LoggedIn ->
             case msg of
+                LoggedInView loggedInMsg ->
+                    case loggedInMsg of
+                        TogglePinNote uid ->
+                            { model
+                                | notes =
+                                    List.map
+                                        (\n ->
+                                            if n.id == uid then
+                                                { n | pinned = not n.pinned }
+
+                                            else
+                                                n
+                                        )
+                                        model.notes
+                            }
+                                |> pure
+
+                        RemoveLabelFromNote { noteID, labelID } ->
+                            { model
+                                | notes =
+                                    List.map
+                                        (\n ->
+                                            if sameId n.id noteID then
+                                                { n | labels = n.labels |> List.filter (idDiff labelID) }
+
+                                            else
+                                                n
+                                        )
+                                        model.notes
+                            }
+                                |> pure
+
+                        NewNoteIsListChange v ->
+                            { model
+                                | isNewNoteAList = v
+
+                                -- , newContent = Right (String.split "\n" model.newContent)
+                            }
+                                |> pure
+
+                        AddNote ->
+                            -- TODO: check if note is empty
+                            -- TODO: no iAwaitingRandomValues, instead a compact type
+                            ( model
+                            , requestRandomValues ()
+                            )
+
+                        DeleteNote uid ->
+                            { model
+                                | notes =
+                                    List.filter (\n -> idDiff n.id uid) model.notes
+                            }
+                                |> pure
+
+                        ReceivedRandomValues values ->
+                            { model | seeds = List.map Random.initialSeed values }
+                                |> pure
+
+                        BeginWritingNewNote ->
+                            { model
+                                | isWritingANewNote =
+                                    Just
+                                        { title = ""
+                                        , content = ""
+                                        , labels = Nothing
+                                        }
+                            }
+                                |> pure
+
+                        NewTitleChange s ->
+                            { model
+                                | isWritingANewNote =
+                                    Maybe.map
+                                        (\data ->
+                                            { data
+                                                | title = s
+                                            }
+                                        )
+                                        model.isWritingANewNote
+                            }
+                                |> pure
+
+                        NewNotePlainTextContentChange s ->
+                            { model
+                                | isWritingANewNote =
+                                    Maybe.map
+                                        (\data ->
+                                            { data | content = s }
+                                        )
+                                        model.isWritingANewNote
+                            }
+                                |> pure
+
+                        SearchLabelsQueryChange s ->
+                            { model
+                                | isWritingANewNote =
+                                    Maybe.map
+                                        (\data ->
+                                            { data
+                                                | labels =
+                                                    Maybe.map
+                                                        (\{ labels } ->
+                                                            { labels = labels
+                                                            , labelsSearchQuery = s
+                                                            }
+                                                        )
+                                                        data.labels
+                                            }
+                                        )
+                                        model.isWritingANewNote
+                            }
+                                |> pure
+
+                        AddLabelToNewNote newLabel ->
+                            { model
+                                | isWritingANewNote =
+                                    Maybe.map
+                                        (\data ->
+                                            { data
+                                                | labels =
+                                                    Maybe.map
+                                                        (\{ labelsSearchQuery, labels } ->
+                                                            { labels = newLabel :: labels
+                                                            , labelsSearchQuery = labelsSearchQuery
+                                                            }
+                                                        )
+                                                        data.labels
+                                            }
+                                        )
+                                        model.isWritingANewNote
+                            }
+                                |> pure
+
+                        RemoveLabelFromNewNote labelID ->
+                            { model
+                                | isWritingANewNote =
+                                    model.isWritingANewNote
+                                        |> Maybe.map
+                                            (\data ->
+                                                { data
+                                                    | labels =
+                                                        data.labels
+                                                            |> Maybe.map
+                                                                (\{ labelsSearchQuery, labels } ->
+                                                                    { labels = labels |> List.filter (idDiff labelID)
+                                                                    , labelsSearchQuery = labelsSearchQuery
+                                                                    }
+                                                                )
+                                                }
+                                            )
+                            }
+                                |> pure
+
+                        FinishWritingNewNote ->
+                            case model.isWritingANewNote of
+                                Nothing ->
+                                    model |> pure
+
+                                Just newNoteData ->
+                                    if String.length newNoteData.content == 0 then
+                                        model |> pure
+
+                                    else
+                                        ( { model
+                                            | isWritingANewNote = Nothing
+                                            , notes =
+                                                model.notes
+                                                    ++ [ { id = OfflineID (generateUID model.seeds |> Tuple.first)
+                                                         , title = newNoteData.title
+                                                         , content = newNoteData.content
+                                                         , pinned = False
+                                                         , labels =
+                                                            case newNoteData.labels of
+                                                                Just { labels } ->
+                                                                    labels
+
+                                                                Nothing ->
+                                                                    []
+                                                         }
+                                                       ]
+                                          }
+                                        , Cmd.batch
+                                            [ requestRandomValues ()
+
+                                            -- TODO: sync with local db
+                                            , Api.postNewNote
+                                                { title =
+                                                    if String.length newNoteData.title == 0 then
+                                                        Nothing
+
+                                                    else
+                                                        Just newNoteData.title
+                                                , content = newNoteData.content
+                                                , pinned = Nothing
+                                                }
+                                                (\l -> LoggedInView (PostNewNoteResp l))
+                                            ]
+                                        )
+
+                        PostNewNoteResp res ->
+                            -- TODO:
+                            model |> pure
+
+                        BeginAddingNewNoteLabels ->
+                            case model.isWritingANewNote of
+                                Just data ->
+                                    { model
+                                        | isWritingANewNote =
+                                            Just
+                                                { data
+                                                    | labels =
+                                                        Just
+                                                            { labels = []
+                                                            , labelsSearchQuery = ""
+                                                            }
+                                                }
+                                    }
+                                        |> pure
+
+                                Nothing ->
+                                    model
+                                        |> pure
+
                 -- TODO: Change later
                 LoggedOutView _ ->
                     ( model, Cmd.none )
@@ -290,227 +519,6 @@ update msg model =
                         Err v ->
                             model |> pure
 
-                RemoveLabelFromNote { noteID, labelID } ->
-                    { model
-                        | notes =
-                            List.map
-                                (\n ->
-                                    if sameId n.id noteID then
-                                        { n | labels = n.labels |> List.filter (idDiff labelID) }
-
-                                    else
-                                        n
-                                )
-                                model.notes
-                    }
-                        |> pure
-
-                NewNoteIsListChange v ->
-                    { model
-                        | isNewNoteAList = v
-
-                        -- , newContent = Right (String.split "\n" model.newContent)
-                    }
-                        |> pure
-
-                AddNote ->
-                    -- TODO: check if note is empty
-                    -- TODO: no iAwaitingRandomValues, instead a compact type
-                    ( model
-                    , requestRandomValues ()
-                    )
-
-                DeleteNote uid ->
-                    { model
-                        | notes =
-                            List.filter (\n -> idDiff n.id uid) model.notes
-                    }
-                        |> pure
-
-                TogglePinNote uid ->
-                    { model
-                        | notes =
-                            List.map
-                                (\n ->
-                                    if n.id == uid then
-                                        { n | pinned = not n.pinned }
-
-                                    else
-                                        n
-                                )
-                                model.notes
-                    }
-                        |> pure
-
-                ReceivedRandomValues values ->
-                    { model | seeds = List.map Random.initialSeed values }
-                        |> pure
-
-                BeginWritingNewNote ->
-                    { model
-                        | isWritingANewNote =
-                            Just
-                                { title = ""
-                                , content = ""
-                                , labels = Nothing
-                                }
-                    }
-                        |> pure
-
-                NewTitleChange s ->
-                    { model
-                        | isWritingANewNote =
-                            Maybe.map
-                                (\data ->
-                                    { data
-                                        | title = s
-                                    }
-                                )
-                                model.isWritingANewNote
-                    }
-                        |> pure
-
-                NewNotePlainTextContentChange s ->
-                    { model
-                        | isWritingANewNote =
-                            Maybe.map
-                                (\data ->
-                                    { data | content = s }
-                                )
-                                model.isWritingANewNote
-                    }
-                        |> pure
-
-                SearchLabelsQueryChange s ->
-                    { model
-                        | isWritingANewNote =
-                            Maybe.map
-                                (\data ->
-                                    { data
-                                        | labels =
-                                            Maybe.map
-                                                (\{ labels } ->
-                                                    { labels = labels
-                                                    , labelsSearchQuery = s
-                                                    }
-                                                )
-                                                data.labels
-                                    }
-                                )
-                                model.isWritingANewNote
-                    }
-                        |> pure
-
-                AddLabelToNewNote newLabel ->
-                    { model
-                        | isWritingANewNote =
-                            Maybe.map
-                                (\data ->
-                                    { data
-                                        | labels =
-                                            Maybe.map
-                                                (\{ labelsSearchQuery, labels } ->
-                                                    { labels = newLabel :: labels
-                                                    , labelsSearchQuery = labelsSearchQuery
-                                                    }
-                                                )
-                                                data.labels
-                                    }
-                                )
-                                model.isWritingANewNote
-                    }
-                        |> pure
-
-                RemoveLabelFromNewNote labelID ->
-                    { model
-                        | isWritingANewNote =
-                            model.isWritingANewNote
-                                |> Maybe.map
-                                    (\data ->
-                                        { data
-                                            | labels =
-                                                data.labels
-                                                    |> Maybe.map
-                                                        (\{ labelsSearchQuery, labels } ->
-                                                            { labels = labels |> List.filter (idDiff labelID)
-                                                            , labelsSearchQuery = labelsSearchQuery
-                                                            }
-                                                        )
-                                        }
-                                    )
-                    }
-                        |> pure
-
-                FinishWritingNewNote ->
-                    case model.isWritingANewNote of
-                        Nothing ->
-                            model |> pure
-
-                        Just newNoteData ->
-                            if String.length newNoteData.content == 0 then
-                                model |> pure
-
-                            else
-                                ( { model
-                                    | isWritingANewNote = Nothing
-                                    , notes =
-                                        model.notes
-                                            ++ [ { id = OfflineID (generateUID model.seeds |> Tuple.first)
-                                                 , title = newNoteData.title
-                                                 , content = newNoteData.content
-                                                 , pinned = False
-                                                 , labels =
-                                                    case newNoteData.labels of
-                                                        Just { labels } ->
-                                                            labels
-
-                                                        Nothing ->
-                                                            []
-                                                 }
-                                               ]
-                                  }
-                                , Cmd.batch
-                                    [ requestRandomValues ()
-
-                                    -- TODO: sync with local db
-                                    , Api.postNewNote
-                                        { title =
-                                            if String.length newNoteData.title == 0 then
-                                                Nothing
-
-                                            else
-                                                Just newNoteData.title
-                                        , content = newNoteData.content
-                                        , pinned = Nothing
-                                        }
-                                        PostNewNoteResp
-                                    ]
-                                )
-
-                PostNewNoteResp res ->
-                    -- TODO:
-                    model |> pure
-
-                BeginAddingNewNoteLabels ->
-                    case model.isWritingANewNote of
-                        Just data ->
-                            { model
-                                | isWritingANewNote =
-                                    Just
-                                        { data
-                                            | labels =
-                                                Just
-                                                    { labels = []
-                                                    , labelsSearchQuery = ""
-                                                    }
-                                        }
-                            }
-                                |> pure
-
-                        Nothing ->
-                            model
-                                |> pure
-
 
 
 -- VIEW
@@ -535,172 +543,7 @@ view model =
                 div [] [ text "TODO" ]
 
             LoggedIn ->
-                div [ css [ height (pct 100), overflow auto ] ]
-                    [ nav
-                        [ css
-                            [ backgroundColor (rgb 140 20 254)
-                            , color (rgb 255 255 255)
-                            , padding2 (px 10) (px 30)
-                            , publicSans
-                            , fontWeight bolder
-                            , fontSize (px 25)
-                            , borderBottom3 (px 3) solid (rgb 0 0 0)
-                            , position sticky
-                            , top (px 0)
-                            ]
-                        ]
-                        [ text "Notes" ]
-                    , div []
-                        (case model.isWritingANewNote of
-                            Nothing ->
-                                [ div [ css [ fullWidth, displayFlex, marginTop (px 30) ] ]
-                                    [ div [ css [ margin2 (px 0) auto, width (px 500) ] ]
-                                        [ input
-                                            [ onClick BeginWritingNewNote
-                                            , css
-                                                [ border3 (px 3) solid (rgb 0 0 0)
-                                                , publicSans
-                                                , fontWeight bold
-                                                , padding (px 8)
-                                                , margin2 (px 0) auto
-                                                , fullWidth
-                                                , backgroundColor (rgb 255 203 127)
-                                                ]
-                                            , placeholder "TAKE A NEW NOTE"
-                                            ]
-                                            []
-                                        ]
-                                    ]
-                                ]
-
-                            Just data ->
-                                [ div
-                                    [ css
-                                        [ displayFlex
-                                        , marginTop (px 30)
-                                        ]
-                                    ]
-                                    [ form
-                                        [ css
-                                            [ displayFlex
-                                            , margin2 auto auto
-                                            , flexDirection column
-                                            , border3 (px 3) solid (rgb 0 0 0)
-                                            , hover [ boxShadow4 (px 6) (px 6) (px 0) (rgb 0 0 0) ]
-                                            , margin2 (px 0) auto
-                                            , minWidth (px 500)
-                                            ]
-                                        , onSubmit FinishWritingNewNote
-                                        ]
-                                        [ -- TODO: Add focus on input task
-                                          input
-                                            [ css
-                                                [ publicSans
-                                                , border (px 0)
-                                                , backgroundColor (rgb 255 203 127)
-                                                , padding (px 8)
-                                                , fontSize (px 16)
-                                                , margin2 (px 0) auto
-                                                , fullWidth
-                                                ]
-                                            , placeholder "Grocery List"
-                                            , onInput NewTitleChange
-                                            , value data.title
-                                            ]
-                                            []
-                                        , textarea
-                                            [ css
-                                                [ backgroundColor (rgb 255 203 127)
-                                                , border (px 0)
-                                                , publicSans
-                                                , padding (px 8)
-                                                , fontSize (px 16)
-                                                , margin2 (px 0) auto
-                                                , fullWidth
-                                                , minWidth (px 494)
-                                                , minHeight (px 150)
-                                                ]
-                                            , placeholder "Milk, eggs, bread, and fruits."
-                                            , onInput NewNotePlainTextContentChange
-                                            , value data.content
-                                            ]
-                                            []
-                                        , case data.labels of
-                                            Just { labels, labelsSearchQuery } ->
-                                                div [ css [ marginTop (px 8) ] ]
-                                                    [ label [ css [ color (hex "fff"), mx (px 15) ] ] [ text "Labels:" ]
-                                                    , input [ placeholder "Search label", value labelsSearchQuery, onInput SearchLabelsQueryChange ] []
-                                                    , div
-                                                        []
-                                                        -- TODO: fix styles
-                                                        (List.map
-                                                            (\l ->
-                                                                button
-                                                                    [ css [ margin (px 5), padding2 (px 5) (px 10) ]
-                                                                    , onClick (AddLabelToNewNote l.id)
-                                                                    , type_ "button"
-                                                                    ]
-                                                                    [ text l.name ]
-                                                            )
-                                                            (model.labels
-                                                                |> List.filter (\l -> List.any (\j -> j == l.id) labels |> not)
-                                                                |> List.filter (.name >> String.toLower >> String.contains labelsSearchQuery)
-                                                            )
-                                                        )
-                                                    , div [ css [ color (hex "fff"), mx (px 15) ] ] [ text "Selected labels:" ]
-                                                    , div
-                                                        []
-                                                        (List.map
-                                                            (\l ->
-                                                                button
-                                                                    [ css
-                                                                        [ margin (px 5), padding2 (px 5) (px 10) ]
-                                                                    , onClick (RemoveLabelFromNewNote l.id)
-                                                                    , type_ "button"
-                                                                    ]
-                                                                    [ text l.name ]
-                                                            )
-                                                            (List.filter (\r -> List.any (\e -> e == r.id) labels) model.labels)
-                                                        )
-                                                    ]
-
-                                            Nothing ->
-                                                div []
-                                                    [ button
-                                                        [ -- TODO: style
-                                                          css [ padding (px 15) ]
-                                                        , onClick BeginAddingNewNoteLabels
-                                                        , type_ "button"
-                                                        ]
-                                                        [ text "Add label" ]
-                                                    ]
-                                        , button
-                                            [ css
-                                                [ padding (px 15)
-                                                , fontSize (px 16)
-                                                ]
-                                            , type_ "submit"
-                                            , Html.Styled.Attributes.disabled (String.length data.content == 0)
-                                            ]
-                                            [ text "Create note" ]
-                                        ]
-                                    ]
-                                ]
-                        )
-
-                    -- TODO: add no notes empty state design
-                    , div
-                        [ -- TODO: give the tiled effect of google keep
-                          -- using translate and transitions
-                          css
-                            [ displayFlex
-                            , flexDirection row
-                            , flexWrap wrap
-                            , marginTop (px 30)
-                            ]
-                        ]
-                        (List.map (note model) (model.notes |> prioritizePinned))
-                    ]
+                Html.Styled.map LoggedInView (mainView model)
         ]
 
 
@@ -716,7 +559,177 @@ logInView { username, password } =
         ]
 
 
-note : Model -> Note -> Html Msg
+mainView : Model -> Html LoggedInMsg
+mainView model =
+    div [ css [ height (pct 100), overflow auto ] ]
+        [ nav
+            [ css
+                [ backgroundColor (rgb 140 20 254)
+                , color (rgb 255 255 255)
+                , padding2 (px 10) (px 30)
+                , publicSans
+                , fontWeight bolder
+                , fontSize (px 25)
+                , borderBottom3 (px 3) solid (rgb 0 0 0)
+                , position sticky
+                , top (px 0)
+                ]
+            ]
+            [ text "Notes" ]
+        , div []
+            (case model.isWritingANewNote of
+                Nothing ->
+                    [ div [ css [ fullWidth, displayFlex, marginTop (px 30) ] ]
+                        [ div [ css [ margin2 (px 0) auto, width (px 500) ] ]
+                            [ input
+                                [ onClick BeginWritingNewNote
+                                , css
+                                    [ border3 (px 3) solid (rgb 0 0 0)
+                                    , publicSans
+                                    , fontWeight bold
+                                    , padding (px 8)
+                                    , margin2 (px 0) auto
+                                    , fullWidth
+                                    , backgroundColor (rgb 255 203 127)
+                                    ]
+                                , placeholder "TAKE A NEW NOTE"
+                                ]
+                                []
+                            ]
+                        ]
+                    ]
+
+                Just data ->
+                    [ div
+                        [ css
+                            [ displayFlex
+                            , marginTop (px 30)
+                            ]
+                        ]
+                        [ form
+                            [ css
+                                [ displayFlex
+                                , margin2 auto auto
+                                , flexDirection column
+                                , border3 (px 3) solid (rgb 0 0 0)
+                                , hover [ boxShadow4 (px 6) (px 6) (px 0) (rgb 0 0 0) ]
+                                , margin2 (px 0) auto
+                                , minWidth (px 500)
+                                ]
+                            , onSubmit FinishWritingNewNote
+                            ]
+                            [ -- TODO: Add focus on input task
+                              input
+                                [ css
+                                    [ publicSans
+                                    , border (px 0)
+                                    , backgroundColor (rgb 255 203 127)
+                                    , padding (px 8)
+                                    , fontSize (px 16)
+                                    , margin2 (px 0) auto
+                                    , fullWidth
+                                    ]
+                                , placeholder "Grocery List"
+                                , onInput NewTitleChange
+                                , value data.title
+                                ]
+                                []
+                            , textarea
+                                [ css
+                                    [ backgroundColor (rgb 255 203 127)
+                                    , border (px 0)
+                                    , publicSans
+                                    , padding (px 8)
+                                    , fontSize (px 16)
+                                    , margin2 (px 0) auto
+                                    , fullWidth
+                                    , minWidth (px 494)
+                                    , minHeight (px 150)
+                                    ]
+                                , placeholder "Milk, eggs, bread, and fruits."
+                                , onInput NewNotePlainTextContentChange
+                                , value data.content
+                                ]
+                                []
+                            , case data.labels of
+                                Just { labels, labelsSearchQuery } ->
+                                    div [ css [ marginTop (px 8) ] ]
+                                        [ label [ css [ color (hex "fff"), mx (px 15) ] ] [ text "Labels:" ]
+                                        , input [ placeholder "Search label", value labelsSearchQuery, onInput SearchLabelsQueryChange ] []
+                                        , div
+                                            []
+                                            -- TODO: fix styles
+                                            (List.map
+                                                (\l ->
+                                                    button
+                                                        [ css [ margin (px 5), padding2 (px 5) (px 10) ]
+                                                        , onClick (AddLabelToNewNote l.id)
+                                                        , type_ "button"
+                                                        ]
+                                                        [ text l.name ]
+                                                )
+                                                (model.labels
+                                                    |> List.filter (\l -> List.any (\j -> j == l.id) labels |> not)
+                                                    |> List.filter (.name >> String.toLower >> String.contains labelsSearchQuery)
+                                                )
+                                            )
+                                        , div [ css [ color (hex "fff"), mx (px 15) ] ] [ text "Selected labels:" ]
+                                        , div
+                                            []
+                                            (List.map
+                                                (\l ->
+                                                    button
+                                                        [ css
+                                                            [ margin (px 5), padding2 (px 5) (px 10) ]
+                                                        , onClick (RemoveLabelFromNewNote l.id)
+                                                        , type_ "button"
+                                                        ]
+                                                        [ text l.name ]
+                                                )
+                                                (List.filter (\r -> List.any (\e -> e == r.id) labels) model.labels)
+                                            )
+                                        ]
+
+                                Nothing ->
+                                    div []
+                                        [ button
+                                            [ -- TODO: style
+                                              css [ padding (px 15) ]
+                                            , onClick BeginAddingNewNoteLabels
+                                            , type_ "button"
+                                            ]
+                                            [ text "Add label" ]
+                                        ]
+                            , button
+                                [ css
+                                    [ padding (px 15)
+                                    , fontSize (px 16)
+                                    ]
+                                , type_ "submit"
+                                , Html.Styled.Attributes.disabled (String.length data.content == 0)
+                                ]
+                                [ text "Create note" ]
+                            ]
+                        ]
+                    ]
+            )
+
+        -- TODO: add no notes empty state design
+        , div
+            [ -- TODO: give the tiled effect of google keep
+              -- using translate and transitions
+              css
+                [ displayFlex
+                , flexDirection row
+                , flexWrap wrap
+                , marginTop (px 30)
+                ]
+            ]
+            (List.map (note model) (model.notes |> prioritizePinned))
+        ]
+
+
+note : Model -> Note -> Html LoggedInMsg
 note model data =
     div
         [ css
