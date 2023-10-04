@@ -235,6 +235,29 @@ new Elysia()
       cookie: requiredCookieSession
     }
   )
+  .delete(
+    "/note/:id",
+    async ({ params: { id: noteID }, set }) => {
+      const noteExists = await prisma.note.findUnique({
+        where: { id: noteID }
+      });
+
+      if (!noteExists) {
+        set.status = 404;
+        return "Note not found";
+      }
+
+      return prisma.note.delete({
+        where: { id: noteID }
+      });
+    },
+    {
+      params: t.Object({
+        id: t.Numeric()
+      }),
+      cookie: requiredCookieSession
+    }
+  )
   .post(
     "/notes",
     async ({ body, cookie: { session } }) => {
