@@ -338,8 +338,8 @@ new Elysia()
         return await prisma.label.create({
           data: {
             name: body.name,
-            Note: { connect: { id: body.noteID } },
-            ownerId: session.value
+            ownerId: session.value,
+            ...(body.noteID ? { Note: { connect: { id: body.noteID! } } } : {})
           }
         });
       } catch (e) {
@@ -357,6 +357,35 @@ new Elysia()
       body: t.Object({
         name: t.String(),
         noteID: t.Optional(t.Number())
+      }),
+      cookie: requiredCookieSession
+    }
+  )
+  .put(
+    "/label/:id",
+    async ({ body, set, params: { id }, cookie: { session } }) => {
+      const label = await prisma.label.findFirst({
+        where: { id: id, ownerId: session.value }
+      });
+
+      if (!label) {
+        set.status = 404;
+        return "Label not found";
+      }
+
+      return prisma.label.update({
+        where: { id: id },
+        data: {
+          name: body.name
+        }
+      });
+    },
+    {
+      body: t.Object({
+        name: t.String()
+      }),
+      params: t.Object({
+        id: t.Numeric()
       }),
       cookie: requiredCookieSession
     }
