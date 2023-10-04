@@ -136,7 +136,7 @@ type LoggedOutMsg
     = UsernameChange String
     | PasswordChange String
     | Login
-    | Resulted (Result Http.Error ())
+    | LoginRes (Result Http.Error ())
 
 
 type LoggedInMsg
@@ -240,9 +240,9 @@ update msg model =
                                 model |> pure
 
                             else
-                                ( model, Api.logIn username password Resulted |> Cmd.map LoggedOutView )
+                                ( model, Api.logIn username password LoginRes |> Cmd.map LoggedOutView )
 
-                        Resulted res ->
+                        LoginRes res ->
                             case res of
                                 Ok v ->
                                     ( { model | user = LoggedIn }, Api.fullSync FullSyncResp )
