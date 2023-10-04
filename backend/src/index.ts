@@ -390,6 +390,29 @@ new Elysia()
       cookie: requiredCookieSession
     }
   )
+  .delete(
+    "/label/:id",
+    async ({ params: { id }, set, cookie: { session } }) => {
+      const label = await prisma.label.findFirst({
+        where: { id: id, ownerId: session.value }
+      });
+
+      if (!label) {
+        set.status = 404;
+        return "Label not found";
+      }
+
+      return prisma.label.delete({
+        where: { id: id }
+      });
+    },
+    {
+      params: t.Object({
+        id: t.Numeric()
+      }),
+      cookie: requiredCookieSession
+    }
+  )
   .get(
     "/full-sync",
     async ({ cookie: { session } }) => {
