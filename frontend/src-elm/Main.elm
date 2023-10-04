@@ -111,7 +111,6 @@ type User
 type alias Model =
     { seeds : List Random.Seed
     , notes : List Note
-    , isNewNoteAList : Bool
     , isWritingANewNote : Maybe NewNoteData
     , labels : List Label
     , user : User
@@ -144,7 +143,6 @@ type LoggedInMsg
     = TogglePinNote ID
     | NewTitleChange String
     | NewNotePlainTextContentChange String
-    | NewNoteIsListChange Bool
     | AddNote
     | ReceivedRandomValues (List Int)
     | DeleteNote ID
@@ -180,7 +178,6 @@ init flags =
     in
     ( { seeds = seeds
       , notes = []
-      , isNewNoteAList = False
       , isWritingANewNote = Nothing
       , labels = []
       , user =
@@ -292,14 +289,6 @@ update msg model =
                                                 n
                                         )
                                         model.notes
-                            }
-                                |> pure
-
-                        NewNoteIsListChange v ->
-                            { model
-                                | isNewNoteAList = v
-
-                                -- , newContent = Right (String.split "\n" model.newContent)
                             }
                                 |> pure
 
