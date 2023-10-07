@@ -190,7 +190,11 @@ init flags =
                     , password = ""
                     }
       }
-    , Cmd.none
+    , if flags.hasSessionCookie then
+        Api.fullSync FullSyncResp
+
+      else
+        Cmd.none
     )
 
 
