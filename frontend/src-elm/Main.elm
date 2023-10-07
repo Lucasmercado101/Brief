@@ -112,6 +112,7 @@ type alias Model =
     { seeds : List Random.Seed
     , notes : List Note
     , isWritingANewNote : Maybe NewNoteData
+    , newLabelName : String
     , labels : List Label
     , user : User
     }
@@ -154,6 +155,9 @@ type LoggedInMsg
     | RemoveLabelFromNewNote ID
     | RemoveLabelFromNote { noteID : ID, labelID : ID }
     | PostNewNoteResp (Result Http.Error Api.PostNewNoteResponse)
+    | ChangeNewLabelName String
+    | CreateNewLabel
+    | NewLabelResp (Result Http.Error Api.NewLabelResponse)
 
 
 type Msg
@@ -179,6 +183,7 @@ init flags =
     ( { seeds = seeds
       , notes = []
       , isWritingANewNote = Nothing
+      , newLabelName = ""
       , labels = []
       , user =
             if flags.hasSessionCookie then
@@ -309,6 +314,36 @@ update msg model =
                                     List.filter (\n -> idDiff n.id uid) model.notes
                             }
                                 |> pure
+
+                        ChangeNewLabelName newName ->
+                            { model | newLabelName = newName }
+                                |> pure
+
+                        CreateNewLabel ->
+                            if String.length model.newLabelName == 0 then
+                                model |> pure
+
+                            else
+                                ( { model | newLabelName = "" }
+                                , Api.postNewLabel ( model.newLabelName, Nothing ) NewLabelResp
+                                    |> Cmd.map LoggedInView
+                                )
+
+                        NewLabelResp res ->
+                            case res of
+                                Ok v ->
+                                    { model
+                                        | labels =
+                                            { id = DatabaseID v.id
+                                            , name = v.name
+                                            }
+                                                :: model.labels
+                                    }
+                                        |> pure
+
+                                Err err ->
+                                    -- TODO: handle 403
+                                    model |> pure
 
                         ReceivedRandomValues values ->
                             { model | seeds = List.map Random.initialSeed values }
@@ -510,6 +545,7 @@ update msg model =
                                 |> pure
 
                         Err v ->
+                            -- TODO: handle 403
                             model |> pure
 
 
@@ -645,26 +681,34 @@ mainView model =
                                 ]
                                 []
                             , case data.labels of
-                                Just labelsData ->
-                                    let
-                                        searchQuery =
-                                            labelsData.labelsSearchQuery
-                                    in
-                                    case labelsData.labels of
+                                Just { labels, labelsSearchQuery } ->
+                                    case model.labels of
                                         [] ->
                                             -- TODO: design empty state
-                                            div [ css [ displayFlex, flexDirection column, publicSans, color (hex "fff"), padding (px 15) ] ]
-                                                [ text "No labels, add some"
+                                            form
+                                                [ css [ displayFlex, flexDirection column, publicSans, color (hex "fff"), padding (px 15) ]
+                                                , onSubmit CreateNewLabel
+                                                ]
+                                                [ text "No labels, create some"
                                                 , label []
                                                     [ text "Label:"
-                                                    , input [ placeholder "School" ] []
+                                                    , input
+                                                        [ placeholder "School"
+                                                        , onInput ChangeNewLabelName
+                                                        ]
+                                                        []
                                                     ]
+                                                , button
+                                                    [ type_ "submit"
+                                                    , Html.Styled.Attributes.disabled (String.length model.newLabelName == 0)
+                                                    ]
+                                                    [ text "Create label" ]
                                                 ]
 
-                                        labels ->
+                                        _ ->
                                             div [ css [ marginTop (px 8) ] ]
                                                 [ label [ css [ color (hex "fff"), mx (px 15) ] ] [ text "Labels:" ]
-                                                , input [ placeholder "Search label", value searchQuery, onInput SearchLabelsQueryChange ] []
+                                                , input [ placeholder "Search label", value labelsSearchQuery, onInput SearchLabelsQueryChange ] []
                                                 , div
                                                     []
                                                     -- TODO: fix styles
@@ -679,7 +723,7 @@ mainView model =
                                                         )
                                                         (model.labels
                                                             |> List.filter (\l -> List.any (\j -> j == l.id) labels |> not)
-                                                            |> List.filter (.name >> String.toLower >> String.contains searchQuery)
+                                                            |> List.filter (.name >> String.toLower >> String.contains labelsSearchQuery)
                                                         )
                                                     )
                                                 , div [ css [ color (hex "fff"), mx (px 15) ] ] [ text "Selected labels:" ]
