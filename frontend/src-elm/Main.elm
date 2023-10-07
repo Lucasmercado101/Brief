@@ -115,6 +115,7 @@ type alias Model =
     , newLabelName : String
     , labels : List Label
     , user : User
+    , offlineQueue : OfflineQueue LoggedInMsg
     }
 
 
@@ -185,6 +186,7 @@ init flags =
       , isWritingANewNote = Nothing
       , newLabelName = ""
       , labels = []
+      , offlineQueue = []
       , user =
             if flags.hasSessionCookie then
                 LoggedIn
@@ -1039,3 +1041,35 @@ mx l =
 my : Css.LengthOrAuto a -> Style
 my l =
     Css.batch [ Css.marginTop l, Css.marginBottom l ]
+
+
+
+--- Queue
+
+
+type alias OfflineQueue msg =
+    List ( Int, Cmd msg )
+
+
+type alias QueuePostNewLabel =
+    { offlineID : String
+    , name : String
+    }
+
+
+type alias QueuePostNewNoteOfflineDeps =
+    { offlineID : String
+    , title : Maybe String
+    , content : String
+    , pinned : Maybe Bool
+    , labels : List ID
+    }
+
+
+type alias QueuePostNewNote =
+    { offlineID : Api.ID
+    , title : Maybe String
+    , content : String
+    , pinned : Maybe Bool
+    , labels : List Api.ID
+    }
