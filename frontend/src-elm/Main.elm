@@ -645,43 +645,59 @@ mainView model =
                                 ]
                                 []
                             , case data.labels of
-                                Just { labels, labelsSearchQuery } ->
-                                    div [ css [ marginTop (px 8) ] ]
-                                        [ label [ css [ color (hex "fff"), mx (px 15) ] ] [ text "Labels:" ]
-                                        , input [ placeholder "Search label", value labelsSearchQuery, onInput SearchLabelsQueryChange ] []
-                                        , div
-                                            []
-                                            -- TODO: fix styles
-                                            (List.map
-                                                (\l ->
-                                                    button
-                                                        [ css [ margin (px 5), padding2 (px 5) (px 10) ]
-                                                        , onClick (AddLabelToNewNote l.id)
-                                                        , type_ "button"
-                                                        ]
-                                                        [ text l.name ]
-                                                )
-                                                (model.labels
-                                                    |> List.filter (\l -> List.any (\j -> j == l.id) labels |> not)
-                                                    |> List.filter (.name >> String.toLower >> String.contains labelsSearchQuery)
-                                                )
-                                            )
-                                        , div [ css [ color (hex "fff"), mx (px 15) ] ] [ text "Selected labels:" ]
-                                        , div
-                                            []
-                                            (List.map
-                                                (\l ->
-                                                    button
-                                                        [ css
-                                                            [ margin (px 5), padding2 (px 5) (px 10) ]
-                                                        , onClick (RemoveLabelFromNewNote l.id)
-                                                        , type_ "button"
-                                                        ]
-                                                        [ text l.name ]
-                                                )
-                                                (List.filter (\r -> List.any (\e -> e == r.id) labels) model.labels)
-                                            )
-                                        ]
+                                Just labelsData ->
+                                    let
+                                        searchQuery =
+                                            labelsData.labelsSearchQuery
+                                    in
+                                    case labelsData.labels of
+                                        [] ->
+                                            -- TODO: design empty state
+                                            div [ css [ displayFlex, flexDirection column, publicSans, color (hex "fff"), padding (px 15) ] ]
+                                                [ text "No labels, add some"
+                                                , label []
+                                                    [ text "Label:"
+                                                    , input [ placeholder "School" ] []
+                                                    ]
+                                                ]
+
+                                        labels ->
+                                            div [ css [ marginTop (px 8) ] ]
+                                                [ label [ css [ color (hex "fff"), mx (px 15) ] ] [ text "Labels:" ]
+                                                , input [ placeholder "Search label", value searchQuery, onInput SearchLabelsQueryChange ] []
+                                                , div
+                                                    []
+                                                    -- TODO: fix styles
+                                                    (List.map
+                                                        (\l ->
+                                                            button
+                                                                [ css [ margin (px 5), padding2 (px 5) (px 10) ]
+                                                                , onClick (AddLabelToNewNote l.id)
+                                                                , type_ "button"
+                                                                ]
+                                                                [ text l.name ]
+                                                        )
+                                                        (model.labels
+                                                            |> List.filter (\l -> List.any (\j -> j == l.id) labels |> not)
+                                                            |> List.filter (.name >> String.toLower >> String.contains searchQuery)
+                                                        )
+                                                    )
+                                                , div [ css [ color (hex "fff"), mx (px 15) ] ] [ text "Selected labels:" ]
+                                                , div
+                                                    []
+                                                    (List.map
+                                                        (\l ->
+                                                            button
+                                                                [ css
+                                                                    [ margin (px 5), padding2 (px 5) (px 10) ]
+                                                                , onClick (RemoveLabelFromNewNote l.id)
+                                                                , type_ "button"
+                                                                ]
+                                                                [ text l.name ]
+                                                        )
+                                                        (List.filter (\r -> List.any (\e -> e == r.id) labels) model.labels)
+                                                    )
+                                                ]
 
                                 Nothing ->
                                     div []
