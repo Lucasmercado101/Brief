@@ -70,6 +70,7 @@ type alias PostNewNoteInput =
     { title : Maybe String
     , content : String
     , pinned : Maybe Bool
+    , labels : List ID
     }
 
 
@@ -101,8 +102,10 @@ postNewNote inputData msg =
     riskyPost "note"
         (Http.jsonBody
             (JE.object
-                (( "content", JE.string inputData.content )
-                    :: (case inputData.title of
+                ([ ( "content", JE.string inputData.content )
+                 , ( "labels", JE.list JE.int inputData.labels )
+                 ]
+                    ++ (case inputData.title of
                             Just title ->
                                 [ ( "title", JE.string title ) ]
 
