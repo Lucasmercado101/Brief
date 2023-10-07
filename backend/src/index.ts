@@ -164,12 +164,34 @@ new Elysia()
   .post(
     "/note",
     async ({ body, cookie: { session } }) => {
+      if (body.labels) {
+        const labelsExist = await prisma.label.findMany({
+          where: {
+            id: {
+              in: body.labels
+            },
+            ownerId: session.value
+          },
+          select: {
+            id: true
+          }
+        });
+
+        if (labelsExist.length !== body.labels.length) {
+          return `Labels ${body.labels.filter(
+            (e) => !labelsExist.some((l) => l.id === e)
+          )} not found`;
+        }
+      }
       return await prisma.note
         .create({
           data: {
             userId: session.value,
             title: body.title,
-            content: body.content
+            content: body.content,
+            labels: {
+              connect: body.labels?.map((i) => ({ id: i })) ?? []
+            }
           }
         })
         .then((n) => ({
@@ -182,7 +204,7 @@ new Elysia()
       body: t.Object({
         title: t.Optional(t.String()),
         content: t.String(),
-        labels: t.Optional(t.Array(t.String())),
+        labels: t.Optional(t.Array(t.Number(), { uniqueItems: true })),
         pinned: t.Optional(t.Boolean())
       }),
       cookie: requiredCookieSession
