@@ -178,11 +178,12 @@ new Elysia()
         });
 
         if (labelsExist.length !== body.labels.length) {
-          return `Labels ${body.labels.filter(
+          return `Label(s) ${body.labels.filter(
             (e) => !labelsExist.some((l) => l.id === e)
           )} not found`;
         }
       }
+
       return await prisma.note
         .create({
           data: {
@@ -212,9 +213,29 @@ new Elysia()
   )
   .put(
     "/note/:id",
-    async ({ body, params: { id: noteID }, set }) => {
+    async ({ body, params: { id: noteID }, set, cookie: { session } }) => {
+      if (body.labels) {
+        const labelsExist = await prisma.label.findMany({
+          where: {
+            id: {
+              in: body.labels
+            },
+            ownerId: session.value
+          },
+          select: {
+            id: true
+          }
+        });
+
+        if (labelsExist.length !== body.labels.length) {
+          return `Label(s) ${body.labels.filter(
+            (e) => !labelsExist.some((l) => l.id === e)
+          )} not found`;
+        }
+      }
+
       const noteExists = await prisma.note.findUnique({
-        where: { id: noteID }
+        where: { id: noteID, userId: session.value }
       });
 
       if (!noteExists) {
@@ -248,7 +269,7 @@ new Elysia()
       body: t.Object({
         title: t.Optional(t.String()),
         content: t.Optional(t.String()),
-        labels: t.Optional(t.Array(t.Numeric())),
+        labels: t.Optional(t.Array(t.Number(), { uniqueItems: true })),
         pinned: t.Optional(t.Boolean())
       }),
       params: t.Object({
