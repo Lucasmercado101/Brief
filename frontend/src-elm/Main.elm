@@ -485,6 +485,31 @@ update msg model =
                                                         Just newNoteData.title
                                                 , content = newNoteData.content
                                                 , pinned = Nothing
+                                                , labels =
+                                                    case newNoteData.labels of
+                                                        Just { labels } ->
+                                                            labels
+                                                                |> List.filter
+                                                                    (\e ->
+                                                                        case e of
+                                                                            DatabaseID id ->
+                                                                                True
+
+                                                                            _ ->
+                                                                                False
+                                                                    )
+                                                                |> List.map
+                                                                    (\e ->
+                                                                        case e of
+                                                                            DatabaseID id ->
+                                                                                id
+
+                                                                            _ ->
+                                                                                1
+                                                                    )
+
+                                                        Nothing ->
+                                                            []
                                                 }
                                                 (\l -> LoggedInView (PostNewNoteResp l))
                                             ]
