@@ -126,6 +126,33 @@ postNewNote inputData msg =
 --
 
 
+type alias NewLabelResponse =
+    Label
+
+
+postNewLabel : ( String, Maybe ID ) -> (Result Http.Error NewLabelResponse -> msg) -> Cmd msg
+postNewLabel ( name, parentNoteID ) msg =
+    riskyPost "label"
+        (Http.jsonBody
+            (JE.object
+                (( "name", JE.string name )
+                    :: (case parentNoteID of
+                            Just noteId ->
+                                [ ( "noteID", JE.int noteId ) ]
+
+                            Nothing ->
+                                []
+                       )
+                )
+            )
+        )
+        (Http.expectJson msg labelDecoder)
+
+
+
+--
+
+
 type alias FullSyncResponse =
     ( List Note, List Label )
 
