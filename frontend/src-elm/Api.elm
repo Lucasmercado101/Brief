@@ -182,6 +182,26 @@ postNewLabel ( name, parentNoteID ) msg =
 ---
 
 
+type alias ToggleNotePinnedResp =
+    ( Int, Bool )
+
+
+toggleNotePinnedDecoder : Decoder ToggleNotePinnedResp
+toggleNotePinnedDecoder =
+    map2 Tuple.pair (field "id" int) (field "pinned" bool)
+
+
+toggleNotePinned : Int -> Bool -> (Result Http.Error ToggleNotePinnedResp -> msg) -> Cmd msg
+toggleNotePinned noteID pinned msg =
+    riskyPut ("note/" ++ String.fromInt noteID)
+        (Http.jsonBody (JE.object [ ( "pinned", JE.bool pinned ) ]))
+        (Http.expectJson msg toggleNotePinnedDecoder)
+
+
+
+---
+
+
 type alias FullSyncResponse =
     ( List Note, List Label )
 
