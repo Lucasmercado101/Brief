@@ -158,7 +158,7 @@ type LoggedInMsg
     | AddLabelToNewNote ID
     | RemoveLabelFromNewNote ID
     | RemoveLabelFromNote { noteID : ID, labelID : ID }
-    | PostNewNoteResp (Result Http.Error Api.PostNewNoteResponse)
+    | PostNewNoteResp String (Result Http.Error Api.PostNewNoteResponse)
     | ChangeNewLabelName String
     | CreateNewLabel
     | NewLabelResp (Result Http.Error Api.NewLabelResponse)
@@ -201,6 +201,7 @@ init flags =
                     , password = ""
                     }
       }
+      -- TODO: full-sync with regards to indexedDb
     , if flags.hasSessionCookie then
         Api.fullSync FullSyncResp
 
@@ -225,6 +226,7 @@ main =
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
+    -- TODO: sync with indexedDB
     case model.user of
         LoggedOut { username, password } ->
             case msg of
@@ -365,7 +367,7 @@ update msg model =
                                 , requestRandomValues ()
                                 )
                                     |> addToQueue
-                                        ( QNewLabel newLabel
+                                        ( QNewLabel
                                         , Api.postNewLabel ( model.newLabelName, Nothing ) NewLabelResp
                                             |> Cmd.map LoggedInView
                                         )
@@ -500,74 +502,100 @@ update msg model =
 
                                 Just newNoteData ->
                                     -- TODO: offline sync
+                                    let
+                                        newNoteOfflineId =
+                                            generateUID model.seeds |> Tuple.first
+
+                                        newNote =
+                                            { id = OfflineID newNoteOfflineId
+                                            , title = newNoteData.title
+                                            , content = newNoteData.content
+                                            , pinned = False
+                                            , labels =
+                                                case newNoteData.labels of
+                                                    Just { labels } ->
+                                                        labels
+
+                                                    Nothing ->
+                                                        []
+                                            }
+                                    in
                                     if String.length newNoteData.content == 0 then
                                         model |> pure
 
                                     else
                                         ( { model
                                             | isWritingANewNote = Nothing
-                                            , notes =
-                                                model.notes
-                                                    ++ [ { id = OfflineID (generateUID model.seeds |> Tuple.first)
-                                                         , title = newNoteData.title
-                                                         , content = newNoteData.content
-                                                         , pinned = False
-                                                         , labels =
-                                                            case newNoteData.labels of
-                                                                Just { labels } ->
-                                                                    labels
-
-                                                                Nothing ->
-                                                                    []
-                                                         }
-                                                       ]
+                                            , notes = newNote :: model.notes
                                           }
-                                        , Cmd.batch
-                                            [ requestRandomValues ()
-
-                                            -- TODO: sync with local db
-                                            , Api.postNewNote
-                                                { title =
-                                                    if String.length newNoteData.title == 0 then
-                                                        Nothing
-
-                                                    else
-                                                        Just newNoteData.title
-                                                , content = newNoteData.content
-                                                , pinned = Nothing
-                                                , labels =
-                                                    case newNoteData.labels of
-                                                        Just { labels } ->
-                                                            labels
-                                                                |> List.filter
-                                                                    (\e ->
-                                                                        case e of
-                                                                            DatabaseID id ->
-                                                                                True
-
-                                                                            _ ->
-                                                                                False
-                                                                    )
-                                                                |> List.map
-                                                                    (\e ->
-                                                                        case e of
-                                                                            DatabaseID id ->
-                                                                                id
-
-                                                                            _ ->
-                                                                                1
-                                                                    )
-
-                                                        Nothing ->
-                                                            []
-                                                }
-                                                (\l -> LoggedInView (PostNewNoteResp l))
-                                            ]
+                                        , requestRandomValues ()
                                         )
+                                            |> addToQueue
+                                                ( QNewNote
+                                                , Api.postNewNote
+                                                    { title =
+                                                        if String.length newNoteData.title == 0 then
+                                                            Nothing
 
-                        PostNewNoteResp res ->
-                            -- TODO:
-                            model |> pure
+                                                        else
+                                                            Just newNoteData.title
+                                                    , content = newNoteData.content
+                                                    , pinned = Nothing
+                                                    , labels =
+                                                        -- NOTE: assuming there's nothing else in the queue
+                                                        -- then all labels should be non-offline only labels
+                                                        -- NOTE: currently cannot create note WITH new labels in it
+                                                        -- so labels are created separately beforehand
+                                                        case newNoteData.labels of
+                                                            Just { labels } ->
+                                                                labels
+                                                                    |> List.filter
+                                                                        (\e ->
+                                                                            case e of
+                                                                                DatabaseID _ ->
+                                                                                    True
+
+                                                                                _ ->
+                                                                                    False
+                                                                        )
+                                                                    |> List.map
+                                                                        (\e ->
+                                                                            case e of
+                                                                                DatabaseID id ->
+                                                                                    id
+
+                                                                                _ ->
+                                                                                    1
+                                                                        )
+
+                                                            Nothing ->
+                                                                []
+                                                    }
+                                                    (PostNewNoteResp newNoteOfflineId)
+                                                    |> Cmd.map LoggedInView
+                                                )
+
+                        PostNewNoteResp originalOfflineID res ->
+                            case res of
+                                Ok newNote ->
+                                    { model
+                                        | notes =
+                                            model.notes
+                                                |> List.map
+                                                    (\n ->
+                                                        if sameId n.id (OfflineID originalOfflineID) then
+                                                            { n | id = DatabaseID newNote.id }
+
+                                                        else
+                                                            n
+                                                    )
+                                    }
+                                        |> pure
+                                        |> handleNextInQueue
+
+                                Err _ ->
+                                    -- TODO: handle 403
+                                    model |> pure
 
                         BeginAddingNewNoteLabels ->
                             case model.isWritingANewNote of
@@ -639,10 +667,10 @@ addToQueue ( action, req ) ( model, cmds ) =
         queue ->
             case action of
                 -- NOTE: optimizations
-                QNewLabel _ ->
+                QNewLabel ->
                     ( { model | offlineQueue = queue ++ [ ( action, req ) ] }, cmds )
 
-                QNewNote _ ->
+                QNewNote ->
                     ( { model | offlineQueue = queue ++ [ ( action, req ) ] }, cmds )
 
                 QDeleteNote _ ->
@@ -688,10 +716,10 @@ runNextInQueue ( model, originalCmds ) =
 
         action :: restQueue ->
             case action of
-                ( QNewLabel _, cmd ) ->
+                ( QNewLabel, cmd ) ->
                     ( { model | offlineQueue = restQueue }, cmd )
 
-                ( QNewNote _, cmd ) ->
+                ( QNewNote, cmd ) ->
                     ( { model | offlineQueue = restQueue }, cmd )
 
                 ( QPinNote ( id, newPinVal ), _ ) ->
@@ -708,7 +736,7 @@ runNextInQueue ( model, originalCmds ) =
                             )
 
                 ( QDeleteNote id, cmd ) ->
-                    -- NOTE: can just not send requests
+                    -- NOTE: it could just not send previous requests
                     -- since the note will get deleted
                     -- and there is no undo on deletion
                     case id of
@@ -1211,26 +1239,12 @@ my l =
 
 
 type alias OfflineQueue =
+    -- TODO: might not need cmd msg?
     List ( OfflineQueueAction, Cmd Msg )
 
 
 type OfflineQueueAction
-    = QNewLabel QueuePostNewLabel
+    = QNewLabel
     | QDeleteNote ID
     | QPinNote ( ID, Bool )
-    | QNewNote QueuePostNewNote
-
-
-type alias QueuePostNewLabel =
-    { offlineID : String
-    , name : String
-    }
-
-
-type alias QueuePostNewNote =
-    { offlineID : String
-    , title : Maybe String
-    , content : String
-    , pinned : Maybe Bool
-    , labels : List ID
-    }
+    | QNewNote
