@@ -146,7 +146,7 @@ type LoggedOutMsg
 
 
 type LoggedInMsg
-    = TogglePinNote ID
+    = ChangeNotePinned ( ID, Bool )
     | NewTitleChange String
     | NewNotePlainTextContentChange String
     | ReceivedRandomValues (List Int)
@@ -162,6 +162,7 @@ type LoggedInMsg
     | ChangeNewLabelName String
     | CreateNewLabel
     | NewLabelResp (Result Http.Error Api.NewLabelResponse)
+    | ToggleNotePinResp (Result Http.Error Api.ToggleNotePinnedResp)
 
 
 type Msg
@@ -234,9 +235,42 @@ update msg model =
                     )
 
                 queue ->
-                    ( { passedModel | offlineQueue = queue ++ [ ( action, req ) ] }
-                    , cmds
-                    )
+                    case action of
+                        QNewLabel _ ->
+                            ( { passedModel | offlineQueue = queue ++ [ ( action, req ) ] }, cmds )
+
+                        QDeleteNote _ ->
+                            -- TODO: optimizations
+                            ( { passedModel | offlineQueue = queue ++ [ ( action, req ) ] }, cmds )
+
+                        QPinNote ( id, _ ) ->
+                            -- NOTE: only keeping the latest pin toggle request
+                            ( { passedModel
+                                | offlineQueue =
+                                    (queue
+                                        |> List.filter
+                                            (\( act, _ ) ->
+                                                case act of
+                                                    QPinNote ( reqNoteId, _ ) ->
+                                                        idDiff id reqNoteId
+
+                                                    _ ->
+                                                        True
+                                            )
+                                    )
+                                        ++ [ ( action, req ) ]
+                              }
+                            , cmds
+                            )
+
+        removeLastQueued : ( Model, Cmd Msg ) -> ( Model, Cmd Msg )
+        removeLastQueued ( prevModel, prevCmds ) =
+            case prevModel.offlineQueue of
+                [] ->
+                    ( prevModel, prevCmds )
+
+                _ :: restQueue ->
+                    ( { prevModel | offlineQueue = restQueue }, prevCmds )
 
         runNextInQueue : ( Model, Cmd Msg ) -> ( Model, Cmd Msg )
         runNextInQueue ( prevModel, prevCmds ) =
@@ -249,8 +283,38 @@ update msg model =
                         ( QNewLabel _, cmd ) ->
                             ( { prevModel | offlineQueue = restQueue }, cmd )
 
-                        ( QNewNote { offlineID, title, content, pinned, labels }, cmd ) ->
-                            ( { prevModel | offlineQueue = restQueue }, cmd )
+                        ( QPinNote ( id, newPinVal ), _ ) ->
+                            case id of
+                                OfflineID _ ->
+                                    -- NOTE: should never be here, offlineId should be
+                                    -- replaced by database id from a previous queue response
+                                    ( { prevModel | offlineQueue = restQueue }, Cmd.none )
+
+                                DatabaseID dID ->
+                                    ( { prevModel | offlineQueue = restQueue }
+                                    , Api.toggleNotePinned dID newPinVal ToggleNotePinResp
+                                        |> Cmd.map LoggedInView
+                                    )
+
+                        ( QDeleteNote id, cmd ) ->
+                            -- NOTE: can just not send requests
+                            -- since the note will get deleted
+                            -- and there is no undo on deletion
+                            case id of
+                                DatabaseID _ ->
+                                    ( { prevModel | offlineQueue = restQueue }, cmd )
+
+                                OfflineID _ ->
+                                    -- TODO: Should never reach here: offline id is only
+                                    -- allowed so that previous create requests can replace
+                                    -- the offline id in the future and this never gets called
+                                    ( { prevModel | offlineQueue = restQueue }
+                                    , Cmd.none
+                                    )
+
+        handleNextInQueue : ( Model, Cmd Msg ) -> ( Model, Cmd Msg )
+        handleNextInQueue =
+            removeLastQueued >> runNextInQueue
     in
     case model.user of
         LoggedOut { username, password } ->
@@ -304,13 +368,13 @@ update msg model =
             case msg of
                 LoggedInView loggedInMsg ->
                     case loggedInMsg of
-                        TogglePinNote uid ->
+                        ChangeNotePinned ( uid, newPinnedVal ) ->
                             { model
                                 | notes =
                                     List.map
                                         (\n ->
                                             if n.id == uid then
-                                                { n | pinned = not n.pinned }
+                                                { n | pinned = newPinnedVal }
 
                                             else
                                                 n
@@ -318,6 +382,29 @@ update msg model =
                                         model.notes
                             }
                                 |> pure
+                                |> addToQueue
+                                    ( QPinNote ( uid, newPinnedVal )
+                                    , case uid of
+                                        DatabaseID dID ->
+                                            Api.toggleNotePinned dID newPinnedVal ToggleNotePinResp
+                                                |> Cmd.map LoggedInView
+
+                                        OfflineID _ ->
+                                            -- NOTE: if it has no DB id then it's sitting in the queue
+                                            -- waiting for a previous createNote request to finish
+                                            Cmd.none
+                                    )
+
+                        ToggleNotePinResp res ->
+                            case res of
+                                Ok _ ->
+                                    -- NOTE: we don't need to change anything internal
+                                    -- as it was already changed offline when first toggled pin
+                                    model |> pure |> handleNextInQueue
+
+                                Err err ->
+                                    -- TODO: handle 403
+                                    model |> pure
 
                         RemoveLabelFromNote { noteID, labelID } ->
                             -- TODO: online sync
@@ -376,7 +463,6 @@ update msg model =
                                         )
 
                         NewLabelResp res ->
-                            -- TODO: offline sync
                             case res of
                                 Ok resLabel ->
                                     ( { model
@@ -390,21 +476,10 @@ update msg model =
                                                         else
                                                             e
                                                     )
-                                        , offlineQueue =
-                                            model.offlineQueue
-                                                |> List.filter
-                                                    (\l ->
-                                                        case l of
-                                                            ( QNewLabel { name }, _ ) ->
-                                                                name /= resLabel.name
-
-                                                            ( QNewNote _, _ ) ->
-                                                                True
-                                                    )
                                       }
                                     , Cmd.none
                                     )
-                                        |> runNextInQueue
+                                        |> handleNextInQueue
 
                                 Err err ->
                                     -- TODO: handle 403
@@ -926,7 +1001,7 @@ note model data =
                     , paddingLeft (px 4)
                     , paddingTop (px 3)
                     ]
-                , onClick (TogglePinNote data.id)
+                , onClick (ChangeNotePinned ( data.id, not data.pinned ))
                 ]
                 [ Filled.push_pin 28 Inherit |> Svg.Styled.fromUnstyled ]
             , button
@@ -1127,7 +1202,13 @@ type alias OfflineQueue =
 
 type OfflineQueueAction
     = QNewLabel QueuePostNewLabel
-    | QNewNote QueuePostNewNoteOfflineDeps
+    | QDeleteNote ID
+    | QPinNote ( ID, Bool )
+
+
+
+-- will do later
+-- | QNewNote QueuePostNewNoteOfflineDeps
 
 
 type alias QueuePostNewLabel =
