@@ -36,6 +36,21 @@ riskyPost endpoint body expect =
         }
 
 
+riskyPut : String -> Http.Body -> Http.Expect msg -> Cmd msg
+riskyPut endpoint body expect =
+    riskyRequest
+        { url = baseUrl ++ endpoint
+        , headers = []
+        , method = "PUT"
+
+        -- TODO: timeout?
+        , timeout = Nothing
+        , tracker = Nothing
+        , body = body
+        , expect = expect
+        }
+
+
 type alias ID =
     Int
 
@@ -126,7 +141,18 @@ postNewNote inputData msg =
 
 
 
---
+---
+
+
+removeLabelFromNote : Int -> List Int -> (Result Http.Error () -> msg) -> Cmd msg
+removeLabelFromNote noteID labelsIDs msg =
+    riskyPut ("note/" ++ String.fromInt noteID)
+        (Http.jsonBody (JE.object [ ( "labels", JE.list JE.int labelsIDs ) ]))
+        (Http.expectWhatever msg)
+
+
+
+---
 
 
 type alias NewLabelResponse =
@@ -153,7 +179,7 @@ postNewLabel ( name, parentNoteID ) msg =
 
 
 
---
+---
 
 
 type alias FullSyncResponse =
