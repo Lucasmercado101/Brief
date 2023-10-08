@@ -220,6 +220,11 @@ main =
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
+    let
+        addToQueue : ( Model, Cmd Msg ) -> ( Model, Cmd Msg )
+        addToQueue ( m, cmds ) =
+            ( m, cmds )
+    in
     case model.user of
         LoggedOut { username, password } ->
             case msg of
@@ -321,13 +326,34 @@ update msg model =
                                 model |> pure
 
                             else
-                                ( { model | newLabelName = "", offlineQueue = [] }
-                                , Cmd.batch
-                                    [ requestRandomValues ()
-                                    , Api.postNewLabel ( model.newLabelName, Nothing ) NewLabelResp
-                                        |> Cmd.map LoggedInView
-                                    ]
-                                )
+                                let
+                                    newLabel =
+                                        { offlineID = generateUID model.seeds |> Tuple.first
+                                        , name = model.newLabelName
+                                        }
+                                in
+                                case model.offlineQueue of
+                                    [] ->
+                                        ( { model
+                                            | newLabelName = ""
+                                            , labels = { id = OfflineID newLabel.offlineID, name = newLabel.name } :: model.labels
+                                            , offlineQueue = [ QNewLabel newLabel ]
+                                          }
+                                        , Cmd.batch
+                                            [ requestRandomValues ()
+                                            , Api.postNewLabel ( model.newLabelName, Nothing ) NewLabelResp
+                                                |> Cmd.map LoggedInView
+                                            ]
+                                        )
+
+                                    queue ->
+                                        ( { model
+                                            | newLabelName = ""
+                                            , labels = { id = OfflineID newLabel.offlineID, name = newLabel.name } :: model.labels
+                                            , offlineQueue = queue ++ [ QNewLabel newLabel ]
+                                          }
+                                        , requestRandomValues ()
+                                        )
 
                         NewLabelResp res ->
                             -- TODO: offline sync
@@ -632,6 +658,16 @@ mainView model =
                 ]
             ]
             [ text "Notes" ]
+
+        -- TODO: placeholder
+        , div [ css [ padding (px 15), color (hex "fff"), publicSans ] ]
+            [ text "Labels (PLACEHOLDER):"
+            , div [] (List.map (\l -> div [] [ text l.name ]) model.labels)
+            , form [ onSubmit CreateNewLabel ]
+                [ input [ placeholder "School", value model.newLabelName, onInput ChangeNewLabelName ] []
+                , button [ type_ "submit" ] [ text "Create label" ]
+                ]
+            ]
         , div []
             (case model.isWritingANewNote of
                 Nothing ->
@@ -1053,8 +1089,7 @@ type alias OfflineQueue =
 
 type OfflineQueueAction
     = QNewLabel QueuePostNewLabel
-    | QNewNoteOffline QueuePostNewNoteOfflineDeps
-    | QNewNote QueuePostNewNote
+    | QNewNote QueuePostNewNoteOfflineDeps
 
 
 type alias QueuePostNewLabel =
@@ -1065,15 +1100,6 @@ type alias QueuePostNewLabel =
 
 type alias QueuePostNewNoteOfflineDeps =
     { offlineID : String
-    , title : Maybe String
-    , content : String
-    , pinned : Maybe Bool
-    , labels : List ID
-    }
-
-
-type alias QueuePostNewNote =
-    { offlineID : Api.ID
     , title : Maybe String
     , content : String
     , pinned : Maybe Bool
