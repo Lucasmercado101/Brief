@@ -81,6 +81,10 @@ sameId a b =
     not (idDiff a b)
 
 
+type alias UniqueStr =
+    String
+
+
 type alias Note =
     { id : ID
     , title : String
@@ -92,7 +96,7 @@ type alias Note =
 
 type alias Label =
     { id : ID
-    , name : String
+    , name : UniqueStr
     }
 
 
@@ -221,9 +225,32 @@ main =
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     let
-        addToQueue : ( Model, Cmd Msg ) -> ( Model, Cmd Msg )
-        addToQueue ( m, cmds ) =
-            ( m, cmds )
+        addToQueue : ( OfflineQueueAction, Cmd Msg ) -> ( Model, Cmd Msg ) -> ( Model, Cmd Msg )
+        addToQueue ( action, req ) ( passedModel, cmds ) =
+            case passedModel.offlineQueue of
+                [] ->
+                    ( { passedModel | offlineQueue = [ ( action, req ) ] }
+                    , Cmd.batch [ cmds, req ]
+                    )
+
+                queue ->
+                    ( { passedModel | offlineQueue = queue ++ [ ( action, req ) ] }
+                    , cmds
+                    )
+
+        runNextInQueue : ( Model, Cmd Msg ) -> ( Model, Cmd Msg )
+        runNextInQueue ( prevModel, prevCmds ) =
+            case prevModel.offlineQueue of
+                [] ->
+                    ( prevModel, prevCmds )
+
+                action :: restQueue ->
+                    case action of
+                        ( QNewLabel _, cmd ) ->
+                            ( { prevModel | offlineQueue = restQueue }, cmd )
+
+                        ( QNewNote { offlineID, title, content, pinned, labels }, cmd ) ->
+                            ( { prevModel | offlineQueue = restQueue }, cmd )
     in
     case model.user of
         LoggedOut { username, password } ->
@@ -325,6 +352,10 @@ update msg model =
                             if String.length model.newLabelName == 0 then
                                 model |> pure
 
+                            else if List.any (\l -> l.name == model.newLabelName) model.labels then
+                                -- TODO: make this visual to the user
+                                model |> pure
+
                             else
                                 let
                                     newLabel =
@@ -332,41 +363,48 @@ update msg model =
                                         , name = model.newLabelName
                                         }
                                 in
-                                case model.offlineQueue of
-                                    [] ->
-                                        ( { model
-                                            | newLabelName = ""
-                                            , labels = { id = OfflineID newLabel.offlineID, name = newLabel.name } :: model.labels
-                                            , offlineQueue = [ QNewLabel newLabel ]
-                                          }
-                                        , Cmd.batch
-                                            [ requestRandomValues ()
-                                            , Api.postNewLabel ( model.newLabelName, Nothing ) NewLabelResp
-                                                |> Cmd.map LoggedInView
-                                            ]
-                                        )
-
-                                    queue ->
-                                        ( { model
-                                            | newLabelName = ""
-                                            , labels = { id = OfflineID newLabel.offlineID, name = newLabel.name } :: model.labels
-                                            , offlineQueue = queue ++ [ QNewLabel newLabel ]
-                                          }
-                                        , requestRandomValues ()
+                                ( { model
+                                    | newLabelName = ""
+                                    , labels = { id = OfflineID newLabel.offlineID, name = newLabel.name } :: model.labels
+                                  }
+                                , requestRandomValues ()
+                                )
+                                    |> addToQueue
+                                        ( QNewLabel newLabel
+                                        , Api.postNewLabel ( model.newLabelName, Nothing ) NewLabelResp
+                                            |> Cmd.map LoggedInView
                                         )
 
                         NewLabelResp res ->
                             -- TODO: offline sync
                             case res of
-                                Ok v ->
-                                    { model
+                                Ok resLabel ->
+                                    ( { model
                                         | labels =
-                                            { id = DatabaseID v.id
-                                            , name = v.name
-                                            }
-                                                :: model.labels
-                                    }
-                                        |> pure
+                                            model.labels
+                                                |> List.map
+                                                    (\e ->
+                                                        if e.name == resLabel.name then
+                                                            { id = DatabaseID resLabel.id, name = resLabel.name }
+
+                                                        else
+                                                            e
+                                                    )
+                                        , offlineQueue =
+                                            model.offlineQueue
+                                                |> List.filter
+                                                    (\l ->
+                                                        case l of
+                                                            ( QNewLabel { name }, _ ) ->
+                                                                name /= resLabel.name
+
+                                                            ( QNewNote _, _ ) ->
+                                                                True
+                                                    )
+                                      }
+                                    , Cmd.none
+                                    )
+                                        |> runNextInQueue
 
                                 Err err ->
                                     -- TODO: handle 403
@@ -1084,7 +1122,7 @@ my l =
 
 
 type alias OfflineQueue =
-    List OfflineQueueAction
+    List ( OfflineQueueAction, Cmd Msg )
 
 
 type OfflineQueueAction
