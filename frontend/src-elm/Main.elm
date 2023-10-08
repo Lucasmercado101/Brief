@@ -115,7 +115,7 @@ type alias Model =
     , newLabelName : String
     , labels : List Label
     , user : User
-    , offlineQueue : OfflineQueue LoggedInMsg
+    , offlineQueue : OfflineQueue
     }
 
 
@@ -145,7 +145,6 @@ type LoggedInMsg
     = TogglePinNote ID
     | NewTitleChange String
     | NewNotePlainTextContentChange String
-    | AddNote
     | ReceivedRandomValues (List Int)
     | DeleteNote ID
     | BeginWritingNewNote
@@ -289,6 +288,7 @@ update msg model =
                                 |> pure
 
                         RemoveLabelFromNote { noteID, labelID } ->
+                            -- TODO: online sync
                             { model
                                 | notes =
                                     List.map
@@ -303,14 +303,8 @@ update msg model =
                             }
                                 |> pure
 
-                        AddNote ->
-                            -- TODO: check if note is empty
-                            -- TODO: no iAwaitingRandomValues, instead a compact type
-                            ( model
-                            , requestRandomValues ()
-                            )
-
                         DeleteNote uid ->
+                            -- TODO: offline sync
                             { model
                                 | notes =
                                     List.filter (\n -> idDiff n.id uid) model.notes
@@ -322,16 +316,21 @@ update msg model =
                                 |> pure
 
                         CreateNewLabel ->
+                            -- TODO: offline sync
                             if String.length model.newLabelName == 0 then
                                 model |> pure
 
                             else
-                                ( { model | newLabelName = "" }
-                                , Api.postNewLabel ( model.newLabelName, Nothing ) NewLabelResp
-                                    |> Cmd.map LoggedInView
+                                ( { model | newLabelName = "", offlineQueue = [] }
+                                , Cmd.batch
+                                    [ requestRandomValues ()
+                                    , Api.postNewLabel ( model.newLabelName, Nothing ) NewLabelResp
+                                        |> Cmd.map LoggedInView
+                                    ]
                                 )
 
                         NewLabelResp res ->
+                            -- TODO: offline sync
                             case res of
                                 Ok v ->
                                     { model
@@ -447,6 +446,7 @@ update msg model =
                                 |> pure
 
                         FinishWritingNewNote ->
+                            -- TODO: offline sync
                             case model.isWritingANewNote of
                                 Nothing ->
                                     model |> pure
@@ -1047,8 +1047,14 @@ my l =
 --- Queue
 
 
-type alias OfflineQueue msg =
-    List ( Int, Cmd msg )
+type alias OfflineQueue =
+    List OfflineQueueAction
+
+
+type OfflineQueueAction
+    = QNewLabel QueuePostNewLabel
+    | QNewNoteOffline QueuePostNewNoteOfflineDeps
+    | QNewNote QueuePostNewNote
 
 
 type alias QueuePostNewLabel =
