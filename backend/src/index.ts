@@ -378,13 +378,23 @@ new Elysia()
       }
 
       try {
-        return await prisma.label.create({
-          data: {
-            name: body.name,
-            ownerId: session.value,
-            ...(body.noteID ? { Note: { connect: { id: body.noteID! } } } : {})
-          }
-        });
+        return await prisma.label
+          .create({
+            data: {
+              name: body.name,
+              ownerId: session.value,
+              ...(body.noteID
+                ? { Note: { connect: { id: body.noteID! } } }
+                : {})
+            }
+          })
+          .then((e) => {
+            return {
+              ...e,
+              createdAt: e.createdAt.valueOf(),
+              updatedAt: e.updatedAt.valueOf()
+            };
+          });
       } catch (e) {
         if (e instanceof Prisma.PrismaClientKnownRequestError) {
           // "Unique constraint failed on the fields: (`name`,`ownerId`)"
