@@ -39,7 +39,8 @@ new Elysia()
     set.headers["Access-Control-Allow-Origin"] = origin;
     set.headers["Access-Control-Allow-Credentials"] = "true";
     set.headers["Access-Control-Allow-Headers"] = "content-type";
-    set.headers["Access-Control-Allow-Method"] = "POST";
+    set.headers["Access-Control-Allow-Methods"] =
+      request.headers.get("Access-Control-Request-Method") ?? "POST";
     // default max age
     set.headers["Access-Control-Max-Age"] = "5";
     set.status = 204;
@@ -49,7 +50,8 @@ new Elysia()
     set.headers["Access-Control-Allow-Origin"] = origin;
     set.headers["Access-Control-Allow-Credentials"] = "true";
     set.headers["Access-Control-Allow-Headers"] = "content-type";
-    set.headers["Access-Control-Allow-Method"] = "POST";
+    set.headers["Access-Control-Allow-Methods"] =
+      request.headers.get("Access-Control-Request-Method") ?? "POST";
     // default max age
     set.headers["Access-Control-Max-Age"] = "5";
   })
