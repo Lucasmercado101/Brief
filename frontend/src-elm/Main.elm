@@ -163,6 +163,7 @@ type LoggedInMsg
     | CreateNewLabel
     | NewLabelResp (Result Http.Error Api.NewLabelResponse)
     | ToggleNotePinResp (Result Http.Error Api.ToggleNotePinnedResp)
+    | DeleteNoteResp (Result Http.Error ())
 
 
 type Msg
@@ -340,6 +341,82 @@ update msg model =
                                     List.filter (\n -> idDiff n.id uid) model.notes
                             }
                                 |> pure
+                                |> (\( m, c ) ->
+                                        case uid of
+                                            DatabaseID dID ->
+                                                ( m, c )
+                                                    |> addToQueue
+                                                        ( QDeleteNote uid
+                                                        , Api.deleteNote dID DeleteNoteResp
+                                                            |> Cmd.map LoggedInView
+                                                        )
+
+                                            OfflineID id ->
+                                                -- check if note is in queue and hasn't been created yet
+                                                -- if so, remove it from queue and don't send delete request
+                                                case
+                                                    List.filter
+                                                        (\( action, _ ) ->
+                                                            case action of
+                                                                QNewNote noteID ->
+                                                                    case noteID of
+                                                                        OfflineID offlineId ->
+                                                                            offlineId == id
+
+                                                                        DatabaseID _ ->
+                                                                            False
+
+                                                                _ ->
+                                                                    False
+                                                        )
+                                                        m.offlineQueue
+                                                of
+                                                    -- this note is queued for creation on the db
+                                                    [ _ ] ->
+                                                        ( { m
+                                                            | offlineQueue =
+                                                                model.offlineQueue
+                                                                    |> List.filter
+                                                                        (\( ac, cm ) ->
+                                                                            case ac of
+                                                                                QNewNote newNoteID ->
+                                                                                    idDiff newNoteID uid
+
+                                                                                QPinNote ( pinNoteId, _ ) ->
+                                                                                    idDiff pinNoteId uid
+
+                                                                                QNewLabel ->
+                                                                                    True
+
+                                                                                QDeleteNote _ ->
+                                                                                    True
+                                                                        )
+                                                          }
+                                                        , c
+                                                        )
+
+                                                    -- must be in the middle of creation
+                                                    -- TODO: verify this ^
+                                                    _ ->
+                                                        ( m, c )
+                                                            |> addToQueue
+                                                                ( QDeleteNote uid
+                                                                , Cmd.none
+                                                                )
+                                   )
+
+                        DeleteNoteResp res ->
+                            case res of
+                                Ok _ ->
+                                    -- NOTE: already deleted the note when queued
+                                    -- no need to delete it here
+                                    model
+                                        |> pure
+                                        |> handleNextInQueue
+
+                                Err err ->
+                                    -- TODO: handle errors / 403
+                                    model |> pure
 
                         ChangeNewLabelName newName ->
                             { model | newLabelName = newName }
@@ -531,7 +608,7 @@ update msg model =
                                         , requestRandomValues ()
                                         )
                                             |> addToQueue
-                                                ( QNewNote
+                                                ( QNewNote (OfflineID newNoteOfflineId)
                                                 , Api.postNewNote
                                                     { title =
                                                         if String.length newNoteData.title == 0 then
@@ -670,7 +747,7 @@ addToQueue ( action, req ) ( model, cmds ) =
                 QNewLabel ->
                     ( { model | offlineQueue = queue ++ [ ( action, req ) ] }, cmds )
 
-                QNewNote ->
+                QNewNote _ ->
                     ( { model | offlineQueue = queue ++ [ ( action, req ) ] }, cmds )
 
                 QDeleteNote _ ->
@@ -719,7 +796,7 @@ runNextInQueue ( model, originalCmds ) =
                 ( QNewLabel, cmd ) ->
                     ( { model | offlineQueue = restQueue }, cmd )
 
-                ( QNewNote, cmd ) ->
+                ( QNewNote _, cmd ) ->
                     ( { model | offlineQueue = restQueue }, cmd )
 
                 ( QPinNote ( id, newPinVal ), _ ) ->
@@ -1247,4 +1324,4 @@ type OfflineQueueAction
     = QNewLabel
     | QDeleteNote ID
     | QPinNote ( ID, Bool )
-    | QNewNote
+    | QNewNote ID
