@@ -334,75 +334,72 @@ update msg model =
                             }
                                 |> pure
 
-                        DeleteNote uid ->
+                        DeleteNote toDeleteNoteID ->
                             -- TODO: offline sync
                             { model
                                 | notes =
-                                    List.filter (\n -> idDiff n.id uid) model.notes
+                                    List.filter (\n -> idDiff n.id toDeleteNoteID) model.notes
                             }
                                 |> pure
                                 |> (\( m, c ) ->
-                                        case uid of
+                                        case toDeleteNoteID of
                                             DatabaseID dID ->
                                                 ( m, c )
                                                     |> addToQueue
-                                                        ( QDeleteNote uid
+                                                        ( QDeleteNote toDeleteNoteID
                                                         , Api.deleteNote dID DeleteNoteResp
                                                             |> Cmd.map LoggedInView
                                                         )
 
-                                            OfflineID id ->
+                                            OfflineID _ ->
+                                                let
+                                                    addDeleteNoteToQueue =
+                                                        ( m, c ) |> addToQueue ( QDeleteNote toDeleteNoteID, Cmd.none )
+                                                in
                                                 -- check if note is in queue and hasn't been created yet
                                                 -- if so, remove it from queue and don't send delete request
-                                                case
-                                                    List.filter
-                                                        (\( action, _ ) ->
-                                                            case action of
-                                                                QNewNote noteID ->
-                                                                    case noteID of
-                                                                        OfflineID offlineId ->
-                                                                            offlineId == id
+                                                case m.offlineQueue of
+                                                    ( action, _ ) :: _ ->
+                                                        let
+                                                            removeAllNoteRelatedActions =
+                                                                ( { m
+                                                                    | offlineQueue =
+                                                                        model.offlineQueue
+                                                                            |> List.filter
+                                                                                (\( ac, _ ) ->
+                                                                                    case ac of
+                                                                                        QNewNote newNoteID ->
+                                                                                            idDiff newNoteID toDeleteNoteID
 
-                                                                        DatabaseID _ ->
-                                                                            False
+                                                                                        QPinNote ( pinNoteId, _ ) ->
+                                                                                            idDiff pinNoteId toDeleteNoteID
 
-                                                                _ ->
-                                                                    False
-                                                        )
-                                                        m.offlineQueue
-                                                of
-                                                    -- this note is queued for creation on the db
-                                                    [ _ ] ->
-                                                        ( { m
-                                                            | offlineQueue =
-                                                                model.offlineQueue
-                                                                    |> List.filter
-                                                                        (\( ac, cm ) ->
-                                                                            case ac of
-                                                                                QNewNote newNoteID ->
-                                                                                    idDiff newNoteID uid
+                                                                                        QNewLabel ->
+                                                                                            True
 
-                                                                                QPinNote ( pinNoteId, _ ) ->
-                                                                                    idDiff pinNoteId uid
-
-                                                                                QNewLabel ->
-                                                                                    True
-
-                                                                                QDeleteNote _ ->
-                                                                                    True
-                                                                        )
-                                                          }
-                                                        , c
-                                                        )
-
-                                                    -- must be in the middle of creation
-                                                    -- TODO: verify this ^
-                                                    _ ->
-                                                        ( m, c )
-                                                            |> addToQueue
-                                                                ( QDeleteNote uid
-                                                                , Cmd.none
+                                                                                        QDeleteNote _ ->
+                                                                                            True
+                                                                                )
+                                                                  }
+                                                                , c
                                                                 )
+                                                        in
+                                                        case action of
+                                                            QNewNote newNoteOfflineID ->
+                                                                if sameId newNoteOfflineID toDeleteNoteID then
+                                                                    -- this note was created and modified offline
+                                                                    -- it never synced with db, so we remove all requests
+                                                                    -- so that it doesn't get created or anything in the DB
+                                                                    removeAllNoteRelatedActions
+
+                                                                else
+                                                                    addDeleteNoteToQueue
+
+                                                            _ ->
+                                                                addDeleteNoteToQueue
+
+                                                    _ ->
+                                                        addDeleteNoteToQueue
                                    )
 
                         DeleteNoteResp res ->
