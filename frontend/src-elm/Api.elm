@@ -21,6 +21,21 @@ riskyGet endpoint body expect =
         }
 
 
+riskyDelete : String -> Http.Body -> Http.Expect msg -> Cmd msg
+riskyDelete endpoint body expect =
+    riskyRequest
+        { url = baseUrl ++ endpoint
+        , headers = []
+        , method = "DELETE"
+
+        -- TODO: timeout?
+        , timeout = Nothing
+        , tracker = Nothing
+        , body = body
+        , expect = expect
+        }
+
+
 riskyPost : String -> Http.Body -> Http.Expect msg -> Cmd msg
 riskyPost endpoint body expect =
     riskyRequest
@@ -148,6 +163,18 @@ removeLabelFromNote : Int -> List Int -> (Result Http.Error () -> msg) -> Cmd ms
 removeLabelFromNote noteID labelsIDs msg =
     riskyPut ("note/" ++ String.fromInt noteID)
         (Http.jsonBody (JE.object [ ( "labels", JE.list JE.int labelsIDs ) ]))
+        (Http.expectWhatever msg)
+
+
+
+---
+
+
+deleteNote : Int -> (Result Http.Error () -> msg) -> Cmd msg
+deleteNote noteID msg =
+    riskyDelete
+        ("note/" ++ String.fromInt noteID)
+        Http.emptyBody
         (Http.expectWhatever msg)
 
 
