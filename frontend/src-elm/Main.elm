@@ -960,7 +960,24 @@ mainView model =
         -- TODO: placeholder
         , div [ css [ padding (px 15), color (hex "fff"), publicSans ] ]
             [ text "Labels (PLACEHOLDER):"
-            , div [] (List.map (\l -> div [] [ text l.name ]) model.labels)
+            , div []
+                (List.map
+                    (\l ->
+                        div []
+                            [ text l.name
+                            , button
+                                [ css
+                                    [ border (px 0)
+                                    , backgroundColor (hex "ff0000")
+                                    , cursor pointer
+                                    , color (hex "fff")
+                                    ]
+                                ]
+                                [ Filled.close 24 Inherit |> Svg.Styled.fromUnstyled ]
+                            ]
+                    )
+                    model.labels
+                )
             , form [ onSubmit CreateNewLabel ]
                 [ input [ placeholder "School", value model.newLabelName, onInput ChangeNewLabelName ] []
                 , button [ type_ "submit" ] [ text "Create label" ]
