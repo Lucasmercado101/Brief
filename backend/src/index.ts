@@ -30,6 +30,32 @@ const requiredCookieSession = t.Cookie(
 );
 
 new Elysia()
+  .use(logger())
+  // NOTE: CORS -----------
+  // TODO: currently allows any origin
+  .options("/*", ({ set, request }) => {
+    const origin = request.headers.get("Origin") ?? "";
+    set.headers["Vary"] = origin;
+    set.headers["Access-Control-Allow-Origin"] = origin;
+    set.headers["Access-Control-Allow-Credentials"] = "true";
+    set.headers["Access-Control-Allow-Headers"] = "content-type";
+    set.headers["Access-Control-Allow-Methods"] =
+      request.headers.get("Access-Control-Request-Method") ?? "POST";
+    // default max age
+    set.headers["Access-Control-Max-Age"] = "5";
+    set.status = 204;
+  })
+  .onRequest(({ set, request }) => {
+    const origin = request.headers.get("Origin") ?? "";
+    set.headers["Access-Control-Allow-Origin"] = origin;
+    set.headers["Access-Control-Allow-Credentials"] = "true";
+    set.headers["Access-Control-Allow-Headers"] = "content-type";
+    set.headers["Access-Control-Allow-Methods"] =
+      request.headers.get("Access-Control-Request-Method") ?? "POST";
+    // default max age
+    set.headers["Access-Control-Max-Age"] = "5";
+  })
+  // NOTE: CORS END -------
   .onError(({ error, set, code }) => {
     switch (code) {
       case "VALIDATION":
@@ -58,7 +84,6 @@ new Elysia()
         return "An unexpected error has occurred.";
     }
   })
-  .use(logger())
   .post(
     "/register",
     async ({ set, body }) => {
@@ -89,6 +114,8 @@ new Elysia()
       })
     }
   )
+  // TODO: handle user having tampered cookie
+  // error when unsigning doesn't let me reassign and resign
   .post(
     "/login",
     async ({ set, cookie: { session }, body }) => {
@@ -115,8 +142,10 @@ new Elysia()
 
       session.value = userExists.id;
       session.maxAge = COOKIE_MAX_AGE;
+      session.sameSite = "none";
+      session.secure = true;
 
-      return "Logged in";
+      return userExists.id;
     },
     {
       body: t.Object({
@@ -131,25 +160,145 @@ new Elysia()
       )
     }
   )
+  .onBeforeHandle(({ cookie: { session } }) => {
+    session.maxAge = COOKIE_MAX_AGE;
+  })
   .post(
     "/note",
     async ({ body, cookie: { session } }) => {
-      return await prisma.note.create({
+      if (body.labels) {
+        const labelsExist = await prisma.label.findMany({
+          where: {
+            id: {
+              in: body.labels
+            },
+            ownerId: session.value
+          },
+          select: {
+            id: true
+          }
+        });
+
+        if (labelsExist.length !== body.labels.length) {
+          return `Label(s) ${body.labels.filter(
+            (e) => !labelsExist.some((l) => l.id === e)
+          )} not found`;
+        }
+      }
+
+      return await prisma.note
+        .create({
+          data: {
+            userId: session.value,
+            title: body.title,
+            content: body.content,
+            labels: {
+              connect: body.labels?.map((i) => ({ id: i })) ?? []
+            }
+          }
+        })
+        .then((n) => ({
+          ...n,
+          createdAt: n.createdAt.valueOf(),
+          updatedAt: n.updatedAt.valueOf()
+        }));
+    },
+    {
+      body: t.Object({
+        title: t.Optional(t.String()),
+        content: t.String(),
+        labels: t.Optional(t.Array(t.Number(), { uniqueItems: true })),
+        pinned: t.Optional(t.Boolean())
+      }),
+      cookie: requiredCookieSession
+    }
+  )
+  .put(
+    "/note/:id",
+    async ({ body, params: { id: noteID }, set, cookie: { session } }) => {
+      if (body.labels) {
+        const labelsExist = await prisma.label.findMany({
+          where: {
+            id: {
+              in: body.labels
+            },
+            ownerId: session.value
+          },
+          select: {
+            id: true
+          }
+        });
+
+        if (labelsExist.length !== body.labels.length) {
+          return `Label(s) ${body.labels.filter(
+            (e) => !labelsExist.some((l) => l.id === e)
+          )} not found`;
+        }
+      }
+
+      const noteExists = await prisma.note.findUnique({
+        where: { id: noteID, userId: session.value }
+      });
+
+      if (!noteExists) {
+        set.status = 404;
+        return "Note not found";
+      }
+
+      return prisma.note.update({
+        where: { id: noteID },
         data: {
-          userId: session.value,
           title: body.title,
-          content: body.content
+          content: body.content,
+          pinned: body.pinned,
+          ...(body.labels !== undefined
+            ? { labels: { set: body.labels!.map((i) => ({ id: i })) } }
+            : {})
+        },
+        include: {
+          labels: {
+            select: {
+              name: true,
+              id: true,
+              createdAt: true,
+              updatedAt: true
+            }
+          }
         }
       });
     },
     {
-      beforeHandle({ cookie: { session } }) {
-        session.maxAge = COOKIE_MAX_AGE;
-      },
       body: t.Object({
         title: t.Optional(t.String()),
-        content: t.String(),
-        labels: t.Optional(t.Array(t.String()))
+        content: t.Optional(t.String()),
+        labels: t.Optional(t.Array(t.Number(), { uniqueItems: true })),
+        pinned: t.Optional(t.Boolean())
+      }),
+      params: t.Object({
+        id: t.Numeric()
+      }),
+      cookie: requiredCookieSession
+    }
+  )
+  .delete(
+    "/note/:id",
+    async ({ params: { id: noteID }, set }) => {
+      const noteExists = await prisma.note.findUnique({
+        where: { id: noteID }
+      });
+
+      if (!noteExists) {
+        set.status = 404;
+        return "Note not found";
+      }
+
+      return prisma.note.delete({
+        where: { id: noteID }
+      });
+    },
+    {
+      params: t.Object({
+        id: t.Numeric()
       }),
       cookie: requiredCookieSession
     }
@@ -180,11 +329,38 @@ new Elysia()
   .get(
     "/notes",
     async ({ cookie: { session } }) => {
-      return await prisma.note.findMany({
-        where: {
-          userId: session.value
-        }
-      });
+      return await prisma.note
+        .findMany({
+          where: {
+            userId: session.value
+          },
+          include: {
+            labels: {
+              select: {
+                name: true,
+                id: true,
+                createdAt: true,
+                updatedAt: true
+              }
+            }
+          }
+        })
+        .then((e) => {
+          return e.map((n) => {
+            const labels = n.labels.map((l) => ({
+              ...l,
+              createdAt: l.createdAt.valueOf(),
+              updatedAt: l.updatedAt.valueOf()
+            }));
+
+            return {
+              ...n,
+              createdAt: n.createdAt.valueOf(),
+              updatedAt: n.updatedAt.valueOf(),
+              labels
+            };
+          });
+        });
     },
     {
       cookie: requiredCookieSession
@@ -204,13 +380,23 @@ new Elysia()
       }
 
       try {
-        return await prisma.label.create({
-          data: {
-            name: body.name,
-            noteId: body.noteID,
-            ownerId: session.value
-          }
-        });
+        return await prisma.label
+          .create({
+            data: {
+              name: body.name,
+              ownerId: session.value,
+              ...(body.noteID
+                ? { Note: { connect: { id: body.noteID! } } }
+                : {})
+            }
+          })
+          .then((e) => {
+            return {
+              ...e,
+              createdAt: e.createdAt.valueOf(),
+              updatedAt: e.updatedAt.valueOf()
+            };
+          });
       } catch (e) {
         if (e instanceof Prisma.PrismaClientKnownRequestError) {
           // "Unique constraint failed on the fields: (`name`,`ownerId`)"
@@ -226,6 +412,35 @@ new Elysia()
       body: t.Object({
         name: t.String(),
         noteID: t.Optional(t.Number())
+      }),
+      cookie: requiredCookieSession
+    }
+  )
+  .put(
+    "/label/:id",
+    async ({ body, set, params: { id }, cookie: { session } }) => {
+      const label = await prisma.label.findFirst({
+        where: { id: id, ownerId: session.value }
+      });
+
+      if (!label) {
+        set.status = 404;
+        return "Label not found";
+      }
+
+      return prisma.label.update({
+        where: { id: id },
+        data: {
+          name: body.name
+        }
+      });
+    },
+    {
+      body: t.Object({
+        name: t.String()
+      }),
+      params: t.Object({
+        id: t.Numeric()
       }),
       cookie: requiredCookieSession
     }
@@ -258,6 +473,74 @@ new Elysia()
       }),
       cookie: requiredCookieSession
     }
+  )
+  .delete(
+    "/label/:id",
+    async ({ params: { id }, set, cookie: { session } }) => {
+      const label = await prisma.label.findFirst({
+        where: { id: id, ownerId: session.value }
+      });
+
+      if (!label) {
+        set.status = 404;
+        return "Label not found";
+      }
+
+      return prisma.label.delete({
+        where: { id: id }
+      });
+    },
+    {
+      params: t.Object({
+        id: t.Numeric()
+      }),
+      cookie: requiredCookieSession
+    }
+  )
+  .get(
+    "/full-sync",
+    async ({ cookie: { session } }) => {
+      const userID = session.value;
+      const notes = await prisma.note
+        .findMany({
+          where: {
+            userId: userID
+          },
+          include: {
+            labels: {
+              select: {
+                id: true
+              }
+            }
+          }
+        })
+        .then((e) =>
+          e.map((l) => ({
+            ...l,
+            userId: undefined,
+            createdAt: l.createdAt.valueOf(),
+            updatedAt: l.updatedAt.valueOf(),
+            labels: l.labels.map((v) => v.id)
+          }))
+        );
+
+      const labels = await prisma.label.findMany({
+        where: {
+          ownerId: userID
+        }
+      });
+
+      return {
+        notes,
+        labels: labels.map((e) => ({
+          id: e.id,
+          name: e.name,
+          createdAt: e.createdAt.valueOf(),
+          updatedAt: e.updatedAt.valueOf()
+        }))
+      };
+    },
+    { cookie: requiredCookieSession }
   )
   .listen(PORT, (server) => {
     console.log(`🦊 Elysia is running at ${server?.hostname}:${server?.port} `);
