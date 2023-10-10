@@ -158,10 +158,10 @@ type LoggedInMsg
     | AddLabelToNewNote ID
     | RemoveLabelFromNewNote ID
     | RemoveLabelFromNote { noteID : ID, labelID : ID }
-    | PostNewNoteResp String (Result Http.Error Api.PostNewNoteResponse)
     | ChangeNewLabelName String
     | CreateNewLabel
-    | NewLabelResp (Result Http.Error Api.NewLabelResponse)
+    | PostNewNoteResp String (Result Http.Error Api.PostNewNoteResponse)
+    | NewLabelResp String (Result Http.Error Api.NewLabelResponse)
     | ToggleNotePinResp (Result Http.Error Api.ToggleNotePinnedResp)
     | DeleteNoteResp (Result Http.Error ())
 
@@ -359,8 +359,11 @@ update msg model =
 
                             else
                                 let
+                                    newLabelOfflineId =
+                                        generateUID model.seeds |> Tuple.first
+
                                     newLabel =
-                                        { offlineID = generateUID model.seeds |> Tuple.first
+                                        { offlineID = newLabelOfflineId
                                         , name = model.newLabelName
                                         }
                                 in
@@ -370,9 +373,9 @@ update msg model =
                                   }
                                 , requestRandomValues ()
                                 )
-                                    |> addToQueue (QNewLabel model.newLabelName)
+                                    |> addToQueue (QNewLabel model.newLabelName newLabelOfflineId)
 
-                        NewLabelResp res ->
+                        NewLabelResp originalLabelOfflineId res ->
                             case res of
                                 Ok resLabel ->
                                     ( { model
@@ -385,6 +388,34 @@ update msg model =
 
                                                         else
                                                             e
+                                                    )
+                                        , offlineQueue =
+                                            model.offlineQueue
+                                                |> List.map
+                                                    (\l ->
+                                                        case l of
+                                                            QNewNote noteID offlineLabelIDs data ->
+                                                                let
+                                                                    containsOldOfflineLabelThatIJustCreated =
+                                                                        List.any (\e -> e == originalLabelOfflineId) offlineLabelIDs
+                                                                in
+                                                                if containsOldOfflineLabelThatIJustCreated then
+                                                                    QNewNote
+                                                                        noteID
+                                                                        (offlineLabelIDs |> List.filter (\e -> e /= originalLabelOfflineId))
+                                                                        { data | labels = resLabel.id :: data.labels }
+
+                                                                else
+                                                                    l
+
+                                                            QNewLabel _ _ ->
+                                                                l
+
+                                                            QDeleteNote _ ->
+                                                                l
+
+                                                            QPinNote _ ->
+                                                                l
                                                     )
                                       }
                                     , Cmd.none
@@ -530,48 +561,48 @@ update msg model =
                                           }
                                         , requestRandomValues ()
                                         )
-                                            |> addToQueue
-                                                (QNewNote
-                                                    newNoteOfflineId
-                                                    { title =
-                                                        if String.length newNoteData.title == 0 then
-                                                            Nothing
+                                            |> (let
+                                                    labelIDsSplitter : List ID -> List String -> List Int -> ( List String, List Int )
+                                                    labelIDsSplitter ids offlineIds dbIds =
+                                                        case ids of
+                                                            [] ->
+                                                                ( offlineIds, dbIds )
 
-                                                        else
-                                                            Just newNoteData.title
-                                                    , content = newNoteData.content
-                                                    , pinned = Nothing
-                                                    , labels =
-                                                        -- NOTE: assuming there's nothing else in the queue
-                                                        -- then all labels should be non-offline only labels
-                                                        -- NOTE: currently cannot create note WITH new labels in it
-                                                        -- so labels are created separately beforehand
-                                                        case newNoteData.labels of
-                                                            Just { labels } ->
-                                                                labels
-                                                                    |> List.filter
-                                                                        (\e ->
-                                                                            case e of
-                                                                                DatabaseID _ ->
-                                                                                    True
+                                                            x :: xs ->
+                                                                case x of
+                                                                    OfflineID offlineId ->
+                                                                        labelIDsSplitter xs (offlineId :: offlineIds) dbIds
 
-                                                                                _ ->
-                                                                                    False
-                                                                        )
-                                                                    |> List.map
-                                                                        (\e ->
-                                                                            case e of
-                                                                                DatabaseID id ->
-                                                                                    id
+                                                                    DatabaseID dbID ->
+                                                                        labelIDsSplitter xs offlineIds (dbID :: dbIds)
 
-                                                                                _ ->
-                                                                                    1
-                                                                        )
+                                                    ( offlineLabelIDs, dbLabelIDs ) =
+                                                        case newNote.labels of
+                                                            [] ->
+                                                                ( [], [] )
 
-                                                            Nothing ->
-                                                                []
-                                                    }
-                                                )
+                                                            labels ->
+                                                                labelIDsSplitter labels [] []
+                                                in
+                                                addToQueue
+                                                    (QNewNote
+                                                        newNoteOfflineId
+                                                        offlineLabelIDs
+                                                        { title =
+                                                            if String.length newNoteData.title == 0 then
+                                                                Nothing
+
+                                                            else
+                                                                Just newNoteData.title
+                                                        , content = newNoteData.content
+                                                        , pinned = Nothing
+                                                        , labels =
+                                                            -- NOTE: currently cannot create note WITH new labels in it
+                                                            -- so labels are created separately beforehand
+                                                            dbLabelIDs
+                                                        }
+                                                    )
+                                               )
 
                         PostNewNoteResp originalOfflineID res ->
                             case res of
@@ -606,10 +637,10 @@ update msg model =
                                                                 else
                                                                     l
 
-                                                            QNewLabel _ ->
+                                                            QNewLabel _ _ ->
                                                                 l
 
-                                                            QNewNote _ _ ->
+                                                            QNewNote _ _ _ ->
                                                                 l
                                                     )
                                     }
@@ -693,10 +724,10 @@ addToQueue action ( model, cmds ) =
             { model
                 | offlineQueue =
                     case action of
-                        QNewLabel _ ->
+                        QNewLabel _ _ ->
                             queue ++ [ action ]
 
-                        QNewNote _ _ ->
+                        QNewNote _ _ _ ->
                             queue ++ [ action ]
 
                         QDeleteNote toDeleteNoteID ->
@@ -713,7 +744,7 @@ addToQueue action ( model, cmds ) =
                                                 |> List.filter
                                                     (\l ->
                                                         case l of
-                                                            QNewNote newNoteID _ ->
+                                                            QNewNote newNoteID _ _ ->
                                                                 sameId (OfflineID newNoteID) toDeleteNoteID
 
                                                             _ ->
@@ -731,13 +762,13 @@ addToQueue action ( model, cmds ) =
                                                     |> List.filter
                                                         (\ac ->
                                                             case ac of
-                                                                QNewNote newNoteID _ ->
+                                                                QNewNote newNoteID _ _ ->
                                                                     idDiff (OfflineID newNoteID) toDeleteNoteID
 
                                                                 QPinNote ( pinNoteId, _ ) ->
                                                                     idDiff pinNoteId toDeleteNoteID
 
-                                                                QNewLabel _ ->
+                                                                QNewLabel _ _ ->
                                                                     True
 
                                                                 QDeleteNote _ ->
@@ -789,11 +820,11 @@ runNextInQueue ( model, originalCmds ) =
 runAction : OfflineQueueAction -> Cmd Msg
 runAction action =
     case action of
-        QNewLabel newLabelName ->
-            Api.postNewLabel ( newLabelName, Nothing ) NewLabelResp
+        QNewLabel newLabelName labelOfflineId ->
+            Api.postNewLabel ( newLabelName, Nothing ) (NewLabelResp labelOfflineId)
                 |> Cmd.map LoggedInView
 
-        QNewNote newNoteOfflineId data ->
+        QNewNote newNoteOfflineId _ data ->
             Api.postNewNote data (PostNewNoteResp newNoteOfflineId)
                 |> Cmd.map LoggedInView
 
@@ -1320,7 +1351,7 @@ type alias OfflineQueue =
 
 
 type OfflineQueueAction
-    = QNewLabel String
+    = QNewLabel String String
     | QDeleteNote ID
     | QPinNote ( ID, Bool )
-    | QNewNote String Api.PostNewNoteInput
+    | QNewNote String (List String) Api.PostNewNoteInput
