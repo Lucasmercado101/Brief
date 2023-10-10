@@ -587,6 +587,31 @@ update msg model =
                                                         else
                                                             n
                                                     )
+                                        , offlineQueue =
+                                            model.offlineQueue
+                                                |> List.map
+                                                    (\l ->
+                                                        case l of
+                                                            QDeleteNote id ->
+                                                                if sameId id (OfflineID originalOfflineID) then
+                                                                    QDeleteNote (DatabaseID newNote.id)
+
+                                                                else
+                                                                    l
+
+                                                            QPinNote ( id, newPinStatus ) ->
+                                                                if sameId id (OfflineID originalOfflineID) then
+                                                                    QPinNote ( DatabaseID newNote.id, newPinStatus )
+
+                                                                else
+                                                                    l
+
+                                                            QNewLabel _ ->
+                                                                l
+
+                                                            QNewNote _ _ ->
+                                                                l
+                                                    )
                                     }
                                         |> pure
                                         |> handleNextInQueue
@@ -664,7 +689,7 @@ addToQueue action ( model, cmds ) =
             , Cmd.batch [ cmds, runAction action ]
             )
 
-        queue ->
+        (currentActionInProgress :: actionsNotInProgress) as queue ->
             { model
                 | offlineQueue =
                     case action of
@@ -674,9 +699,54 @@ addToQueue action ( model, cmds ) =
                         QNewNote _ _ ->
                             queue ++ [ action ]
 
-                        QDeleteNote _ ->
-                            -- TODO: optimizations
-                            queue ++ [ action ]
+                        QDeleteNote toDeleteNoteID ->
+                            case toDeleteNoteID of
+                                DatabaseID dID ->
+                                    queue ++ [ action ]
+
+                                OfflineID _ ->
+                                    -- check if note is in queue and hasn't been created yet
+                                    -- if so, remove it from queue and don't send delete request
+                                    let
+                                        noteHasNotBeenCreatedYet =
+                                            actionsNotInProgress
+                                                |> List.filter
+                                                    (\l ->
+                                                        case l of
+                                                            QNewNote newNoteID _ ->
+                                                                sameId (OfflineID newNoteID) toDeleteNoteID
+
+                                                            _ ->
+                                                                False
+                                                    )
+                                                |> List.isEmpty
+                                                |> not
+                                    in
+                                    if noteHasNotBeenCreatedYet then
+                                        -- don't add to the queue, no need to add it
+                                        -- just cancel every other action to create or modify
+                                        -- the offline only note
+                                        currentActionInProgress
+                                            :: (actionsNotInProgress
+                                                    |> List.filter
+                                                        (\ac ->
+                                                            case ac of
+                                                                QNewNote newNoteID _ ->
+                                                                    idDiff (OfflineID newNoteID) toDeleteNoteID
+
+                                                                QPinNote ( pinNoteId, _ ) ->
+                                                                    idDiff pinNoteId toDeleteNoteID
+
+                                                                QNewLabel _ ->
+                                                                    True
+
+                                                                QDeleteNote _ ->
+                                                                    True
+                                                        )
+                                               )
+
+                                    else
+                                        queue ++ [ action ]
 
                         QPinNote ( id, _ ) ->
                             -- only keeping the latest pin toggle request
@@ -729,89 +799,33 @@ runAction action =
 
         QPinNote ( id, newPinVal ) ->
             case id of
-                OfflineID _ ->
-                    -- NOTE: should never be here, offlineId should be
-                    -- replaced by database id from a previous queue response
-                    Cmd.none
-
-                -- , case uid of
-                --     DatabaseID dID ->
-                --         Api.toggleNotePinned dID newPinnedVal ToggleNotePinResp
-                --             |> Cmd.map LoggedInView
-                --     OfflineID _ ->
-                --         -- NOTE: if it has no DB id then it's sitting in the queue
-                --         -- waiting for a previous createNote request to finish
-                --         Cmd.none
                 DatabaseID dID ->
                     Api.toggleNotePinned dID newPinVal ToggleNotePinResp
                         |> Cmd.map LoggedInView
+
+                OfflineID _ ->
+                    -- NOTE: if it has no DB id then it's sitting in the queue
+                    -- waiting for a previous createNote request to finish
+                    -- ergo it should never reach here
+                    -- TODO: test this
+                    Cmd.none
 
         QDeleteNote id ->
             -- NOTE: it could just not send previous requests
             -- since the note will get deleted
             -- and there is no undo on deletion
             case id of
-                -- |> (\( m, c ) ->
-                --         case toDeleteNoteID of
-                --             DatabaseID dID ->
-                --                 ( m, c )
-                --                     |> addToQueue
-                --                         ( QDeleteNote toDeleteNoteID
-                --                         , Api.deleteNote dID DeleteNoteResp
-                --                             |> Cmd.map LoggedInView
-                --                         )
-                --             OfflineID _ ->
-                --                 let
-                --                     addDeleteNoteToQueue =
-                --                         ( m, c ) |> addToQueue ( QDeleteNote toDeleteNoteID, Cmd.none )
-                --                 in
-                --                 -- check if note is in queue and hasn't been created yet
-                --                 -- if so, remove it from queue and don't send delete request
-                --                 case m.offlineQueue of
-                --                     ( action, _ ) :: _ ->
-                --                         let
-                --                             removeAllNoteRelatedActions =
-                --                                 ( { m
-                --                                     | offlineQueue =
-                --                                         model.offlineQueue
-                --                                             |> List.filter
-                --                                                 (\( ac, _ ) ->
-                --                                                     case ac of
-                --                                                         QNewNote newNoteID _ ->
-                --                                                             idDiff (OfflineID newNoteID) toDeleteNoteID
-                --                                                         QPinNote ( pinNoteId, _ ) ->
-                --                                                             idDiff pinNoteId toDeleteNoteID
-                --                                                         QNewLabel _ ->
-                --                                                             True
-                --                                                         QDeleteNote _ ->
-                --                                                             True
-                --                                                 )
-                --                                   }
-                --                                 , c
-                --                                 )
-                --                         in
-                --                         case action of
-                --                             QNewNote newNoteOfflineID _ ->
-                --                                 if sameId (OfflineID newNoteOfflineID) toDeleteNoteID then
-                --                                     -- this note was created and modified offline
-                --                                     -- it never synced with db, so we remove all requests
-                --                                     -- so that it doesn't get created or anything in the DB
-                --                                     removeAllNoteRelatedActions
-                --                                 else
-                --                                     addDeleteNoteToQueue
-                --                             _ ->
-                --                                 addDeleteNoteToQueue
-                --                     _ ->
-                --                         addDeleteNoteToQueue
-                --    )
-                DatabaseID _ ->
-                    -- TODO: all the logic here
-                    Cmd.none
+                DatabaseID dID ->
+                    Api.deleteNote dID DeleteNoteResp
+                        |> Cmd.map LoggedInView
 
                 OfflineID _ ->
-                    -- TODO: Should never reach here: offline id is only
-                    -- allowed so that previous create requests can replace
-                    -- the offline id in the future and this never gets called
+                    -- NOTE: it should never reach here.
+                    -- if it has an offlineID then it's already filtered out
+                    -- in addToQueue fn
+                    -- TODO: maybe this should return a different type of action
+                    -- TODO: validate that it doesn't reach here in addToQueue
+                    -- TODO: to avoid this extra check altogether?
                     Cmd.none
 
 
