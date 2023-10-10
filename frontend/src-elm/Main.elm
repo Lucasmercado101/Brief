@@ -389,6 +389,23 @@ update msg model =
                                                         else
                                                             e
                                                     )
+                                        , notes =
+                                            model.notes
+                                                |> List.map
+                                                    (\l ->
+                                                        { l
+                                                            | labels =
+                                                                l.labels
+                                                                    |> List.map
+                                                                        (\e ->
+                                                                            if e == OfflineID originalLabelOfflineId then
+                                                                                DatabaseID resLabel.id
+
+                                                                            else
+                                                                                e
+                                                                        )
+                                                        }
+                                                    )
                                         , offlineQueue =
                                             model.offlineQueue
                                                 |> List.map
