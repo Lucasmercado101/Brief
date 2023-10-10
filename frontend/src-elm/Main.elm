@@ -738,7 +738,7 @@ addToQueue action ( model, cmds ) =
             )
 
         (currentActionInProgress :: actionsNotInProgress) as queue ->
-            { model
+            ( { model
                 | offlineQueue =
                     case action of
                         QNewLabel _ _ ->
@@ -810,8 +810,9 @@ addToQueue action ( model, cmds ) =
                                     )
                             )
                                 ++ [ action ]
-            }
-                |> pure
+              }
+            , cmds
+            )
 
 
 removeLastQueued : ( Model, Cmd Msg ) -> ( Model, Cmd Msg )
