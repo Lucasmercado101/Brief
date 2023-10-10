@@ -932,13 +932,30 @@ mainView model =
                 , padding2 (px 10) (px 30)
                 , publicSans
                 , fontWeight bolder
-                , fontSize (px 25)
                 , borderBottom3 (px 3) solid (rgb 0 0 0)
                 , position sticky
                 , top (px 0)
+                , displayFlex
+                , justifyContent spaceBetween
                 ]
             ]
-            [ text "Notes" ]
+            [ p
+                [ css
+                    [ fontSize (px 25)
+                    ]
+                ]
+                [ text "Notes" ]
+            , (case model.offlineQueue of
+                [] ->
+                    Outlined.cloud
+
+                _ ->
+                    Outlined.sync
+              )
+                28
+                Inherit
+                |> Svg.Styled.fromUnstyled
+            ]
 
         -- TODO: placeholder
         , div [ css [ padding (px 15), color (hex "fff"), publicSans ] ]
