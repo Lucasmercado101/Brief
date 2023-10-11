@@ -182,6 +182,18 @@ deleteNote noteID msg =
 ---
 
 
+deleteLabel : Int -> (Result Http.Error () -> msg) -> Cmd msg
+deleteLabel labelID msg =
+    riskyDelete
+        ("label/" ++ String.fromInt labelID)
+        Http.emptyBody
+        (Http.expectWhatever msg)
+
+
+
+---
+
+
 type alias NewLabelResponse =
     Label
 
