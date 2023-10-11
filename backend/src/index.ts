@@ -245,27 +245,42 @@ new Elysia()
         return "Note not found";
       }
 
-      return prisma.note.update({
-        where: { id: noteID },
-        data: {
-          title: body.title,
-          content: body.content,
-          pinned: body.pinned,
-          ...(body.labels !== undefined
-            ? { labels: { set: body.labels!.map((i) => ({ id: i })) } }
-            : {})
-        },
-        include: {
-          labels: {
-            select: {
-              name: true,
-              id: true,
-              createdAt: true,
-              updatedAt: true
+      return prisma.note
+        .update({
+          where: { id: noteID },
+          data: {
+            title: body.title,
+            content: body.content,
+            pinned: body.pinned,
+            ...(body.labels !== undefined
+              ? { labels: { set: body.labels!.map((i) => ({ id: i })) } }
+              : {})
+          },
+          include: {
+            labels: {
+              select: {
+                name: true,
+                id: true,
+                createdAt: true,
+                updatedAt: true
+              }
             }
           }
-        }
-      });
+        })
+        .then((e) => {
+          const labels = e.labels.map((l) => ({
+            ...l,
+            createdAt: l.createdAt.valueOf(),
+            updatedAt: l.updatedAt.valueOf()
+          }));
+
+          return {
+            ...e,
+            createdAt: e.createdAt.valueOf(),
+            updatedAt: e.updatedAt.valueOf(),
+            labels
+          };
+        });
     },
     {
       body: t.Object({
