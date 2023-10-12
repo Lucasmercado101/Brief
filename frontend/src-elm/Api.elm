@@ -160,7 +160,7 @@ postNewNote inputData msg =
 
 
 type alias EditNoteInput =
-    { title : Maybe String
+    { title : Maybe (Nullable String)
     , content : Maybe String
     , pinned : Maybe Bool
     , labels : Maybe (List ID)
@@ -176,6 +176,11 @@ type alias EditNoteResp =
     , updatedAt : Posix
     , labels : List Label
     }
+
+
+type Nullable a
+    = Val a
+    | Null
 
 
 editNoteDecoder : Decoder EditNoteResp
@@ -197,8 +202,13 @@ editNote noteID inputData msg =
             (JE.object
                 ([]
                     ++ (case inputData.title of
-                            Just title ->
-                                [ ( "title", JE.string title ) ]
+                            Just v ->
+                                case v of
+                                    Val title ->
+                                        [ ( "title", JE.string title ) ]
+
+                                    Null ->
+                                        [ ( "title", JE.null ) ]
 
                             Nothing ->
                                 []

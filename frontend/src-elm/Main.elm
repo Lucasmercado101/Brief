@@ -325,6 +325,25 @@ update msg model =
                                         model.notes
                             }
                                 |> pure
+                                |> (let
+                                        ( offlineIds, dbIds ) =
+                                            case List.filter (.id >> sameId noteID) model.notes of
+                                                [] ->
+                                                    ( [], [] )
+
+                                                noteFound :: _ ->
+                                                    labelIDsSplitter (noteFound.labels |> List.filter (idDiff labelID)) [] []
+                                    in
+                                    addToQueue
+                                        (QEditNote noteID
+                                            offlineIds
+                                            { title = Nothing
+                                            , content = Nothing
+                                            , pinned = Nothing
+                                            , labels = Just dbIds
+                                            }
+                                        )
+                                   )
 
                         DeleteNote toDeleteNoteID ->
                             -- TODO: offline sync
@@ -1601,12 +1620,5 @@ type OfflineQueueAction
     | QDeleteNote ID
     | QDeleteLabel ID
     | QPinNote ( ID, Bool )
-    | QEditNote
-        ID
-        (List String)
-        { title : Maybe String
-        , content : Maybe String
-        , pinned : Maybe Bool
-        , labels : Maybe (List Int)
-        }
+    | QEditNote ID (List String) Api.EditNoteInput
     | QNewNote { offlineId : String, offlineLabelIds : List String, data : Api.PostNewNoteInput }
