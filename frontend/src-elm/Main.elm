@@ -607,20 +607,6 @@ update msg model =
                                         , requestRandomValues ()
                                         )
                                             |> (let
-                                                    labelIDsSplitter : List ID -> List String -> List Int -> ( List String, List Int )
-                                                    labelIDsSplitter ids offlineIds dbIds =
-                                                        case ids of
-                                                            [] ->
-                                                                ( offlineIds, dbIds )
-
-                                                            x :: xs ->
-                                                                case x of
-                                                                    OfflineID offlineId ->
-                                                                        labelIDsSplitter xs (offlineId :: offlineIds) dbIds
-
-                                                                    DatabaseID dbID ->
-                                                                        labelIDsSplitter xs offlineIds (dbID :: dbIds)
-
                                                     ( offlineLabelIDs, dbLabelIDs ) =
                                                         case newNote.labels of
                                                             [] ->
@@ -986,6 +972,21 @@ runAction action =
 handleNextInQueue : ( Model, Cmd Msg ) -> ( Model, Cmd Msg )
 handleNextInQueue =
     removeLastQueued >> runNextInQueue
+
+
+labelIDsSplitter : List ID -> List String -> List Int -> ( List String, List Int )
+labelIDsSplitter ids offlineIds dbIds =
+    case ids of
+        [] ->
+            ( offlineIds, dbIds )
+
+        x :: xs ->
+            case x of
+                OfflineID offlineId ->
+                    labelIDsSplitter xs (offlineId :: offlineIds) dbIds
+
+                DatabaseID dbID ->
+                    labelIDsSplitter xs offlineIds (dbID :: dbIds)
 
 
 
