@@ -162,6 +162,7 @@ type LoggedInMsg
     | ChangeNewLabelName String
     | CreateNewLabel
     | PostNewNoteResp String (Result Http.Error Api.PostNewNoteResponse)
+    | EditNoteResp (Result Http.Error Api.EditNoteResp)
     | NewLabelResp String (Result Http.Error Api.NewLabelResponse)
     | ToggleNotePinResp (Result Http.Error Api.ToggleNotePinnedResp)
     | DeleteNoteResp (Result Http.Error ())
@@ -435,6 +436,32 @@ update msg model =
                                                                 else
                                                                     l
 
+                                                            QEditNote _ offlineLabels data ->
+                                                                case data.labels of
+                                                                    Nothing ->
+                                                                        l
+
+                                                                    Just labelsList ->
+                                                                        case labelsList of
+                                                                            [] ->
+                                                                                l
+
+                                                                            labels ->
+                                                                                let
+                                                                                    containsOldOfflineLabelThatIJustCreated : Bool
+                                                                                    containsOldOfflineLabelThatIJustCreated =
+                                                                                        offlineLabels
+                                                                                            |> List.any (\e -> e == originalLabelOfflineId)
+                                                                                in
+                                                                                if containsOldOfflineLabelThatIJustCreated then
+                                                                                    QEditNote
+                                                                                        (DatabaseID resLabel.id)
+                                                                                        (offlineLabels |> List.filter (\e -> e /= originalLabelOfflineId))
+                                                                                        { data | labels = Just (resLabel.id :: labels) }
+
+                                                                                else
+                                                                                    l
+
                                                             QNewLabel _ ->
                                                                 l
 
@@ -571,6 +598,40 @@ update msg model =
                             }
                                 |> pure
 
+                        EditNoteResp res ->
+                            case res of
+                                Ok data ->
+                                    { model
+                                        | notes =
+                                            model.notes
+                                                |> List.map
+                                                    (\n ->
+                                                        if sameId n.id (DatabaseID data.id) then
+                                                            { title = Maybe.withDefault n.title data.title
+                                                            , content = data.content
+                                                            , pinned = data.pinned
+                                                            , labels =
+                                                                case data.labels of
+                                                                    [] ->
+                                                                        n.labels
+
+                                                                    newLabels ->
+                                                                        newLabels
+                                                                            |> List.map (.id >> DatabaseID)
+                                                            , id = DatabaseID data.id
+                                                            }
+
+                                                        else
+                                                            n
+                                                    )
+                                    }
+                                        |> pure
+                                        |> handleNextInQueue
+
+                                Err _ ->
+                                    -- TODO: handle 403
+                                    model |> pure
+
                         CreateNewNote ->
                             case model.isWritingANewNote of
                                 Nothing ->
@@ -661,6 +722,13 @@ update msg model =
                                                             QPinNote ( id, newPinStatus ) ->
                                                                 if sameId id (OfflineID originalOfflineID) then
                                                                     QPinNote ( DatabaseID newNote.id, newPinStatus )
+
+                                                                else
+                                                                    l
+
+                                                            QEditNote id offlineLabelIds data ->
+                                                                if sameId id (OfflineID originalOfflineID) then
+                                                                    QEditNote (DatabaseID newNote.id) offlineLabelIds data
 
                                                                 else
                                                                     l
@@ -764,6 +832,10 @@ addToQueue action ( model, cmds ) =
                         QNewNote _ ->
                             queue ++ [ action ]
 
+                        QEditNote _ _ _ ->
+                            -- TODO: smush similar edits together
+                            queue ++ [ action ]
+
                         QDeleteLabel toDeleteLabelID ->
                             case toDeleteLabelID of
                                 DatabaseID _ ->
@@ -810,6 +882,9 @@ addToQueue action ( model, cmds ) =
 
                                                                 QDeleteLabel _ ->
                                                                     True
+
+                                                                QEditNote _ _ _ ->
+                                                                    True
                                                         )
                                                 -- no need to List.map to update QNewNote to remove offline label if it
                                                 -- may have been there, note will never be created with offline label either way
@@ -855,6 +930,9 @@ addToQueue action ( model, cmds ) =
 
                                                                 QPinNote ( pinNoteId, _ ) ->
                                                                     idDiff pinNoteId toDeleteNoteID
+
+                                                                QEditNote editNoteID _ _ ->
+                                                                    idDiff editNoteID toDeleteNoteID
 
                                                                 QNewLabel _ ->
                                                                     True
@@ -943,6 +1021,18 @@ runAction action =
                     -- NOTE: it should never reach here.
                     -- if it has an offlineID then it's already filtered out
                     -- in addToQueue fn
+                    Cmd.none
+
+        QEditNote id _ data ->
+            case id of
+                DatabaseID dID ->
+                    Api.editNote dID data EditNoteResp
+                        |> Cmd.map LoggedInView
+
+                OfflineID _ ->
+                    -- NOTE: if it has no DB id then it's sitting in the queue
+                    -- waiting for a previous createNote request to finish
+                    -- ergo it should never reach here
                     Cmd.none
 
         QDeleteNote id ->
@@ -1511,4 +1601,12 @@ type OfflineQueueAction
     | QDeleteNote ID
     | QDeleteLabel ID
     | QPinNote ( ID, Bool )
+    | QEditNote
+        ID
+        (List String)
+        { title : Maybe String
+        , content : Maybe String
+        , pinned : Maybe Bool
+        , labels : Maybe (List Int)
+        }
     | QNewNote { offlineId : String, offlineLabelIds : List String, data : Api.PostNewNoteInput }
