@@ -763,6 +763,8 @@ update msg model =
 addToQueue : OfflineQueueAction -> ( Model, Cmd Msg ) -> ( Model, Cmd Msg )
 addToQueue action ( model, cmds ) =
     -- TODO: handle down-syncs
+    -- have DB respond with db changes since last
+    -- date updated and
     case model.offlineQueue of
         [] ->
             -- no queued actions?
