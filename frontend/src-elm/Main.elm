@@ -1395,6 +1395,7 @@ note model data =
                                             , marginLeft (px 3)
                                             , backgroundColor (hex "ff0000")
                                             , color (hex "fff")
+                                            , cursor pointer
                                             ]
                                         , type_ "button"
                                         , onClick
