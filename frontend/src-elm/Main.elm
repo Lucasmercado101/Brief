@@ -1272,21 +1272,22 @@ note model data =
             , flexDirection column
             , maxWidth (px 240)
             , minWidth (px 240)
+            , minHeight (px 120)
             , backgroundColor (rgb 255 203 127)
             , hover
-                [ boxShadow4 (px 6) (px 6) (px 0) (rgb 0 0 0)
-                ]
+                [ boxShadow4 (px 6) (px 6) (px 0) (rgb 0 0 0) ]
             ]
+        , class "note"
         ]
         [ div
             [ css
                 [ backgroundColor (rgb 117 93 39)
                 , color (hex "fff")
                 , height (px 36)
-                , displayFlex
                 , justifyContent spaceBetween
                 , borderBottom3 (px 3) solid (rgb 0 0 0)
                 ]
+            , class "note-top-actions"
             ]
             [ button
                 [ css
