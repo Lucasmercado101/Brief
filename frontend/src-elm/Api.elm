@@ -167,7 +167,7 @@ type alias EditNoteInput =
     }
 
 
-type alias EditNoteResponse =
+type alias EditNoteResp =
     { id : ID
     , title : Maybe String
     , content : String
@@ -178,9 +178,9 @@ type alias EditNoteResponse =
     }
 
 
-editNoteDecoder : Decoder EditNoteResponse
+editNoteDecoder : Decoder EditNoteResp
 editNoteDecoder =
-    map7 EditNoteResponse
+    map7 EditNoteResp
         (field "id" int)
         (field "title" (maybe string))
         (field "content" string)
@@ -190,7 +190,7 @@ editNoteDecoder =
         (field "labels" (list labelDecoder))
 
 
-editNote : Int -> EditNoteInput -> (Result Http.Error EditNoteResponse -> msg) -> Cmd msg
+editNote : Int -> EditNoteInput -> (Result Http.Error EditNoteResp -> msg) -> Cmd msg
 editNote noteID inputData msg =
     riskyPut ("note/" ++ String.fromInt noteID)
         (Http.jsonBody
