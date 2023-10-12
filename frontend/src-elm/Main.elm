@@ -608,12 +608,7 @@ update msg model =
                                         )
                                             |> (let
                                                     ( offlineLabelIDs, dbLabelIDs ) =
-                                                        case newNote.labels of
-                                                            [] ->
-                                                                ( [], [] )
-
-                                                            labels ->
-                                                                labelIDsSplitter labels [] []
+                                                        labelIDsSplitter newNote.labels [] []
                                                 in
                                                 addToQueue
                                                     (QNewNote
@@ -1462,7 +1457,7 @@ alphaNumericGenerator strLength =
 
 
 
--- Helpers
+-- css helpers
 
 
 displayGrid : Style
