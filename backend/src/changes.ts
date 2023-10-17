@@ -452,7 +452,7 @@ type DeleteNotes = {
 
 type NewNote = {
   offlineId: offlineId;
-  title: string;
+  title?: string;
   content: string;
   pinned: boolean;
   labels: (string | number)[];
