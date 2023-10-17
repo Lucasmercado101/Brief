@@ -4,21 +4,11 @@ import { prisma, requiredCookieSession } from "./index";
 const POSIX = t.Number();
 
 const body = t.Object({
-  operations: t.Array(t.Unknown()),
+  operations: t.Array(t.Unknown(), { minItems: 1 }),
   lastSync: POSIX,
   currentData: t.Object({
-    labels: t.Array(
-      t.Object({
-        id: t.Number(),
-        updatedAt: POSIX
-      })
-    ),
-    notes: t.Array(
-      t.Object({
-        id: t.Number(),
-        updatedAt: POSIX
-      })
-    )
+    labels: t.Array(t.Number()),
+    notes: t.Array(t.Number())
   })
 });
 
@@ -312,7 +302,7 @@ export default () =>
         .findMany({
           where: {
             userId,
-            id: { in: body.currentData.notes.map(({ id }) => id) }
+            id: { in: body.currentData.notes.map((id) => id) }
           },
           select: {
             id: true
@@ -320,7 +310,7 @@ export default () =>
         })
         .then((e) =>
           e.filter(
-            (note) => !body.currentData.notes.find(({ id }) => id === note.id)
+            (note) => !body.currentData.notes.find((id) => id === note.id)
           )
         );
 
@@ -328,7 +318,7 @@ export default () =>
         .findMany({
           where: {
             ownerId: userId,
-            id: { in: body.currentData.labels.map(({ id }) => id) }
+            id: { in: body.currentData.labels.map((id) => id) }
           },
           select: {
             id: true
@@ -336,8 +326,7 @@ export default () =>
         })
         .then((e) =>
           e.filter(
-            (label) =>
-              !body.currentData.labels.find(({ id }) => id === label.id)
+            (label) => !body.currentData.labels.find((id) => id === label.id)
           )
         );
 
