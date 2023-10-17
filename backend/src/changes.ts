@@ -6,7 +6,7 @@ const POSIX = t.Number();
 const body = t.Object({
   operations: t.Array(t.Unknown()),
   lastSync: POSIX,
-  data: t.Object({
+  currentData: t.Object({
     labels: t.Array(
       t.Object({
         id: t.Number(),
@@ -284,7 +284,32 @@ export default new Elysia().post(
         ({ id }) => !labelsNameEdited.find((label) => label.id === id)
       );
     }
-    return {};
+
+    const lastSync = new Date(body.lastSync);
+
+    const toDownSyncNotes = await prisma.note.findMany({
+      where: {
+        updatedAt: {
+          gt: lastSync
+        },
+        id: userId
+      }
+    });
+    const toDownSyncLabels = await prisma.label.findMany({
+      where: {
+        updatedAt: {
+          gt: lastSync
+        },
+        id: userId
+      }
+    });
+
+    return {
+      data: {
+        notes: toDownSyncNotes,
+        labels: toDownSyncLabels
+      }
+    };
   },
   {
     body: body,
