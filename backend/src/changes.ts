@@ -330,37 +330,33 @@ export default () =>
         }
       });
 
-      const deletedNotes = await prisma.note
-        .findMany({
-          where: {
-            userId,
-            id: { in: body.currentData.notes.map((id) => id) }
-          },
-          select: {
-            id: true
-          }
-        })
-        .then((e) =>
-          e.filter(
-            (note) => !body.currentData.notes.find((id) => id === note.id)
-          )
-        );
+      const dbNotes = await prisma.note.findMany({
+        where: {
+          userId,
+          id: { in: body.currentData.notes.map((id) => id) }
+        },
+        select: {
+          id: true
+        }
+      });
 
-      const deletedLabels = await prisma.label
-        .findMany({
-          where: {
-            ownerId: userId,
-            id: { in: body.currentData.labels.map((id) => id) }
-          },
-          select: {
-            id: true
-          }
-        })
-        .then((e) =>
-          e.filter(
-            (label) => !body.currentData.labels.find((id) => id === label.id)
-          )
-        );
+      const deletedNotes = body.currentData.notes.filter(
+        (id) => !dbNotes.find((label) => label.id === id)
+      );
+
+      const dbLabels = await prisma.label.findMany({
+        where: {
+          ownerId: userId,
+          id: { in: body.currentData.labels.map((id) => id) }
+        },
+        select: {
+          id: true
+        }
+      });
+
+      const deletedLabels = body.currentData.labels.filter(
+        (id) => !dbLabels.find((label) => label.id === id)
+      );
 
       return {
         data: {
