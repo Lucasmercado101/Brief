@@ -5,5 +5,4 @@
 
 ### To access db with psql
 
-- `psql -U postgres` in the docker container console
-- \connect mydb
+- `psql -U postgres -d mydb` in the docker container console
