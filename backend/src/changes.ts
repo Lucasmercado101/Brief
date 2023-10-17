@@ -345,19 +345,23 @@ export default () =>
 
         const lastSyncedAt = new Date(body.lastSyncedAt);
 
-        const toDownSyncNotes = await prisma.note.findMany({
-          where: {
-            updatedAt: {
-              gt: lastSyncedAt
+        const toDownSyncNotes = await prisma.note
+          .findMany({
+            where: {
+              updatedAt: {
+                gt: lastSyncedAt
+              },
+              userId: userId
             },
-            userId: userId
-          },
-          include: {
-            labels: {
-              select: { id: true }
+            include: {
+              labels: {
+                select: { id: true }
+              }
             }
-          }
-        });
+          })
+          .then((res) =>
+            res.map((e) => ({ ...e, labels: e.labels.map((e) => e.id) }))
+          );
 
         const toDownSyncLabels = await prisma.label.findMany({
           where: {
