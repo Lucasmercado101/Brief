@@ -2,6 +2,7 @@ import { Elysia, t } from "elysia";
 import { Prisma, PrismaClient } from "@prisma/client";
 import { logger } from "./logger";
 import PrismaError from "./prismaErrorCodes";
+import changesEndpoint from "./changes";
 
 // in seconds
 const MINUTE = 60;
@@ -564,6 +565,7 @@ new Elysia()
     },
     { cookie: requiredCookieSession }
   )
+  .use(changesEndpoint())
   .listen(PORT, (server) => {
     console.log(`🦊 Elysia is running at ${server?.hostname}:${server?.port} `);
   });
