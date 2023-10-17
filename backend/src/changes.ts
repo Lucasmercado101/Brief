@@ -29,17 +29,16 @@ export default new Elysia().post(
 
     const operations = getOperations(body.operations as Operation[]);
 
-    const {
-      deleteLabelIds,
-      deleteNoteIds,
-      createNotes,
-      editNote,
-      changeLabelName
-    } = operations;
+    const { deleteLabelIds, deleteNoteIds } = operations;
     let createLabels = operations.createLabels;
+    let createNotes = operations.createNotes;
+    let editNotes = operations.editNotes;
+    let changeLabelsName = operations.changeLabelsName;
 
     let labelsNotCreated: NewLabel[] = [];
     let notesNotCreated: NewNote[] = [];
+    let notesNotEdited: EditNote[] = [];
+    let labelsNameNotChanged: ChangeLabelName[] = [];
 
     let newLabels: {
       offlineId: string | undefined;
@@ -59,6 +58,25 @@ export default new Elysia().post(
       createdAt: Date;
       updatedAt: Date;
       userId: number;
+    }[] = [];
+
+    let editedNotes: {
+      offlineId: ID;
+      id: number;
+      title: string | null;
+      content: string;
+      pinned: boolean;
+      createdAt: Date;
+      updatedAt: Date;
+      userId: number;
+    }[] = [];
+
+    let labelsNameEdited: {
+      id: number;
+      name: string;
+      createdAt: Date;
+      updatedAt: Date;
+      ownerId: number;
     }[] = [];
 
     if (deleteLabelIds.length > 0) {
@@ -122,13 +140,30 @@ export default new Elysia().post(
           }));
         });
 
-      createNotes.map((note) =>
-        note.labels.map((label) => {
+      createNotes = createNotes.map((note) => ({
+        ...note,
+        labels: note.labels.map((label) => {
           const onlineLabel = newLabels.find((l) => l.offlineId === label);
+          // replace offline label with db label
           if (onlineLabel) return onlineLabel.id;
           else return label;
         })
-      );
+      }));
+
+      editNotes = editNotes.map((note) => ({
+        ...note,
+        labels: note.labels.map((label) => {
+          const onlineLabel = newLabels.find((l) => l.offlineId === label);
+          // replace offline label with db label
+          if (onlineLabel) return onlineLabel.id;
+          else return label;
+        })
+      }));
+
+      changeLabelsName = changeLabelsName.map((label) => ({
+        ...label,
+        id: newLabels.find((l) => l.offlineId === label.id)?.id ?? label.id
+      }));
 
       // NOTE: don't inquire further, if it couldn't create then don't
       // retry, don't fail, just send as "not created" in response
@@ -167,6 +202,14 @@ export default new Elysia().post(
         }
       });
 
+      editNotes = editNotes.map((note) => {
+        const noteOnlineId = newNotes.find((n) => n.offlineId === note.id)?.id;
+        return {
+          ...note,
+          id: noteOnlineId ?? note.id
+        };
+      });
+
       // NOTE: don't inquire further, if it couldn't create then don't
       // retry, don't fail, just send as "not created" in response
       notesNotCreated = createNotes.filter(
@@ -174,6 +217,74 @@ export default new Elysia().post(
           !newNotes.find((note) => note.offlineId === offlineId)
       );
     }
+
+    if (editNotes.length > 0) {
+      const editNotesPromises = editNotes
+        .filter((e) => e.id === "number")
+        .map(({ id, title, content, pinned, labels }) => {
+          const editNote = prisma.note
+            .update({
+              where: {
+                id: id as number
+              },
+              data: {
+                title,
+                content,
+                pinned,
+                labels: {
+                  // if some label failed to create or just got given
+                  // offline id then just ignore it and don't connect it
+                  connect: labels
+                    .filter((e) => typeof e === "number")
+                    .map((label) => ({
+                      id: label as number
+                    }))
+                }
+              }
+            })
+            .then((e) => ({ ...e, offlineId: id }));
+          return editNote;
+        });
+
+      (await Promise.allSettled(editNotesPromises)).forEach((e) => {
+        if (e.status === "fulfilled") {
+          editedNotes.push(e.value);
+        }
+      });
+
+      // NOTE: don't inquire further, if it couldn't create then don't
+      // retry, don't fail, just send as "not edited" in response
+      notesNotEdited = editNotes.filter(
+        ({ id }) => !newNotes.find((note) => note.offlineId === id)
+      );
+    }
+
+    if (changeLabelsName.length > 0) {
+      const changeLabelsNamePromises = changeLabelsName
+        .filter((e) => e.id === "number")
+        .map(({ id, name }) => {
+          const changeLabelName = prisma.label.update({
+            where: {
+              id: id as number
+            },
+            data: {
+              name
+            }
+          });
+          return changeLabelName;
+        });
+
+      (await Promise.allSettled(changeLabelsNamePromises)).forEach((e) => {
+        if (e.status === "fulfilled") {
+          labelsNameEdited.push(e.value);
+        }
+      });
+
+      labelsNameNotChanged = changeLabelsName.filter(
+        ({ id }) => !labelsNameEdited.find((label) => label.id === id)
+      );
+    }
+    return {};
   },
   {
     body: body,
@@ -260,8 +371,8 @@ function getOperations(operations: Operation[]): {
   deleteNoteIds: DeleteNotes["ids"];
   createLabels: CreateLabels["labels"];
   createNotes: CreateNotes["notes"];
-  editNote: EditNote[];
-  changeLabelName: ChangeLabelName[];
+  editNotes: EditNote[];
+  changeLabelsName: ChangeLabelName[];
 } {
   const [[deleteLabels], r1] = partition(
     operations,
@@ -287,13 +398,13 @@ function getOperations(operations: Operation[]): {
       mutation.operation === Operations.CREATE_NOTES
   );
 
-  const [editNote, r5] = partition(
+  const [editNotes, r5] = partition(
     r4,
     (mutation): mutation is EditNote =>
       mutation.operation === Operations.EDIT_NOTE
   );
 
-  const [changeLabelName] = partition(
+  const [changeLabelsName] = partition(
     r5,
     (mutation): mutation is ChangeLabelName =>
       mutation.operation === Operations.CHANGE_LABEL_NAME
@@ -304,8 +415,8 @@ function getOperations(operations: Operation[]): {
     deleteNoteIds: deleteNotes.ids,
     createLabels: createLabels.labels,
     createNotes: createNotes.notes,
-    editNote,
-    changeLabelName
+    editNotes,
+    changeLabelsName
   };
 }
 
