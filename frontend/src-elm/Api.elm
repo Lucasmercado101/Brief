@@ -382,6 +382,154 @@ labelDecoder =
         (field "updatedAt" posixTime)
 
 
+
+---
+
+
+type OfflineFirstId
+    = -- Not synced with DB yet,
+      -- generated ID offline
+      OfflineID String
+      -- Synced with DB,
+      -- using DB's ID
+    | DatabaseID ID
+
+
+type Optional a
+    = HasIt a
+    | Undefined
+
+
+type Operation
+    = DeleteLabels (List Int)
+    | CreateLabels (List { offlineId : String, name : String })
+    | DeleteNotes (List Int)
+    | CreateNotes
+        (List
+            { offlineId : String
+            , title : Optional String
+            , content : String
+            , pinned : Bool
+            , labels : List OfflineFirstId
+            }
+        )
+    | EditNote
+        { id : OfflineFirstId
+        , title : Optional String
+        , content : String
+        , pinned : Bool
+        , labels : List OfflineFirstId
+        }
+    | ChangeLabelName
+        { name : String
+        , id : OfflineFirstId
+        }
+
+
+operationEncoder : Operation -> JE.Value
+operationEncoder operation =
+    let
+        offlineFirstEncoder =
+            \l ->
+                case l of
+                    OfflineID v ->
+                        JE.string v
+
+                    DatabaseID v ->
+                        JE.int v
+    in
+    case operation of
+        DeleteLabels ids ->
+            JE.object
+                [ ( "operation", JE.string "DELETE_LABELS" )
+                , ( "ids", JE.list JE.int ids )
+                ]
+
+        CreateLabels data ->
+            JE.object
+                [ ( "operation", JE.string "CREATE_LABELS" )
+                , ( "labels"
+                  , JE.list
+                        (\l ->
+                            JE.object
+                                [ ( "offlineId", JE.string l.offlineId )
+                                , ( "name", JE.string l.name )
+                                ]
+                        )
+                        data
+                  )
+                ]
+
+        DeleteNotes ids ->
+            JE.object
+                [ ( "operation", JE.string "DELETE_NOTES" )
+                , ( "ids", JE.list JE.int ids )
+                ]
+
+        CreateNotes data ->
+            JE.object
+                [ ( "operation", JE.string "CREATE_NOTES" )
+                , ( "notes"
+                  , JE.list
+                        (\n ->
+                            JE.object
+                                ([ ( "offlineId", JE.string n.offlineId )
+                                 , ( "content", JE.string n.content )
+                                 , ( "pinned", JE.bool n.pinned )
+                                 , ( "labels", JE.list offlineFirstEncoder n.labels )
+                                 ]
+                                    ++ (case n.title of
+                                            HasIt t ->
+                                                [ ( "title"
+                                                  , JE.string t
+                                                  )
+                                                ]
+
+                                            Undefined ->
+                                                []
+                                       )
+                                )
+                        )
+                        data
+                  )
+                ]
+
+        EditNote data ->
+            JE.object
+                ([ ( "operation", JE.string "EDIT_NOTE" )
+                 , ( "offlineId", offlineFirstEncoder data.id )
+                 , ( "content", JE.string data.content )
+                 , ( "pinned", JE.bool data.pinned )
+                 , ( "labels", JE.list offlineFirstEncoder data.labels )
+                 ]
+                    ++ (case data.title of
+                            HasIt t ->
+                                [ ( "title"
+                                  , JE.string t
+                                  )
+                                ]
+
+                            Undefined ->
+                                []
+                       )
+                )
+
+        ChangeLabelName data ->
+            JE.object
+                [ ( "operation", JE.string "CHANGE_LABEL_NAME" )
+                , ( "id", offlineFirstEncoder data.id )
+                , ( "name", JE.string data.name )
+                ]
+
+
+type alias ChangesInput =
+    List Operation
+
+
+
+--
+
+
 posixTime : Decoder Posix
 posixTime =
     int |> JD.map Time.millisToPosix
