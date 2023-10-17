@@ -26,7 +26,7 @@ export default new Elysia().post(
   "/changes",
   ({ body }) => {
     const operations = body.operations as Operation[];
-    const [
+    const {
       newNote,
       deleteNote,
       editNote,
@@ -37,7 +37,7 @@ export default new Elysia().post(
       createLabels,
       deleteNotes,
       createNotes
-    ] = getOperations(operations);
+    } = getOperations(operations);
   },
   {
     body: body,
@@ -130,20 +130,18 @@ type CreateNotes = {
   notes: Omit<NewNote, "operation">[];
 };
 
-function getOperations(
-  operations: Operation[]
-): [
-  NewNote | undefined,
-  DeleteNote | undefined,
-  EditNote | undefined,
-  NewLabel | undefined,
-  ChangeLabelName | undefined,
-  DeleteLabel | undefined,
-  DeleteLabels[],
-  CreateLabels[],
-  DeleteNotes[],
-  CreateNotes[]
-] {
+function getOperations(operations: Operation[]): {
+  newNote: NewNote | undefined;
+  deleteNote: DeleteNote | undefined;
+  editNote: EditNote | undefined;
+  newLabel: NewLabel | undefined;
+  changeLabelName: ChangeLabelName | undefined;
+  deleteLabel: DeleteLabel | undefined;
+  deleteLabels: DeleteLabels[];
+  createLabels: CreateLabels[];
+  deleteNotes: DeleteNotes[];
+  createNotes: CreateNotes[];
+} {
   const [[newNote], r1] = partition(
     operations,
     (mutation): mutation is NewNote =>
@@ -204,7 +202,7 @@ function getOperations(
       mutation.operation === Operations.CREATE_NOTES
   );
 
-  return [
+  return {
     newNote,
     deleteNote,
     editNote,
@@ -215,7 +213,7 @@ function getOperations(
     createLabels,
     deleteNotes,
     createNotes
-  ];
+  };
 }
 
 function partition<T, X extends T, Y extends T>(
