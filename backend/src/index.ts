@@ -31,6 +31,7 @@ export const requiredCookieSession = t.Cookie(
 );
 
 new Elysia()
+  .use(changesEndpoint)
   .use(logger())
   // NOTE: CORS -----------
   // TODO: currently allows any origin
@@ -565,7 +566,6 @@ new Elysia()
     },
     { cookie: requiredCookieSession }
   )
-  .use(changesEndpoint())
   .listen(PORT, (server) => {
     console.log(`🦊 Elysia is running at ${server?.hostname}:${server?.port} `);
   });
