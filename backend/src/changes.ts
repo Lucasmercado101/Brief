@@ -350,7 +350,7 @@ export default () =>
             updatedAt: {
               gt: lastSyncedAt
             },
-            id: userId
+            userId: userId
           },
           include: {
             labels: {
