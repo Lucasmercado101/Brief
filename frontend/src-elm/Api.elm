@@ -1,9 +1,10 @@
 module Api exposing (..)
 
+import Either exposing (Either(..))
 import Http exposing (riskyRequest)
-import Json.Decode as JD exposing (Decoder, bool, field, int, list, map2, map4, map7, maybe, string)
+import Json.Decode as JD exposing (Decoder, bool, field, int, list, map2, map4, map5, map6, map7, map8, maybe, oneOf, string)
 import Json.Encode as JE
-import Time exposing (Posix)
+import Time exposing (Posix, millisToPosix)
 
 
 riskyGet : String -> Http.Body -> Http.Expect msg -> Cmd msg
@@ -549,6 +550,7 @@ type alias ChangesResponse =
     , justSyncedAt : Posix
     , downSyncedData :
         { notes : List Note
+        , labels : List Label
         }
     , justCreatedData :
         { notes : List ( Note, OfflineId )
@@ -557,8 +559,146 @@ type alias ChangesResponse =
     }
 
 
+changesResponseDecoder : Decoder ChangesResponse
+changesResponseDecoder =
+    let
+        deletedDecoder =
+            map2 (\a b -> { notes = a, labels = b })
+                (field "notes" (list int))
+                (field "labels" (list int))
 
---
+        offlineFirstDecoder : Decoder OfflineFirstId
+        offlineFirstDecoder =
+            oneOf
+                [ JD.map DatabaseID int
+                , JD.map OfflineID string
+                ]
+
+        failedToEditDecoder =
+            map2 (\a b -> { notes = a, labels = b })
+                (field "notes" (list offlineFirstDecoder))
+                (field "labels" (list offlineFirstDecoder))
+
+        downSyncNoteDecoder : Decoder (Either ( Note, OfflineId ) Note)
+        downSyncNoteDecoder =
+            map8
+                (\a b c d e f g h ->
+                    case h of
+                        Just offlineId ->
+                            Left
+                                ( { id = a
+                                  , title = b
+                                  , content = c
+                                  , pinned = d
+                                  , createdAt = e
+                                  , updatedAt = f
+                                  , labels = g
+                                  }
+                                , offlineId
+                                )
+
+                        Nothing ->
+                            Right
+                                { id = a
+                                , title = b
+                                , content = c
+                                , pinned = d
+                                , createdAt = e
+                                , updatedAt = f
+                                , labels = g
+                                }
+                )
+                (field "id" int)
+                (field "title" (maybe string))
+                (field "content" string)
+                (field "pinned" bool)
+                (field "createdAt" posixTime)
+                (field "updatedAt" posixTime)
+                (field "labels" (list int))
+                (maybe (field "offlineId" string))
+
+        downSyncLabelDecoder : Decoder (Either ( Label, OfflineId ) Label)
+        downSyncLabelDecoder =
+            map5
+                (\a b c d e ->
+                    case e of
+                        Just offlineId ->
+                            Left
+                                ( { id = a
+                                  , name = b
+                                  , createdAt = c
+                                  , updatedAt = d
+                                  }
+                                , offlineId
+                                )
+
+                        Nothing ->
+                            Right
+                                { id = a
+                                , name = b
+                                , createdAt = c
+                                , updatedAt = d
+                                }
+                )
+                (field "id" int)
+                (field "name" string)
+                (field "createdAt" posixTime)
+                (field "updatedAt" posixTime)
+                (maybe (field "offlineId" string))
+
+        downSyncedDataDecoder =
+            map2
+                (\n l ->
+                    { notes = n
+                    , labels = l
+                    }
+                )
+                (field "notes" (list downSyncNoteDecoder))
+                (field "labels" (list downSyncLabelDecoder))
+    in
+    map5
+        (\a b c d e ->
+            let
+                offlineOrJustCreatedPartitioner : List (Either ( a, OfflineId ) a) -> List ( a, OfflineId ) -> List a -> ( List ( a, OfflineId ), List a )
+                offlineOrJustCreatedPartitioner eithers items offlineIds =
+                    -- TODO: use List.partition instead?
+                    case eithers of
+                        [] ->
+                            ( items, offlineIds )
+
+                        x :: xs ->
+                            case x of
+                                Left ( data, offlineId ) ->
+                                    offlineOrJustCreatedPartitioner xs (( data, offlineId ) :: items) offlineIds
+
+                                Right data ->
+                                    offlineOrJustCreatedPartitioner xs items (data :: offlineIds)
+
+                ( justCreatedNotes, downSyncedNotes ) =
+                    offlineOrJustCreatedPartitioner e.notes [] []
+
+                ( justCreatedLabels, downSyncedLabels ) =
+                    offlineOrJustCreatedPartitioner e.labels [] []
+            in
+            { deleted = a
+            , failedToCreate = b
+            , failedToEdit = c
+            , justSyncedAt = d
+            , downSyncedData =
+                { notes = downSyncedNotes
+                , labels = downSyncedLabels
+                }
+            , justCreatedData =
+                { notes = justCreatedNotes
+                , labels = justCreatedLabels
+                }
+            }
+        )
+        (field "deleted" deletedDecoder)
+        (field "failedToCreate" (list string))
+        (field "failedToEdit" failedToEditDecoder)
+        (field "justSyncedAt" posixTime)
+        (field "data" downSyncedDataDecoder)
 
 
 posixTime : Decoder Posix
