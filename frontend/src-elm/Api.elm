@@ -522,12 +522,37 @@ operationEncoder operation =
                 ]
 
 
+type alias OfflineId =
+    String
+
+
 type alias ChangesInput =
     { operations : List Operation
     , lastSyncedAt : Posix
     , currentData :
-        { notes : List Int
-        , labels : List Int
+        { notes : List ID
+        , labels : List ID
+        }
+    }
+
+
+type alias ChangesResponse =
+    { deleted :
+        { notes : List ID
+        , labels : List ID
+        }
+    , failedToCreate : List OfflineId
+    , failedToEdit :
+        { notes : List OfflineFirstId
+        , labels : List OfflineFirstId
+        }
+    , justSyncedAt : Posix
+    , downSyncedData :
+        { notes : List Note
+        }
+    , justCreatedData :
+        { notes : List ( Note, OfflineId )
+        , labels : List ( Label, OfflineId )
         }
     }
 
