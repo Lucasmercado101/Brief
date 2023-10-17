@@ -117,6 +117,7 @@ export default new Elysia().post(
 
       // create new labels
       await prisma.label.createMany({
+        skipDuplicates: true,
         data: createLabels.map(({ name }) => ({
           name,
           ownerId: userId
@@ -304,11 +305,60 @@ export default new Elysia().post(
       }
     });
 
+    const deletedNotes = await prisma.note
+      .findMany({
+        where: {
+          userId,
+          id: { in: body.currentData.notes.map(({ id }) => id) }
+        },
+        select: {
+          id: true
+        }
+      })
+      .then((e) =>
+        e.filter(
+          (note) => !body.currentData.notes.find(({ id }) => id === note.id)
+        )
+      );
+
+    const deletedLabels = await prisma.label
+      .findMany({
+        where: {
+          ownerId: userId,
+          id: { in: body.currentData.labels.map(({ id }) => id) }
+        },
+        select: {
+          id: true
+        }
+      })
+      .then((e) =>
+        e.filter(
+          (label) => !body.currentData.labels.find(({ id }) => id === label.id)
+        )
+      );
+
     return {
       data: {
-        notes: toDownSyncNotes,
-        labels: toDownSyncLabels
-      }
+        notes: toDownSyncNotes.map((n) => ({
+          ...n,
+          updatedAt: n.updatedAt.valueOf(),
+          createdAt: n.createdAt.valueOf()
+        })),
+        labels: toDownSyncLabels.map((n) => ({
+          ...n,
+          updatedAt: n.updatedAt.valueOf(),
+          createdAt: n.createdAt.valueOf()
+        }))
+      },
+      deleted: {
+        notes: deletedNotes,
+        labels: deletedLabels
+      },
+      failedToCreate: {
+        labels: labelsNotCreated.map((e) => e.offlineId),
+        notes: notesNotCreated.map((e) => e.offlineId)
+      },
+      justSyncedAt: new Date().valueOf()
     };
   },
   {
