@@ -393,6 +393,10 @@ export default () =>
           ...labelsNotCreated.map((e) => e.offlineId),
           ...notesNotCreated.map((e) => e.offlineId)
         ],
+        failedToEdit: {
+          notes: notesNotEdited,
+          labels: labelsNameNotChanged
+        },
         justSyncedAt: new Date().valueOf()
       };
     },
