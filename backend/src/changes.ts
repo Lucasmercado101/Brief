@@ -30,8 +30,8 @@ export default new Elysia().post(
     const operations = getOperations(body.operations as Operation[]);
 
     const deleteLabelIds = operations.deleteLabels.ids;
-    const createLabelIds = operations.createLabels.labels;
     const deleteNoteIds = operations.deleteNotes.ids;
+    const createLabels = operations.createLabels.labels;
     const createNotes = operations.createNotes.notes;
     const editNote = operations.editNote;
     const changeLabelName = operations.changeLabelName;
