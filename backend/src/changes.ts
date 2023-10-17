@@ -343,16 +343,28 @@ export default () =>
 
       return {
         data: {
-          notes: toDownSyncNotes.map((n) => ({
-            ...n,
-            updatedAt: n.updatedAt.valueOf(),
-            createdAt: n.createdAt.valueOf()
-          })),
-          labels: toDownSyncLabels.map((n) => ({
-            ...n,
-            updatedAt: n.updatedAt.valueOf(),
-            createdAt: n.createdAt.valueOf()
-          }))
+          notes: toDownSyncNotes
+            .map((n) => ({
+              ...n,
+              updatedAt: n.updatedAt.valueOf(),
+              createdAt: n.createdAt.valueOf()
+            }))
+            .map((e) => {
+              const offlineId = newNotes.find((n) => n.id === e.id)?.offlineId;
+              if (offlineId) return { ...e, offlineId };
+              else return e;
+            }),
+          labels: toDownSyncLabels
+            .map((n) => ({
+              ...n,
+              updatedAt: n.updatedAt.valueOf(),
+              createdAt: n.createdAt.valueOf()
+            }))
+            .map((e) => {
+              const offlineId = newLabels.find((l) => l.id === e.id)?.offlineId;
+              if (offlineId) return { ...e, offlineId };
+              else return e;
+            })
         },
         deleted: {
           notes: deletedNotes,
