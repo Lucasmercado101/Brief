@@ -5,7 +5,7 @@ const POSIX = t.Number();
 
 const body = t.Object({
   operations: t.Array(t.Unknown(), { minItems: 1 }),
-  lastSync: POSIX,
+  lastSyncedAt: POSIX,
   currentData: t.Object({
     labels: t.Array(t.Number()),
     notes: t.Array(t.Number())
@@ -312,12 +312,12 @@ export default () =>
         );
       }
 
-      const lastSync = new Date(body.lastSync);
+      const lastSyncedAt = new Date(body.lastSyncedAt);
 
       const toDownSyncNotes = await prisma.note.findMany({
         where: {
           updatedAt: {
-            gt: lastSync
+            gt: lastSyncedAt
           },
           id: userId
         }
@@ -326,7 +326,7 @@ export default () =>
       const toDownSyncLabels = await prisma.label.findMany({
         where: {
           updatedAt: {
-            gt: lastSync
+            gt: lastSyncedAt
           },
           ownerId: userId
         }
