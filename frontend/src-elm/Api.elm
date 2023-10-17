@@ -523,7 +523,13 @@ operationEncoder operation =
 
 
 type alias ChangesInput =
-    List Operation
+    { operations : List Operation
+    , lastSyncedAt : Posix
+    , currentData :
+        { notes : List Int
+        , labels : List Int
+        }
+    }
 
 
 
