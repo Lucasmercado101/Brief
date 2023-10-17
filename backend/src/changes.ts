@@ -246,7 +246,7 @@ export default () =>
 
       if (editNotes.length > 0) {
         const editNotesPromises = editNotes
-          .filter((e) => e.id === "number")
+          .filter((e) => typeof e.id === "number")
           .map(({ id, title, content, pinned, labels }) => {
             const editNote = prisma.note
               .update({
@@ -287,7 +287,7 @@ export default () =>
 
       if (changeLabelsName.length > 0) {
         const changeLabelsNamePromises = changeLabelsName
-          .filter((e) => e.id === "number")
+          .filter((e) => typeof e.id === "number")
           .map(({ id, name }) => {
             const changeLabelName = prisma.label.update({
               where: {
