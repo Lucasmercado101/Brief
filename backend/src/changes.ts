@@ -27,14 +27,27 @@ export default new Elysia().post(
   async ({ body, cookie: { session } }) => {
     const userId = session.value;
 
+    const operations = getOperations(body.operations as Operation[]);
+
     const {
       deleteLabelIds,
       deleteNoteIds,
-      createLabels,
       createNotes,
       editNote,
       changeLabelName
-    } = getOperations(body.operations as Operation[]);
+    } = operations;
+    let createLabels = operations.createLabels;
+
+    let labelsNotCreated: NewLabel[] = [];
+
+    let newLabels: {
+      offlineId: string | undefined;
+      id: number;
+      name: string;
+      createdAt: Date;
+      updatedAt: Date;
+      ownerId: number;
+    }[] = [];
 
     if (deleteLabelIds.length > 0) {
       await prisma.label.deleteMany({
@@ -56,6 +69,85 @@ export default new Elysia().post(
           userId: userId
         }
       });
+    }
+
+    if (createLabels.length > 0) {
+      // remove labels that already exist
+      const existingLabels = await prisma.label.findMany({
+        where: {
+          name: {
+            in: createLabels.map(({ name }) => name)
+          }
+        }
+      });
+
+      createLabels = createLabels.filter(
+        ({ name }) => !existingLabels.find((label) => label.name === name)
+      );
+
+      // create new labels
+      await prisma.label.createMany({
+        data: createLabels.map(({ name }) => ({
+          name,
+          ownerId: userId
+        }))
+      });
+
+      newLabels = await prisma.label
+        .findMany({
+          where: {
+            name: {
+              in: createLabels.map(({ name }) => name)
+            },
+            ownerId: userId
+          }
+        })
+        .then((labels) => {
+          return labels.map((label) => ({
+            ...label,
+            offlineId: createLabels.find(({ name }) => name === label.name)
+              ?.offlineId
+          }));
+        });
+
+      createNotes.map((note) =>
+        note.labels.map((label) => {
+          const onlineLabel = newLabels.find((l) => l.offlineId === label);
+          if (onlineLabel) return onlineLabel.id;
+          else return label;
+        })
+      );
+
+      labelsNotCreated = createLabels.filter(
+        ({ name }) => !newLabels.find((label) => label.name === name)
+      );
+    }
+
+    if (createNotes.length > 0) {
+      const newNotesPromises = createNotes.map(
+        ({ title, content, pinned, labels, offlineId }) => {
+          const newNote = prisma.note.create({
+            data: {
+              title,
+              content,
+              pinned,
+              userId,
+              labels: {
+                // if some label failed to create or just got given
+                // offline id then just ignore it and don't connect it
+                connect: labels
+                  .filter((e) => typeof e === "number")
+                  .map((label) => ({
+                    id: label as number
+                  }))
+              }
+            }
+          });
+          return newNote.then((e) => ({ ...e, offlineId }));
+        }
+      );
+
+      const newNotes = await Promise.allSettled(newNotesPromises);
     }
   },
   {
