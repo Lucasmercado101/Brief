@@ -523,10 +523,10 @@ function getOperations(operations: Operation[]): {
   );
 
   return {
-    deleteLabelIds: deleteLabels.ids,
-    deleteNoteIds: deleteNotes.ids,
-    createLabels: createLabels.labels,
-    createNotes: createNotes.notes,
+    deleteLabelIds: deleteLabels?.ids ?? [],
+    deleteNoteIds: deleteNotes?.ids ?? [],
+    createLabels: createLabels?.labels ?? [],
+    createNotes: createNotes?.notes ?? [],
     editNotes,
     changeLabelsName
   };
