@@ -13,250 +13,229 @@ const body = t.Object({
 });
 
 export default () =>
-  new Elysia().post(
-    "/changes",
-    async ({ body, set, cookie: { session } }) => {
-      const userId = session.value;
-
-      // TODO: use Zod for all of this
-      if (body.operations.some((e) => (e as any).operation === undefined)) {
-        set.status = 400;
-        return;
-      }
-
-      // check if operation is a valid one
-      if (
-        body.operations.some((e) => {
-          const op: string = (e as any).operation;
-          switch (op) {
-            case Operations.DELETE_LABELS:
-              return false;
-            case Operations.CREATE_LABELS:
-              return false;
-            case Operations.DELETE_NOTES:
-              return false;
-            case Operations.CREATE_NOTES:
-              return false;
-            case Operations.EDIT_NOTE:
-              return false;
-            case Operations.CHANGE_LABEL_NAME:
-              return false;
-            default:
-              return true;
+  new Elysia()
+    // error handler Copy and pasted from index.ts
+    .onError(({ error, set, code }) => {
+      console.log(code);
+      switch (code) {
+        case "VALIDATION":
+          set.status = 400;
+          return error.message;
+        case "NOT_FOUND":
+          set.status = 404;
+          return "Endpoint not found.";
+        case "INVALID_COOKIE_SIGNATURE":
+          set.status = 401;
+          return error.message;
+        // TODO: better
+        case "PARSE":
+        case "UNKNOWN":
+          if (error.message.includes("JSON Parse error")) {
+            set.status = 400;
+            return "Invalid JSON.";
           }
-        })
-      ) {
-        set.status = 400;
-        return "Invalid operation";
+        case "INTERNAL_SERVER_ERROR":
+        default:
+          console.log("ERROR\n");
+          console.log("CODE:", code);
+          console.log(error);
+          console.log("\nERROR END");
+          set.status = 500;
+          return "An unexpected error has occurred.";
       }
+    })
+    .post(
+      "/changes",
+      async ({ body, set, cookie: { session } }) => {
+        const userId = session.value;
 
-      const operations = getOperations(body.operations as Operation[]);
+        // TODO: use Zod for all of this
+        if (body.operations.some((e) => (e as any).operation === undefined)) {
+          set.status = 400;
+          return;
+        }
 
-      const { deleteLabelIds, deleteNoteIds } = operations;
-      let createLabels = operations.createLabels;
-      let createNotes = operations.createNotes;
-      let editNotes = operations.editNotes;
-      let changeLabelsName = operations.changeLabelsName;
-
-      let labelsNotCreated: NewLabel[] = [];
-      let notesNotCreated: NewNote[] = [];
-      let notesNotEdited: EditNote[] = [];
-      let labelsNameNotChanged: ChangeLabelName[] = [];
-
-      let newLabels: {
-        offlineId: string | undefined;
-        id: number;
-        name: string;
-        createdAt: Date;
-        updatedAt: Date;
-        ownerId: number;
-      }[] = [];
-
-      let newNotes: {
-        offlineId: string;
-        id: number;
-        title: string | null;
-        content: string;
-        pinned: boolean;
-        createdAt: Date;
-        updatedAt: Date;
-        userId: number;
-      }[] = [];
-
-      let editedNotes: {
-        offlineId: ID;
-        id: number;
-        title: string | null;
-        content: string;
-        pinned: boolean;
-        createdAt: Date;
-        updatedAt: Date;
-        userId: number;
-      }[] = [];
-
-      let labelsNameEdited: {
-        id: number;
-        name: string;
-        createdAt: Date;
-        updatedAt: Date;
-        ownerId: number;
-      }[] = [];
-
-      if (deleteLabelIds.length > 0) {
-        await prisma.label.deleteMany({
-          where: {
-            id: {
-              in: deleteLabelIds
-            },
-            ownerId: userId
-          }
-        });
-      }
-
-      if (deleteNoteIds.length > 0) {
-        await prisma.note.deleteMany({
-          where: {
-            id: {
-              in: deleteNoteIds
-            },
-            userId: userId
-          }
-        });
-      }
-
-      if (createLabels.length > 0) {
-        // remove labels that already exist
-        const existingLabels = await prisma.label.findMany({
-          where: {
-            name: {
-              in: createLabels.map(({ name }) => name)
+        // check if operation is a valid one
+        if (
+          body.operations.some((e) => {
+            const op: string = (e as any).operation;
+            switch (op) {
+              case Operations.DELETE_LABELS:
+                return false;
+              case Operations.CREATE_LABELS:
+                return false;
+              case Operations.DELETE_NOTES:
+                return false;
+              case Operations.CREATE_NOTES:
+                return false;
+              case Operations.EDIT_NOTE:
+                return false;
+              case Operations.CHANGE_LABEL_NAME:
+                return false;
+              default:
+                return true;
             }
-          }
-        });
+          })
+        ) {
+          set.status = 400;
+          return "Invalid operation";
+        }
 
-        createLabels = createLabels.filter(
-          ({ name }) => !existingLabels.find((label) => label.name === name)
-        );
+        const operations = getOperations(body.operations as Operation[]);
 
-        // create new labels
-        await prisma.label.createMany({
-          skipDuplicates: true,
-          data: createLabels.map(({ name }) => ({
-            name,
-            ownerId: userId
-          }))
-        });
+        const { deleteLabelIds, deleteNoteIds } = operations;
+        let createLabels = operations.createLabels;
+        let createNotes = operations.createNotes;
+        let editNotes = operations.editNotes;
+        let changeLabelsName = operations.changeLabelsName;
 
-        newLabels = await prisma.label
-          .findMany({
+        let labelsNotCreated: NewLabel[] = [];
+        let notesNotCreated: NewNote[] = [];
+        let notesNotEdited: EditNote[] = [];
+        let labelsNameNotChanged: ChangeLabelName[] = [];
+
+        let newLabels: {
+          offlineId: string | undefined;
+          id: number;
+          name: string;
+          createdAt: Date;
+          updatedAt: Date;
+          ownerId: number;
+        }[] = [];
+
+        let newNotes: {
+          offlineId: string;
+          id: number;
+          title: string | null;
+          content: string;
+          pinned: boolean;
+          createdAt: Date;
+          updatedAt: Date;
+          userId: number;
+        }[] = [];
+
+        let editedNotes: {
+          offlineId: ID;
+          id: number;
+          title: string | null;
+          content: string;
+          pinned: boolean;
+          createdAt: Date;
+          updatedAt: Date;
+          userId: number;
+        }[] = [];
+
+        let labelsNameEdited: {
+          id: number;
+          name: string;
+          createdAt: Date;
+          updatedAt: Date;
+          ownerId: number;
+        }[] = [];
+
+        if (deleteLabelIds.length > 0) {
+          await prisma.label.deleteMany({
             where: {
-              name: {
-                in: createLabels.map(({ name }) => name)
+              id: {
+                in: deleteLabelIds
               },
               ownerId: userId
             }
-          })
-          .then((labels) => {
-            return labels.map((label) => ({
-              ...label,
-              offlineId: createLabels.find(({ name }) => name === label.name)
-                ?.offlineId
-            }));
+          });
+        }
+
+        if (deleteNoteIds.length > 0) {
+          await prisma.note.deleteMany({
+            where: {
+              id: {
+                in: deleteNoteIds
+              },
+              userId: userId
+            }
+          });
+        }
+
+        if (createLabels.length > 0) {
+          // remove labels that already exist
+          const existingLabels = await prisma.label.findMany({
+            where: {
+              name: {
+                in: createLabels.map(({ name }) => name)
+              }
+            }
           });
 
-        createNotes = createNotes.map((note) => ({
-          ...note,
-          labels: note.labels.map((label) => {
-            const onlineLabel = newLabels.find((l) => l.offlineId === label);
-            // replace offline label with db label
-            if (onlineLabel) return onlineLabel.id;
-            else return label;
-          })
-        }));
+          createLabels = createLabels.filter(
+            ({ name }) => !existingLabels.find((label) => label.name === name)
+          );
 
-        editNotes = editNotes.map((note) => ({
-          ...note,
-          labels: note.labels.map((label) => {
-            const onlineLabel = newLabels.find((l) => l.offlineId === label);
-            // replace offline label with db label
-            if (onlineLabel) return onlineLabel.id;
-            else return label;
-          })
-        }));
+          // create new labels
+          await prisma.label.createMany({
+            skipDuplicates: true,
+            data: createLabels.map(({ name }) => ({
+              name,
+              ownerId: userId
+            }))
+          });
 
-        changeLabelsName = changeLabelsName.map((label) => ({
-          ...label,
-          id: newLabels.find((l) => l.offlineId === label.id)?.id ?? label.id
-        }));
-
-        // NOTE: don't inquire further, if it couldn't create then don't
-        // retry, don't fail, just send as "not created" in response
-        labelsNotCreated = createLabels.filter(
-          ({ name }) => !newLabels.find((label) => label.name === name)
-        );
-      }
-
-      if (createNotes.length > 0) {
-        const newNotesPromises = createNotes.map(
-          ({ title, content, pinned, labels, offlineId }) => {
-            const newNote = prisma.note.create({
-              data: {
-                title,
-                content,
-                pinned,
-                userId,
-                labels: {
-                  // if some label failed to create or just got given
-                  // offline id then just ignore it and don't connect it
-                  connect: labels
-                    .filter((e) => typeof e === "number")
-                    .map((label) => ({
-                      id: label as number
-                    }))
-                }
-              }
-            });
-            return newNote.then((e) => ({ ...e, offlineId }));
-          }
-        );
-
-        (await Promise.allSettled(newNotesPromises)).forEach((e) => {
-          if (e.status === "fulfilled") {
-            newNotes.push(e.value);
-          }
-        });
-
-        editNotes = editNotes.map((note) => {
-          const noteOnlineId = newNotes.find(
-            (n) => n.offlineId === note.id
-          )?.id;
-          return {
-            ...note,
-            id: noteOnlineId ?? note.id
-          };
-        });
-
-        // NOTE: don't inquire further, if it couldn't create then don't
-        // retry, don't fail, just send as "not created" in response
-        notesNotCreated = createNotes.filter(
-          ({ offlineId }) =>
-            !newNotes.find((note) => note.offlineId === offlineId)
-        );
-      }
-
-      if (editNotes.length > 0) {
-        const editNotesPromises = editNotes
-          .filter((e) => typeof e.id === "number")
-          .map(({ id, title, content, pinned, labels }) => {
-            const editNote = prisma.note
-              .update({
-                where: {
-                  id: id as number
+          newLabels = await prisma.label
+            .findMany({
+              where: {
+                name: {
+                  in: createLabels.map(({ name }) => name)
                 },
+                ownerId: userId
+              }
+            })
+            .then((labels) => {
+              return labels.map((label) => ({
+                ...label,
+                offlineId: createLabels.find(({ name }) => name === label.name)
+                  ?.offlineId
+              }));
+            });
+
+          createNotes = createNotes.map((note) => ({
+            ...note,
+            labels: note.labels.map((label) => {
+              const onlineLabel = newLabels.find((l) => l.offlineId === label);
+              // replace offline label with db label
+              if (onlineLabel) return onlineLabel.id;
+              else return label;
+            })
+          }));
+
+          editNotes = editNotes.map((note) => ({
+            ...note,
+            labels: note.labels.map((label) => {
+              const onlineLabel = newLabels.find((l) => l.offlineId === label);
+              // replace offline label with db label
+              if (onlineLabel) return onlineLabel.id;
+              else return label;
+            })
+          }));
+
+          changeLabelsName = changeLabelsName.map((label) => ({
+            ...label,
+            id: newLabels.find((l) => l.offlineId === label.id)?.id ?? label.id
+          }));
+
+          // NOTE: don't inquire further, if it couldn't create then don't
+          // retry, don't fail, just send as "not created" in response
+          labelsNotCreated = createLabels.filter(
+            ({ name }) => !newLabels.find((label) => label.name === name)
+          );
+        }
+
+        if (createNotes.length > 0) {
+          const newNotesPromises = createNotes.map(
+            ({ title, content, pinned, labels, offlineId }) => {
+              const newNote = prisma.note.create({
                 data: {
                   title,
                   content,
                   pinned,
+                  userId,
                   labels: {
                     // if some label failed to create or just got given
                     // offline id then just ignore it and don't connect it
@@ -267,149 +246,205 @@ export default () =>
                       }))
                   }
                 }
-              })
-              .then((e) => ({ ...e, offlineId: id }));
-            return editNote;
+              });
+              return newNote.then((e) => ({ ...e, offlineId }));
+            }
+          );
+
+          (await Promise.allSettled(newNotesPromises)).forEach((e) => {
+            if (e.status === "fulfilled") {
+              newNotes.push(e.value);
+            }
           });
 
-        (await Promise.allSettled(editNotesPromises)).forEach((e) => {
-          if (e.status === "fulfilled") {
-            editedNotes.push(e.value);
-          }
-        });
+          editNotes = editNotes.map((note) => {
+            const noteOnlineId = newNotes.find(
+              (n) => n.offlineId === note.id
+            )?.id;
+            return {
+              ...note,
+              id: noteOnlineId ?? note.id
+            };
+          });
 
-        // NOTE: don't inquire further, if it couldn't create then don't
-        // retry, don't fail, just send as "not edited" in response
-        notesNotEdited = editNotes.filter(
-          ({ id }) => !newNotes.find((note) => note.offlineId === id)
-        );
-      }
+          // NOTE: don't inquire further, if it couldn't create then don't
+          // retry, don't fail, just send as "not created" in response
+          notesNotCreated = createNotes.filter(
+            ({ offlineId }) =>
+              !newNotes.find((note) => note.offlineId === offlineId)
+          );
+        }
 
-      if (changeLabelsName.length > 0) {
-        const changeLabelsNamePromises = changeLabelsName
-          .filter((e) => typeof e.id === "number")
-          .map(({ id, name }) => {
-            const changeLabelName = prisma.label.update({
-              where: {
-                id: id as number,
-                ownerId: userId
-              },
-              data: {
-                name
-              }
+        if (editNotes.length > 0) {
+          const editNotesPromises = editNotes
+            .filter((e) => typeof e.id === "number")
+            .map(({ id, title, content, pinned, labels }) => {
+              const editNote = prisma.note
+                .update({
+                  where: {
+                    id: id as number
+                  },
+                  data: {
+                    title,
+                    content,
+                    pinned,
+                    labels: {
+                      // if some label failed to create or just got given
+                      // offline id then just ignore it and don't connect it
+                      connect: labels
+                        .filter((e) => typeof e === "number")
+                        .map((label) => ({
+                          id: label as number
+                        }))
+                    }
+                  }
+                })
+                .then((e) => ({ ...e, offlineId: id }));
+              return editNote;
             });
-            return changeLabelName;
+
+          (await Promise.allSettled(editNotesPromises)).forEach((e) => {
+            if (e.status === "fulfilled") {
+              editedNotes.push(e.value);
+            }
           });
 
-        (await Promise.allSettled(changeLabelsNamePromises)).forEach((e) => {
-          if (e.status === "fulfilled") {
-            labelsNameEdited.push(e.value);
+          // NOTE: don't inquire further, if it couldn't create then don't
+          // retry, don't fail, just send as "not edited" in response
+          notesNotEdited = editNotes.filter(
+            ({ id }) => !newNotes.find((note) => note.offlineId === id)
+          );
+        }
+
+        if (changeLabelsName.length > 0) {
+          const changeLabelsNamePromises = changeLabelsName
+            .filter((e) => typeof e.id === "number")
+            .map(({ id, name }) => {
+              const changeLabelName = prisma.label.update({
+                where: {
+                  id: id as number,
+                  ownerId: userId
+                },
+                data: {
+                  name
+                }
+              });
+              return changeLabelName;
+            });
+
+          (await Promise.allSettled(changeLabelsNamePromises)).forEach((e) => {
+            if (e.status === "fulfilled") {
+              labelsNameEdited.push(e.value);
+            }
+          });
+
+          labelsNameNotChanged = changeLabelsName.filter(
+            ({ id }) => !labelsNameEdited.find((label) => label.id === id)
+          );
+        }
+
+        const lastSyncedAt = new Date(body.lastSyncedAt);
+
+        const toDownSyncNotes = await prisma.note.findMany({
+          where: {
+            updatedAt: {
+              gt: lastSyncedAt
+            },
+            id: userId
+          },
+          include: {
+            labels: {
+              select: { id: true }
+            }
           }
         });
 
-        labelsNameNotChanged = changeLabelsName.filter(
-          ({ id }) => !labelsNameEdited.find((label) => label.id === id)
-        );
-      }
-
-      const lastSyncedAt = new Date(body.lastSyncedAt);
-
-      const toDownSyncNotes = await prisma.note.findMany({
-        where: {
-          updatedAt: {
-            gt: lastSyncedAt
-          },
-          id: userId
-        },
-        include: {
-          labels: {
-            select: { id: true }
+        const toDownSyncLabels = await prisma.label.findMany({
+          where: {
+            updatedAt: {
+              gt: lastSyncedAt
+            },
+            ownerId: userId
           }
-        }
-      });
+        });
 
-      const toDownSyncLabels = await prisma.label.findMany({
-        where: {
-          updatedAt: {
-            gt: lastSyncedAt
+        const dbNotes = await prisma.note.findMany({
+          where: {
+            userId,
+            id: { in: body.currentData.notes.map((id) => id) }
           },
-          ownerId: userId
-        }
-      });
+          select: {
+            id: true
+          }
+        });
 
-      const dbNotes = await prisma.note.findMany({
-        where: {
-          userId,
-          id: { in: body.currentData.notes.map((id) => id) }
-        },
-        select: {
-          id: true
-        }
-      });
+        const deletedNotes = body.currentData.notes.filter(
+          (id) => !dbNotes.find((label) => label.id === id)
+        );
 
-      const deletedNotes = body.currentData.notes.filter(
-        (id) => !dbNotes.find((label) => label.id === id)
-      );
+        const dbLabels = await prisma.label.findMany({
+          where: {
+            ownerId: userId,
+            id: { in: body.currentData.labels.map((id) => id) }
+          },
+          select: {
+            id: true
+          }
+        });
 
-      const dbLabels = await prisma.label.findMany({
-        where: {
-          ownerId: userId,
-          id: { in: body.currentData.labels.map((id) => id) }
-        },
-        select: {
-          id: true
-        }
-      });
+        const deletedLabels = body.currentData.labels.filter(
+          (id) => !dbLabels.find((label) => label.id === id)
+        );
 
-      const deletedLabels = body.currentData.labels.filter(
-        (id) => !dbLabels.find((label) => label.id === id)
-      );
-
-      return {
-        data: {
-          notes: toDownSyncNotes
-            .map((n) => ({
-              ...n,
-              updatedAt: n.updatedAt.valueOf(),
-              createdAt: n.createdAt.valueOf()
-            }))
-            .map((e) => {
-              const offlineId = newNotes.find((n) => n.id === e.id)?.offlineId;
-              if (offlineId) return { ...e, offlineId };
-              else return e;
-            }),
-          labels: toDownSyncLabels
-            .map((n) => ({
-              ...n,
-              updatedAt: n.updatedAt.valueOf(),
-              createdAt: n.createdAt.valueOf()
-            }))
-            .map((e) => {
-              const offlineId = newLabels.find((l) => l.id === e.id)?.offlineId;
-              if (offlineId) return { ...e, offlineId };
-              else return e;
-            })
-        },
-        deleted: {
-          notes: deletedNotes,
-          labels: deletedLabels
-        },
-        failedToCreate: [
-          ...labelsNotCreated.map((e) => e.offlineId),
-          ...notesNotCreated.map((e) => e.offlineId)
-        ],
-        failedToEdit: {
-          notes: notesNotEdited,
-          labels: labelsNameNotChanged
-        },
-        justSyncedAt: new Date().valueOf()
-      };
-    },
-    {
-      body: body,
-      cookie: requiredCookieSession
-    }
-  );
+        return {
+          data: {
+            notes: toDownSyncNotes
+              .map((n) => ({
+                ...n,
+                updatedAt: n.updatedAt.valueOf(),
+                createdAt: n.createdAt.valueOf()
+              }))
+              .map((e) => {
+                const offlineId = newNotes.find(
+                  (n) => n.id === e.id
+                )?.offlineId;
+                if (offlineId) return { ...e, offlineId };
+                else return e;
+              }),
+            labels: toDownSyncLabels
+              .map((n) => ({
+                ...n,
+                updatedAt: n.updatedAt.valueOf(),
+                createdAt: n.createdAt.valueOf()
+              }))
+              .map((e) => {
+                const offlineId = newLabels.find(
+                  (l) => l.id === e.id
+                )?.offlineId;
+                if (offlineId) return { ...e, offlineId };
+                else return e;
+              })
+          },
+          deleted: {
+            notes: deletedNotes,
+            labels: deletedLabels
+          },
+          failedToCreate: [
+            ...labelsNotCreated.map((e) => e.offlineId),
+            ...notesNotCreated.map((e) => e.offlineId)
+          ],
+          failedToEdit: {
+            notes: notesNotEdited,
+            labels: labelsNameNotChanged
+          },
+          justSyncedAt: new Date().valueOf()
+        };
+      },
+      {
+        body: body,
+        cookie: requiredCookieSession
+      }
+    );
 
 enum Operations {
   DELETE_LABELS = "DELETE_LABELS",
