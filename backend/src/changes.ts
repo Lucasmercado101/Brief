@@ -1,5 +1,5 @@
 import { Elysia, t } from "elysia";
-import { requiredCookieSession } from "./index";
+import { prisma, requiredCookieSession } from "./index";
 
 const POSIX = t.Number();
 
@@ -24,20 +24,39 @@ const body = t.Object({
 
 export default new Elysia().post(
   "/changes",
-  ({ body }) => {
-    const operations = body.operations as Operation[];
-    const {
-      newNote,
-      deleteNote,
-      editNote,
-      newLabel,
-      changeLabelName,
-      deleteLabel,
-      deleteLabels,
-      createLabels,
-      deleteNotes,
-      createNotes
-    } = getOperations(operations);
+  async ({ body, cookie: { session } }) => {
+    const userId = session.value;
+
+    const operations = getOperations(body.operations as Operation[]);
+
+    const deleteLabelIds = operations.deleteLabels.ids;
+    const createLabelIds = operations.createLabels.labels;
+    const deleteNoteIds = operations.deleteNotes.ids;
+    const createNotes = operations.createNotes.notes;
+    const editNote = operations.editNote;
+    const changeLabelName = operations.changeLabelName;
+
+    if (deleteLabelIds.length > 0) {
+      await prisma.label.deleteMany({
+        where: {
+          id: {
+            in: deleteLabelIds
+          },
+          ownerId: userId
+        }
+      });
+    }
+
+    if (deleteNoteIds.length > 0) {
+      await prisma.note.deleteMany({
+        where: {
+          id: {
+            in: deleteNoteIds
+          },
+          userId: userId
+        }
+      });
+    }
   },
   {
     body: body,
@@ -46,32 +65,50 @@ export default new Elysia().post(
 );
 
 enum Operations {
-  // note
-  NEW_NOTE,
-  DELETE_NOTE,
-  EDIT_NOTE,
-  // label
-  NEW_LABEL,
-  CHANGE_LABEL_NAME,
-  DELETE_LABEL,
-  // Mutation Aggregations
   DELETE_LABELS,
   CREATE_LABELS,
   DELETE_NOTES,
-  CREATE_NOTES
+  CREATE_NOTES,
+  EDIT_NOTE,
+  CHANGE_LABEL_NAME
 }
-
-type offlineId = string;
-type databaseId = number;
-type ID = offlineId | databaseId;
 
 interface Operation {
   operation: Operations;
   [key: string]: unknown;
 }
 
+type offlineId = string;
+type databaseId = number;
+type ID = offlineId | databaseId;
+
+type DeleteLabels = {
+  operation: Operations.DELETE_LABELS;
+  ids: databaseId[];
+};
+
+//
+
+type NewLabel = {
+  offlineId: offlineId;
+  name: string;
+};
+
+type CreateLabels = {
+  operation: Operations.CREATE_LABELS;
+  labels: NewLabel[];
+};
+
+//
+
+type DeleteNotes = {
+  operation: Operations.DELETE_NOTES;
+  ids: databaseId[];
+};
+
+//
+
 type NewNote = {
-  operation: Operations.NEW_NOTE;
   offlineId: offlineId;
   title: string;
   content: string;
@@ -79,10 +116,12 @@ type NewNote = {
   labels: (string | number)[];
 };
 
-type DeleteNote = {
-  operation: Operations.DELETE_NOTE;
-  id: databaseId;
+type CreateNotes = {
+  operation: Operations.CREATE_NOTES;
+  notes: NewNote[];
 };
+
+//
 
 type EditNote = {
   operation: Operations.EDIT_NOTE;
@@ -93,126 +132,63 @@ type EditNote = {
   labels: ID[];
 };
 
-type NewLabel = {
-  operation: Operations.NEW_LABEL;
-  offlineId: offlineId;
-  name: string;
-};
-
 type ChangeLabelName = {
   operation: Operations.CHANGE_LABEL_NAME;
   id: ID;
   name: string;
 };
 
-type DeleteLabel = {
-  operation: Operations.DELETE_LABEL;
-  id: databaseId;
-};
-
-type DeleteLabels = {
-  operation: Operations.DELETE_LABELS;
-  ids: databaseId[];
-};
-
-type CreateLabels = {
-  operation: Operations.CREATE_LABELS;
-  labels: Omit<NewLabel, "operation">[];
-};
-
-type DeleteNotes = {
-  operation: Operations.DELETE_NOTES;
-  ids: databaseId[];
-};
-
-type CreateNotes = {
-  operation: Operations.CREATE_NOTES;
-  notes: Omit<NewNote, "operation">[];
-};
-
 function getOperations(operations: Operation[]): {
-  newNote: NewNote | undefined;
-  deleteNote: DeleteNote | undefined;
-  editNote: EditNote | undefined;
-  newLabel: NewLabel | undefined;
-  changeLabelName: ChangeLabelName | undefined;
-  deleteLabel: DeleteLabel | undefined;
-  deleteLabels: DeleteLabels[];
-  createLabels: CreateLabels[];
-  deleteNotes: DeleteNotes[];
-  createNotes: CreateNotes[];
+  deleteLabels: DeleteLabels;
+  createLabels: CreateLabels;
+  deleteNotes: DeleteNotes;
+  createNotes: CreateNotes;
+  editNote: EditNote[];
+  changeLabelName: ChangeLabelName[];
 } {
-  const [[newNote], r1] = partition(
+  const [[deleteLabels], r1] = partition(
     operations,
-    (mutation): mutation is NewNote =>
-      mutation.operation === Operations.NEW_NOTE
-  );
-
-  const [[deleteNote], r2] = partition(
-    r1,
-    (mutation): mutation is DeleteNote =>
-      mutation.operation === Operations.DELETE_NOTE
-  );
-
-  const [[editNote], r3] = partition(
-    r2,
-    (mutation): mutation is EditNote =>
-      mutation.operation === Operations.EDIT_NOTE
-  );
-
-  const [[newLabel], r4] = partition(
-    r3,
-    (mutation): mutation is NewLabel =>
-      mutation.operation === Operations.NEW_LABEL
-  );
-
-  const [[changeLabelName], r5] = partition(
-    r4,
-    (mutation): mutation is ChangeLabelName =>
-      mutation.operation === Operations.CHANGE_LABEL_NAME
-  );
-
-  const [[deleteLabel], r6] = partition(
-    r5,
-    (mutation): mutation is DeleteLabel =>
-      mutation.operation === Operations.DELETE_LABEL
-  );
-
-  const [deleteLabels, r7] = partition(
-    r6,
     (mutation): mutation is DeleteLabels =>
       mutation.operation === Operations.DELETE_LABELS
   );
 
-  const [createLabels, r8] = partition(
-    r7,
+  const [[createLabels], r2] = partition(
+    r1,
     (mutation): mutation is CreateLabels =>
       mutation.operation === Operations.CREATE_LABELS
   );
 
-  const [deleteNotes, r9] = partition(
-    r8,
+  const [[deleteNotes], r3] = partition(
+    r2,
     (mutation): mutation is DeleteNotes =>
       mutation.operation === Operations.DELETE_NOTES
   );
 
-  const [createNotes] = partition(
-    r9,
+  const [[createNotes], r4] = partition(
+    r3,
     (mutation): mutation is CreateNotes =>
       mutation.operation === Operations.CREATE_NOTES
   );
 
+  const [editNote, r5] = partition(
+    r4,
+    (mutation): mutation is EditNote =>
+      mutation.operation === Operations.EDIT_NOTE
+  );
+
+  const [changeLabelName] = partition(
+    r5,
+    (mutation): mutation is ChangeLabelName =>
+      mutation.operation === Operations.CHANGE_LABEL_NAME
+  );
+
   return {
-    newNote,
-    deleteNote,
-    editNote,
-    newLabel,
-    changeLabelName,
-    deleteLabel,
     deleteLabels,
     createLabels,
     deleteNotes,
-    createNotes
+    createNotes,
+    editNote,
+    changeLabelName
   };
 }
 
