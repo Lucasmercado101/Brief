@@ -320,6 +320,11 @@ export default () =>
             gt: lastSyncedAt
           },
           id: userId
+        },
+        include: {
+          labels: {
+            select: { id: true }
+          }
         }
       });
 
