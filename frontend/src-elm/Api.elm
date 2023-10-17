@@ -159,6 +159,91 @@ postNewNote inputData msg =
 ---
 
 
+type alias EditNoteInput =
+    { title : Maybe (Nullable String)
+    , content : Maybe String
+    , pinned : Maybe Bool
+    , labels : Maybe (List ID)
+    }
+
+
+type alias EditNoteResp =
+    { id : ID
+    , title : Maybe String
+    , content : String
+    , pinned : Bool
+    , createdAt : Posix
+    , updatedAt : Posix
+    , labels : List Label
+    }
+
+
+type Nullable a
+    = Val a
+    | Null
+
+
+editNoteDecoder : Decoder EditNoteResp
+editNoteDecoder =
+    map7 EditNoteResp
+        (field "id" int)
+        (field "title" (maybe string))
+        (field "content" string)
+        (field "pinned" bool)
+        (field "createdAt" posixTime)
+        (field "updatedAt" posixTime)
+        (field "labels" (list labelDecoder))
+
+
+editNote : Int -> EditNoteInput -> (Result Http.Error EditNoteResp -> msg) -> Cmd msg
+editNote noteID inputData msg =
+    riskyPut ("note/" ++ String.fromInt noteID)
+        (Http.jsonBody
+            (JE.object
+                ([]
+                    ++ (case inputData.title of
+                            Just v ->
+                                case v of
+                                    Val title ->
+                                        [ ( "title", JE.string title ) ]
+
+                                    Null ->
+                                        [ ( "title", JE.null ) ]
+
+                            Nothing ->
+                                []
+                       )
+                    ++ (case inputData.content of
+                            Just content ->
+                                [ ( "content", JE.string content ) ]
+
+                            Nothing ->
+                                []
+                       )
+                    ++ (case inputData.pinned of
+                            Just pinned ->
+                                [ ( "pinned", JE.bool pinned ) ]
+
+                            Nothing ->
+                                []
+                       )
+                    ++ (case inputData.labels of
+                            Just labels ->
+                                [ ( "labels", JE.list JE.int labels ) ]
+
+                            Nothing ->
+                                []
+                       )
+                )
+            )
+        )
+        (Http.expectJson msg editNoteDecoder)
+
+
+
+---
+
+
 removeLabelFromNote : Int -> List Int -> (Result Http.Error () -> msg) -> Cmd msg
 removeLabelFromNote noteID labelsIDs msg =
     riskyPut ("note/" ++ String.fromInt noteID)

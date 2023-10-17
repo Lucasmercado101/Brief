@@ -4,3 +4,11 @@
 .note-label:hover .note-label-remove-button {
   display: block;
 }
+
+.note-top-actions {
+  display: none;
+}
+
+.note:hover .note-top-actions {
+  display: flex;
+}
