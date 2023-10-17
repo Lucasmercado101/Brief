@@ -291,7 +291,8 @@ export default () =>
           .map(({ id, name }) => {
             const changeLabelName = prisma.label.update({
               where: {
-                id: id as number
+                id: id as number,
+                ownerId: userId
               },
               data: {
                 name
@@ -321,12 +322,13 @@ export default () =>
           id: userId
         }
       });
+
       const toDownSyncLabels = await prisma.label.findMany({
         where: {
           updatedAt: {
             gt: lastSync
           },
-          id: userId
+          ownerId: userId
         }
       });
 
