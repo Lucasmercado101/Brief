@@ -18,6 +18,7 @@ export default () =>
     async ({ body, set, cookie: { session } }) => {
       const userId = session.value;
 
+      // TODO: use Zod for all of this
       if (body.operations.some((e) => (e as any).operation === undefined)) {
         set.status = 400;
         return;
