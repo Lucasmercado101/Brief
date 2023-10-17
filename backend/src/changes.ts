@@ -39,6 +39,7 @@ export default new Elysia().post(
     let createLabels = operations.createLabels;
 
     let labelsNotCreated: NewLabel[] = [];
+    let notesNotCreated: NewNote[] = [];
 
     let newLabels: {
       offlineId: string | undefined;
@@ -47,6 +48,17 @@ export default new Elysia().post(
       createdAt: Date;
       updatedAt: Date;
       ownerId: number;
+    }[] = [];
+
+    let newNotes: {
+      offlineId: string;
+      id: number;
+      title: string | null;
+      content: string;
+      pinned: boolean;
+      createdAt: Date;
+      updatedAt: Date;
+      userId: number;
     }[] = [];
 
     if (deleteLabelIds.length > 0) {
@@ -118,6 +130,8 @@ export default new Elysia().post(
         })
       );
 
+      // NOTE: don't inquire further, if it couldn't create then don't
+      // retry, don't fail, just send as "not created" in response
       labelsNotCreated = createLabels.filter(
         ({ name }) => !newLabels.find((label) => label.name === name)
       );
@@ -147,7 +161,18 @@ export default new Elysia().post(
         }
       );
 
-      const newNotes = await Promise.allSettled(newNotesPromises);
+      (await Promise.allSettled(newNotesPromises)).forEach((e) => {
+        if (e.status === "fulfilled") {
+          newNotes.push(e.value);
+        }
+      });
+
+      // NOTE: don't inquire further, if it couldn't create then don't
+      // retry, don't fail, just send as "not created" in response
+      notesNotCreated = createNotes.filter(
+        ({ offlineId }) =>
+          !newNotes.find((note) => note.offlineId === offlineId)
+      );
     }
   },
   {
