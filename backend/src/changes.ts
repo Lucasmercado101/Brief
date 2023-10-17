@@ -1,8 +1,25 @@
 import { Elysia, t } from "elysia";
 import { requiredCookieSession } from "./index";
 
+const POSIX = t.Number();
+
 const body = t.Object({
-  operations: t.Array(t.Unknown())
+  operations: t.Array(t.Unknown()),
+  lastSync: POSIX,
+  data: t.Object({
+    labels: t.Array(
+      t.Object({
+        id: t.Number(),
+        updatedAt: POSIX
+      })
+    ),
+    notes: t.Array(
+      t.Object({
+        id: t.Number(),
+        updatedAt: POSIX
+      })
+    )
+  })
 });
 
 export default new Elysia().post(
