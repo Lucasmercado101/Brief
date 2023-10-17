@@ -1080,6 +1080,7 @@ handleNextInQueue =
 
 labelIDsSplitter : List ID -> List String -> List Int -> ( List String, List Int )
 labelIDsSplitter ids offlineIds dbIds =
+    -- TODO: use List.partition instead?
     case ids of
         [] ->
             ( offlineIds, dbIds )
