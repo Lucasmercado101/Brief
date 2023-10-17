@@ -15,8 +15,39 @@ const body = t.Object({
 export default () =>
   new Elysia().post(
     "/changes",
-    async ({ body, cookie: { session } }) => {
+    async ({ body, set, cookie: { session } }) => {
       const userId = session.value;
+
+      if (body.operations.some((e) => (e as any).operation === undefined)) {
+        set.status = 400;
+        return;
+      }
+
+      // check if operation is a valid one
+      if (
+        body.operations.some((e) => {
+          const op: string = (e as any).operation;
+          switch (op) {
+            case Operations.DELETE_LABELS:
+              return false;
+            case Operations.CREATE_LABELS:
+              return false;
+            case Operations.DELETE_NOTES:
+              return false;
+            case Operations.CREATE_NOTES:
+              return false;
+            case Operations.EDIT_NOTE:
+              return false;
+            case Operations.CHANGE_LABEL_NAME:
+              return false;
+            default:
+              return true;
+          }
+        })
+      ) {
+        set.status = 400;
+        return "Invalid operation";
+      }
 
       const operations = getOperations(body.operations as Operation[]);
 
@@ -373,12 +404,12 @@ export default () =>
   );
 
 enum Operations {
-  DELETE_LABELS,
-  CREATE_LABELS,
-  DELETE_NOTES,
-  CREATE_NOTES,
-  EDIT_NOTE,
-  CHANGE_LABEL_NAME
+  DELETE_LABELS = "DELETE_LABELS",
+  CREATE_LABELS = "CREATE_LABELS",
+  DELETE_NOTES = "DELETE_NOTES",
+  CREATE_NOTES = "CREATE_NOTES",
+  EDIT_NOTE = "EDIT_NOTE",
+  CHANGE_LABEL_NAME = "CHANGE_LABEL_NAME"
 }
 
 interface Operation {
