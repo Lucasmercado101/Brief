@@ -27,14 +27,14 @@ export default new Elysia().post(
   async ({ body, cookie: { session } }) => {
     const userId = session.value;
 
-    const operations = getOperations(body.operations as Operation[]);
-
-    const deleteLabelIds = operations.deleteLabels.ids;
-    const deleteNoteIds = operations.deleteNotes.ids;
-    const createLabels = operations.createLabels.labels;
-    const createNotes = operations.createNotes.notes;
-    const editNote = operations.editNote;
-    const changeLabelName = operations.changeLabelName;
+    const {
+      deleteLabelIds,
+      deleteNoteIds,
+      createLabels,
+      createNotes,
+      editNote,
+      changeLabelName
+    } = getOperations(body.operations as Operation[]);
 
     if (deleteLabelIds.length > 0) {
       await prisma.label.deleteMany({
@@ -139,10 +139,10 @@ type ChangeLabelName = {
 };
 
 function getOperations(operations: Operation[]): {
-  deleteLabels: DeleteLabels;
-  createLabels: CreateLabels;
-  deleteNotes: DeleteNotes;
-  createNotes: CreateNotes;
+  deleteLabelIds: DeleteLabels["ids"];
+  deleteNoteIds: DeleteNotes["ids"];
+  createLabels: CreateLabels["labels"];
+  createNotes: CreateNotes["notes"];
   editNote: EditNote[];
   changeLabelName: ChangeLabelName[];
 } {
@@ -183,10 +183,10 @@ function getOperations(operations: Operation[]): {
   );
 
   return {
-    deleteLabels,
-    createLabels,
-    deleteNotes,
-    createNotes,
+    deleteLabelIds: deleteLabels.ids,
+    deleteNoteIds: deleteNotes.ids,
+    createLabels: createLabels.labels,
+    createNotes: createNotes.notes,
     editNote,
     changeLabelName
   };
