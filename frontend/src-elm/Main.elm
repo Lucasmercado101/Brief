@@ -1,11 +1,10 @@
 port module Main exposing (..)
 
-import Api
+import Api exposing (OfflineFirstId(..))
 import Browser
 import Cmd.Extra exposing (pure)
 import Css exposing (..)
 import Either exposing (Either(..))
-import Html
 import Html.Styled exposing (Html, br, button, div, form, input, label, nav, p, text, textarea)
 import Html.Styled.Attributes exposing (class, css, disabled, id, placeholder, style, type_, value)
 import Html.Styled.Events exposing (onClick, onInput, onSubmit)
@@ -54,13 +53,8 @@ dummyNewNote =
 -- MODEL
 
 
-type ID
-    = -- Not synced with DB yet,
-      -- generated ID offline
-      OfflineID String
-      -- Synced with DB,
-      -- using DB's ID
-    | DatabaseID Api.ID
+type alias ID =
+    Api.OfflineFirstId
 
 
 idDiff : ID -> ID -> Bool
