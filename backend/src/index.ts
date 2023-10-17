@@ -18,7 +18,7 @@ const PORT = process.env.PORT || 4000;
 //NOTE: t.Number() === userID in this case:
 const cookieSessionDTO = t.Number();
 
-const cookieSecret = {
+export const cookieSecret = {
   secrets: process.env.COOKIE_SECRETS || "Fischl von Luftschloss Narfidort",
   sign: ["session"]
 };
@@ -116,7 +116,7 @@ new Elysia()
     }
   )
   // TODO: handle user having tampered cookie
-  // error when unsigning doesn't let me reassign and resign
+  // error when unsigning doesn't let me reassign or remove cookie
   .post(
     "/login",
     async ({ set, cookie: { session }, body }) => {
