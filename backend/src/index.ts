@@ -10,7 +10,7 @@ const DAY = HOUR * 24;
 
 const COOKIE_MAX_AGE = DAY * 14;
 
-const prisma = new PrismaClient();
+export const prisma = new PrismaClient();
 
 const PORT = process.env.PORT || 4000;
 
