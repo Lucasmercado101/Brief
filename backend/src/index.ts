@@ -22,7 +22,7 @@ const cookieSecret = {
   sign: ["session"]
 };
 
-const requiredCookieSession = t.Cookie(
+export const requiredCookieSession = t.Cookie(
   {
     session: cookieSessionDTO
   },
@@ -248,15 +248,14 @@ new Elysia()
       return prisma.note
         .update({
           where: { id: noteID },
-          data: {
-            title: body.title,
-            content: body.content,
-            pinned: body.pinned,
-            ...(body.labels !== undefined
-              ? { labels: { set: body.labels!.map((i) => ({ id: i })) } }
-              : {})
-          },
-          include: {
+          select: {
+            userId: false,
+            id: true,
+            title: true,
+            content: true,
+            pinned: true,
+            createdAt: true,
+            updatedAt: true,
             labels: {
               select: {
                 name: true,
@@ -265,6 +264,14 @@ new Elysia()
                 updatedAt: true
               }
             }
+          },
+          data: {
+            title: body.title,
+            content: body.content,
+            pinned: body.pinned,
+            ...(body.labels !== undefined
+              ? { labels: { set: body.labels!.map((i) => ({ id: i })) } }
+              : {})
           }
         })
         .then((e) => {
@@ -284,7 +291,7 @@ new Elysia()
     },
     {
       body: t.Object({
-        title: t.Optional(t.String()),
+        title: t.Optional(t.Nullable(t.String())),
         content: t.Optional(t.String()),
         labels: t.Optional(t.Array(t.Number(), { uniqueItems: true })),
         pinned: t.Optional(t.Boolean())
