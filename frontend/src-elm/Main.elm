@@ -116,7 +116,7 @@ type alias OQDeleteLabel =
 
 type alias OQCreateNote =
     { offlineId : String
-    , title : Api.Optional String
+    , title : Maybe String
     , content : String
     , pinned : Bool
     , labels : List OfflineFirstId
@@ -129,7 +129,7 @@ type alias OQDeleteNote =
 
 type alias OQEditNote =
     { id : OfflineFirstId
-    , title : Maybe (Api.Optional String)
+    , title : Maybe String
     , content : Maybe String
     , pinned : Maybe Bool
     , labels : Maybe (List OfflineFirstId)
@@ -994,6 +994,17 @@ qEditLabelName editData queue =
 
         Nothing ->
             { queue | changeLabelNames = editData :: queue.changeLabelNames }
+
+
+qQueueToOperations : OfflineQueueOperations -> List Operation
+qQueueToOperations { createLabels, deleteLabels, createNotes, deleteNotes, editNotes, changeLabelNames } =
+    [ DeleteLabels deleteLabels
+    , DeleteNotes deleteNotes
+    , CreateLabels createLabels
+    , CreateNotes createNotes
+    ]
+        ++ List.map EditNote editNotes
+        ++ List.map ChangeLabelName changeLabelNames
 
 
 addToQueue : OfflineQueueAction -> ( Model, Cmd Msg ) -> ( Model, Cmd Msg )
