@@ -887,7 +887,7 @@ qDeleteLabel labelId queue =
     let
         ( toCreateLabelInQueue, restCreateLabels ) =
             queue.createLabels
-                |> List.partition (\l -> sameId (OfflineID l.offlineId) labelId)
+                |> partitionFirst (\l -> True)
     in
     queue
 
@@ -1663,8 +1663,8 @@ partitionFirstHelper arr pred ( first, checked ) =
 -}
 
 
-partitionFirst : List a -> (a -> Bool) -> ( Maybe a, List a )
-partitionFirst arr pred =
+partitionFirst : (a -> Bool) -> List a -> ( Maybe a, List a )
+partitionFirst pred arr =
     partitionFirstHelper arr pred ( Nothing, [] )
 
 
