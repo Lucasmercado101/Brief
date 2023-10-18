@@ -1,6 +1,6 @@
 port module Main exposing (..)
 
-import Api exposing (OfflineFirstId(..))
+import Api exposing (OfflineFirstId(..), Operation(..))
 import Browser
 import Cmd.Extra exposing (pure)
 import Css exposing (..)
@@ -106,6 +106,52 @@ type User
     | LoggedIn
 
 
+type alias OQCreateLabel =
+    { offlineId : String, name : String }
+
+
+type alias OQDeleteLabel =
+    Api.OfflineFirstId
+
+
+type alias OQCreateNote =
+    { offlineId : String
+    , title : Api.Optional String
+    , content : String
+    , pinned : Bool
+    , labels : List OfflineFirstId
+    }
+
+
+type alias OQDeleteNote =
+    OfflineFirstId
+
+
+type alias OQEditNote =
+    { id : OfflineFirstId
+    , title : Api.Optional String
+    , content : String
+    , pinned : Bool
+    , labels : List OfflineFirstId
+    }
+
+
+type alias OQChangeLabelName =
+    { name : String
+    , id : Api.OfflineFirstId
+    }
+
+
+type alias OfflineQueueOperations =
+    { createLabels : List OQCreateLabel
+    , deleteLabels : List OQDeleteLabel
+    , createNotes : List OQCreateNote
+    , deleteNotes : List OQDeleteNote
+    , editNotes : List OQEditNote
+    , changeLabelNames : List OQChangeLabelName
+    }
+
+
 type alias Model =
     { seeds : List Random.Seed
     , notes : List Note
@@ -114,6 +160,7 @@ type alias Model =
     , labels : List Label
     , user : User
     , offlineQueue : OfflineQueue
+    , offlineOperationsQueue : OfflineQueueOperations
     }
 
 
@@ -189,6 +236,14 @@ init flags =
       , newLabelName = ""
       , labels = []
       , offlineQueue = []
+      , offlineOperationsQueue =
+            { createLabels = []
+            , deleteLabels = []
+            , createNotes = []
+            , deleteNotes = []
+            , editNotes = []
+            , changeLabelNames = []
+            }
       , user =
             if flags.hasSessionCookie then
                 LoggedIn
@@ -820,6 +875,25 @@ update msg model =
 
 
 -- QUEUE
+
+
+qNewLabel : OQCreateLabel -> OfflineQueueOperations -> OfflineQueueOperations
+qNewLabel { offlineId, name } queue =
+    { queue | createLabels = { offlineId = offlineId, name = name } :: queue.createLabels }
+
+
+qDeleteLabel : OQDeleteLabel -> OfflineQueueOperations -> OfflineQueueOperations
+qDeleteLabel labelId queue =
+    let
+        ( toCreateLabelInQueue, restCreateLabels ) =
+            queue.createLabels
+                |> List.partition (\l -> sameId (OfflineID l.offlineId) labelId)
+    in
+    queue
+
+
+
+-- { queue | createLabels = { offlineId = offlineId, name = name } :: queue.createLabels }
 
 
 addToQueue : OfflineQueueAction -> ( Model, Cmd Msg ) -> ( Model, Cmd Msg )
@@ -1563,7 +1637,26 @@ alphaNumericGenerator strLength =
 
 
 
--- css helpers
+-- Helpers
+
+
+partitionFirstHelper : List a -> (a -> Bool) -> ( Maybe a, List a ) -> ( Maybe a, List a )
+partitionFirstHelper arr pred ( first, checked ) =
+    case arr of
+        [] ->
+            ( Nothing, checked )
+
+        x :: xs ->
+            if pred x then
+                ( Just x, checked ++ xs )
+
+            else
+                partitionFirstHelper xs pred ( Nothing, checked ++ [ x ] )
+
+
+partitionFirst : List a -> (a -> Bool) -> ( Maybe a, List a )
+partitionFirst arr pred =
+    partitionFirstHelper arr pred ( Nothing, [] )
 
 
 displayGrid : Style
