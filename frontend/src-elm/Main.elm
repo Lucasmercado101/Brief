@@ -712,7 +712,7 @@ update msg model =
                                                                 }
                                                             )
                                             in
-                                            (notOutdatedNotes ++ updatedNotes)
+                                            notOutdatedNotes
                                                 -- remove the ones that were failed to create
                                                 |> List.filter (\l -> not (List.any (\e -> sameId l.id (OfflineID e)) failedToCreate))
                                                 -- remove the ones that don't exist in DB
