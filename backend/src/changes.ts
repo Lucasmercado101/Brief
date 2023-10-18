@@ -315,7 +315,7 @@ export default () =>
           // NOTE: don't inquire further, if it couldn't create then don't
           // retry, don't fail, just send as "not edited" in response
           notesNotEdited = editNotes.filter(
-            ({ id }) => !newNotes.find((note) => note.offlineId === id)
+            ({ id }) => !editedNotes.find((note) => note.offlineId === id)
           );
         }
 
