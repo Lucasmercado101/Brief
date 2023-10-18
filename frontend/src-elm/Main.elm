@@ -887,7 +887,7 @@ qDeleteLabel labelId queue =
     let
         ( toCreateLabelInQueue, restCreateLabels ) =
             queue.createLabels
-                |> partitionFirst (\l -> True)
+                |> partitionFirst (\l -> sameId (OfflineID l.offlineId) labelId)
     in
     queue
 
