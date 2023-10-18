@@ -1,6 +1,6 @@
 port module Main exposing (..)
 
-import Api exposing (OfflineFirstId(..), Operation(..))
+import Api exposing (Operation(..), SyncableID(..))
 import Browser
 import Cmd.Extra exposing (pure)
 import Css exposing (..)
@@ -56,7 +56,7 @@ getNewTimeForCreateNewNote :
     , title : String
     , content : String
     , pinned : Bool
-    , labels : List Api.OfflineFirstId
+    , labels : List Api.SyncableID
     }
     -> Cmd Msg
 getNewTimeForCreateNewNote data =
@@ -74,11 +74,7 @@ getNewTimeAndCreateLabel data =
 -- MODEL
 
 
-type alias ID =
-    Api.OfflineFirstId
-
-
-idDiff : ID -> ID -> Bool
+idDiff : SyncableID -> SyncableID -> Bool
 idDiff a b =
     case ( a, b ) of
         ( OfflineID c, OfflineID d ) ->
@@ -91,7 +87,7 @@ idDiff a b =
             True
 
 
-sameId : ID -> ID -> Bool
+sameId : SyncableID -> SyncableID -> Bool
 sameId a b =
     not (idDiff a b)
 
@@ -101,18 +97,18 @@ type alias UniqueStr =
 
 
 type alias Note =
-    { id : ID
+    { id : SyncableID
     , title : Maybe String
     , content : String
     , pinned : Bool
     , createdAt : Posix
     , updatedAt : Posix
-    , labels : List ID
+    , labels : List SyncableID
     }
 
 
 type alias Label =
-    { id : ID
+    { id : SyncableID
     , name : UniqueStr
     , createdAt : Posix
     , updatedAt : Posix
@@ -136,7 +132,7 @@ type alias OQCreateLabel =
 
 
 type alias OQDeleteLabel =
-    Api.OfflineFirstId
+    Api.SyncableID
 
 
 type alias OQCreateNote =
@@ -144,26 +140,26 @@ type alias OQCreateNote =
     , title : Maybe String
     , content : String
     , pinned : Bool
-    , labels : List OfflineFirstId
+    , labels : List SyncableID
     }
 
 
 type alias OQDeleteNote =
-    OfflineFirstId
+    SyncableID
 
 
 type alias OQEditNote =
-    { id : OfflineFirstId
+    { id : SyncableID
     , title : Maybe String
     , content : Maybe String
     , pinned : Maybe Bool
-    , labels : Maybe (List OfflineFirstId)
+    , labels : Maybe (List SyncableID)
     }
 
 
 type alias OQChangeLabelName =
     { name : String
-    , id : Api.OfflineFirstId
+    , id : Api.SyncableID
     }
 
 
@@ -197,7 +193,7 @@ type alias NewNoteData =
     , content : String
     , labels :
         Maybe
-            { labels : List ID
+            { labels : List SyncableID
             , labelsSearchQuery : String
             }
     }
@@ -215,14 +211,14 @@ type LoggedOutMsg
 
 
 type LoggedInMsg
-    = ChangeNotePinned ( ID, Bool )
+    = ChangeNotePinned ( SyncableID, Bool )
     | NewTitleChange String
     | NewNoteContentChange String
     | RequestTimeForNewLabelCreation
     | CreateNewLabel { id : String, name : String } Posix
     | ReceivedRandomValues (List Int)
-    | DeleteNote ID
-    | DeleteLabel ID
+    | DeleteNote SyncableID
+    | DeleteLabel SyncableID
     | BeginWritingNewNote
     | RequestTimeForCreateNewNote
     | GotCurrentTimeForNewNote
@@ -230,14 +226,14 @@ type LoggedInMsg
         , title : String
         , content : String
         , pinned : Bool
-        , labels : List ID
+        , labels : List SyncableID
         }
         Posix
     | BeginAddingNewNoteLabels
     | SearchLabelsQueryChange String
-    | AddLabelToNewNote ID
-    | RemoveLabelFromNewNote ID
-    | RemoveLabelFromNote { noteID : ID, labelID : ID }
+    | AddLabelToNewNote SyncableID
+    | RemoveLabelFromNewNote SyncableID
+    | RemoveLabelFromNote { noteID : SyncableID, labelID : SyncableID }
     | ChangeNewLabelName String
     | ReceivedChangesResp (Result Http.Error Api.ChangesResponse)
 
@@ -1003,7 +999,7 @@ queueToOperations { createLabels, deleteLabels, createNotes, deleteNotes, editNo
         ++ ifNotEmpty1 changeLabelNames (List.map ChangeLabelName changeLabelNames)
 
 
-labelIDsSplitterHelper : List ID -> List String -> List Int -> ( List String, List Int )
+labelIDsSplitterHelper : List SyncableID -> List String -> List Int -> ( List String, List Int )
 labelIDsSplitterHelper ids offlineIds dbIds =
     -- TODO: use List.partition instead?
     case ids of
@@ -1019,7 +1015,7 @@ labelIDsSplitterHelper ids offlineIds dbIds =
                     labelIDsSplitterHelper xs offlineIds (dbID :: dbIds)
 
 
-labelIDsSplitter : List ID -> ( List String, List Int )
+labelIDsSplitter : List SyncableID -> ( List String, List Int )
 labelIDsSplitter ids =
     labelIDsSplitterHelper ids [] []
 

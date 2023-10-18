@@ -67,7 +67,7 @@ riskyPut endpoint body expect =
         }
 
 
-type alias ID =
+type alias DbID =
     Int
 
 
@@ -101,18 +101,18 @@ type alias PostNewNoteInput =
     { title : Maybe String
     , content : String
     , pinned : Maybe Bool
-    , labels : List ID
+    , labels : List DbID
     }
 
 
 type alias PostNewNoteResponse =
-    { id : ID
+    { id : DbID
     , title : Maybe String
     , content : String
     , pinned : Bool
     , createdAt : Posix
     , updatedAt : Posix
-    , userId : ID
+    , userId : DbID
     }
 
 
@@ -164,12 +164,12 @@ type alias EditNoteInput =
     { title : Maybe (Nullable String)
     , content : Maybe String
     , pinned : Maybe Bool
-    , labels : Maybe (List ID)
+    , labels : Maybe (List DbID)
     }
 
 
 type alias EditNoteResp =
-    { id : ID
+    { id : DbID
     , title : Maybe String
     , content : String
     , pinned : Bool
@@ -284,7 +284,7 @@ type alias NewLabelResponse =
     Label
 
 
-postNewLabel : ( String, Maybe ID ) -> (Result Http.Error NewLabelResponse -> msg) -> Cmd msg
+postNewLabel : ( String, Maybe DbID ) -> (Result Http.Error NewLabelResponse -> msg) -> Cmd msg
 postNewLabel ( name, parentNoteID ) msg =
     riskyPost "label"
         (Http.jsonBody
@@ -344,18 +344,18 @@ fullSyncDecoder =
 
 
 type alias Note =
-    { id : ID
+    { id : DbID
     , title : Maybe String
     , content : String
     , pinned : Bool
     , createdAt : Posix
     , updatedAt : Posix
-    , labels : List ID
+    , labels : List DbID
     }
 
 
 type alias Label =
-    { id : ID
+    { id : DbID
     , name : String
     , createdAt : Posix
     , updatedAt : Posix
@@ -387,13 +387,13 @@ labelDecoder =
 ---
 
 
-type OfflineFirstId
+type SyncableID
     = -- Not synced with DB yet,
       -- generated ID offline
       OfflineID String
       -- Synced with DB,
       -- using DB's ID
-    | DatabaseID ID
+    | DatabaseID DbID
 
 
 type Operation
@@ -403,8 +403,8 @@ type Operation
       -- and these would be onlineID only as much as possible instead?
       -- as they would get filtered out beforehand and only real "Operation"
       -- type would be created only JUST before we actually make the request
-      DeleteLabels (List OfflineFirstId)
-    | DeleteNotes (List OfflineFirstId)
+      DeleteLabels (List SyncableID)
+    | DeleteNotes (List SyncableID)
     | CreateLabels (List { offlineId : String, name : String })
     | CreateNotes
         (List
@@ -412,19 +412,19 @@ type Operation
             , title : Maybe String
             , content : String
             , pinned : Bool
-            , labels : List OfflineFirstId
+            , labels : List SyncableID
             }
         )
     | EditNote
-        { id : OfflineFirstId
+        { id : SyncableID
         , title : Maybe String
         , content : Maybe String
         , pinned : Maybe Bool
-        , labels : Maybe (List OfflineFirstId)
+        , labels : Maybe (List SyncableID)
         }
     | ChangeLabelName
         { name : String
-        , id : OfflineFirstId
+        , id : SyncableID
         }
 
 
@@ -559,21 +559,21 @@ type alias ChangesInput =
     { operations : List Operation
     , lastSyncedAt : Posix
     , currentData :
-        { notes : List ID
-        , labels : List ID
+        { notes : List DbID
+        , labels : List DbID
         }
     }
 
 
 type alias ChangesResponse =
     { deleted :
-        { notes : List ID
-        , labels : List ID
+        { notes : List DbID
+        , labels : List DbID
         }
     , failedToCreate : List OfflineId
     , failedToEdit :
-        { notes : List OfflineFirstId
-        , labels : List OfflineFirstId
+        { notes : List SyncableID
+        , labels : List SyncableID
         }
     , justSyncedAt : Posix
 
@@ -599,7 +599,7 @@ changesResponseDecoder =
                 (field "notes" (list int))
                 (field "labels" (list int))
 
-        offlineFirstDecoder : Decoder OfflineFirstId
+        offlineFirstDecoder : Decoder SyncableID
         offlineFirstDecoder =
             oneOf
                 [ JD.map DatabaseID int
