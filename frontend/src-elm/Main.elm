@@ -889,11 +889,86 @@ qDeleteLabel labelId queue =
             queue.createLabels
                 |> partitionFirst (\l -> sameId (OfflineID l.offlineId) labelId)
     in
-    queue
+    case toCreateLabelInQueue of
+        -- hasn't created label yet
+        Just _ ->
+            { queue
+                | createLabels = restCreateLabels
+                , changeLabelNames =
+                    queue.changeLabelNames
+                        |> List.filter (\l -> idDiff l.id labelId)
+                , createNotes =
+                    queue.createNotes
+                        |> List.map
+                            (\l ->
+                                { l
+                                    | labels =
+                                        l.labels
+                                            |> List.filter (\e -> idDiff e labelId)
+                                }
+                            )
+                , editNotes =
+                    queue.editNotes
+                        |> List.map
+                            (\l ->
+                                { l
+                                    | labels =
+                                        l.labels
+                                            |> List.filter (\e -> idDiff e labelId)
+                                }
+                            )
+            }
+
+        -- has already created the label or creation is in progress
+        Nothing ->
+            { queue
+                | deleteLabels = labelId :: queue.deleteLabels
+            }
 
 
+qCreateNewNote : OQCreateNote -> OfflineQueueOperations -> OfflineQueueOperations
+qCreateNewNote data queue =
+    { queue | createNotes = data :: queue.createNotes }
 
--- { queue | createLabels = { offlineId = offlineId, name = name } :: queue.createLabels }
+
+qDeleteNote : OQDeleteNote -> OfflineQueueOperations -> OfflineQueueOperations
+qDeleteNote noteId queue =
+    let
+        ( toCreateNoteInQueue, restCreateNotes ) =
+            queue.createNotes
+                |> partitionFirst (\l -> sameId (OfflineID l.offlineId) noteId)
+    in
+    case toCreateNoteInQueue of
+        -- hasn't created note yet
+        Just _ ->
+            { queue
+                | createNotes = restCreateNotes
+                , editNotes =
+                    queue.editNotes
+                        |> List.filter (\l -> idDiff l.id noteId)
+            }
+
+        -- has already created the note or creation is in progress
+        Nothing ->
+            { queue
+                | deleteNotes = noteId :: queue.deleteNotes
+            }
+
+
+qEditLabelName : OQChangeLabelName -> OfflineQueueOperations -> OfflineQueueOperations
+qEditLabelName editData queue =
+    let
+        ( toEditLabel, restEditLabel ) =
+            queue.changeLabelNames
+                |> partitionFirst (\l -> sameId l.id editData.id)
+    in
+    case toEditLabel of
+        -- already a previous op to edit label name
+        Just _ ->
+            { queue | changeLabelNames = editData :: restEditLabel }
+
+        Nothing ->
+            { queue | changeLabelNames = editData :: queue.changeLabelNames }
 
 
 addToQueue : OfflineQueueAction -> ( Model, Cmd Msg ) -> ( Model, Cmd Msg )
