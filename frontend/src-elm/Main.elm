@@ -1020,7 +1020,6 @@ queueToOperations { createLabels, deleteLabels, createNotes, deleteNotes, editNo
 
 labelIDsSplitterHelper : List SyncableID -> List String -> List Int -> ( List String, List Int )
 labelIDsSplitterHelper ids offlineIds dbIds =
-    -- TODO: use List.partition instead?
     case ids of
         [] ->
             ( offlineIds, dbIds )
