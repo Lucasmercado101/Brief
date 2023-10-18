@@ -133,25 +133,26 @@ export default () =>
           ownerId: number;
         }[] = [];
 
+        // Strings will not make it to deleteLabelIds or deleteNoteIds
+        // strings here means the client has not replaced the offline id
+        // that was created in a previous request
         if (deleteLabelIds.length > 0) {
+          const ids = deleteLabelIds.filter(
+            (e) => typeof e === "number"
+          ) as number[];
+
           await prisma.label.deleteMany({
-            where: {
-              id: {
-                in: deleteLabelIds
-              },
-              ownerId: userId
-            }
+            where: { id: { in: ids }, ownerId: userId }
           });
         }
 
         if (deleteNoteIds.length > 0) {
+          const ids = deleteNoteIds.filter(
+            (e) => typeof e === "number"
+          ) as number[];
+
           await prisma.note.deleteMany({
-            where: {
-              id: {
-                in: deleteNoteIds
-              },
-              userId: userId
-            }
+            where: { id: { in: ids }, userId: userId }
           });
         }
 
@@ -470,7 +471,7 @@ type ID = offlineId | databaseId;
 
 type DeleteLabels = {
   operation: Operations.DELETE_LABELS;
-  ids: databaseId[];
+  ids: ID[];
 };
 
 //
@@ -489,7 +490,7 @@ type CreateLabels = {
 
 type DeleteNotes = {
   operation: Operations.DELETE_NOTES;
-  ids: databaseId[];
+  ids: ID[];
 };
 
 //
