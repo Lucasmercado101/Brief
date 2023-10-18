@@ -499,7 +499,7 @@ operationEncoder operation =
         EditNote data ->
             JE.object
                 ([ ( "operation", JE.string "EDIT_NOTE" )
-                 , ( "offlineId", offlineFirstEncoder data.id )
+                 , ( "id", offlineFirstEncoder data.id )
                  ]
                     ++ (case data.title of
                             Just t ->
