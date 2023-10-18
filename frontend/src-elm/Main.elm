@@ -687,27 +687,9 @@ update msg model =
                                         |> pure
 
                         ReceivedChangesResp resp ->
-                            -- deleted :
-                            -- { notes : List ID
-                            -- , labels : List ID
-                            -- }
-                            -- , failedToCreate : List OfflineId
-                            -- , failedToEdit :
-                            -- { notes : List OfflineFirstId
-                            -- , labels : List OfflineFirstId
-                            -- }
-                            -- , justSyncedAt : Posix
-                            -- , downSyncedData :
-                            -- { notes : List Note
-                            -- , labels : List Label
-                            -- }
-                            -- , justCreatedData :
-                            -- { notes : List ( Note, OfflineId )
-                            -- , labels : List ( Label, OfflineId )
-                            -- }
                             case resp of
                                 Ok { deleted, failedToCreate, failedToEdit, justSyncedAt, downSyncedData, justCreatedData } ->
-                                    { model
+                                    ( { model
                                         | notes =
                                             let
                                                 ( _, notOutdatedNotes ) =
@@ -792,8 +774,30 @@ update msg model =
                                                                 l
                                                     )
                                                 |> (++) updatedLabels
-                                    }
-                                        |> pure
+                                        , offlineQueue = emptyOfflineQueue
+                                        , runningQueueOn =
+                                            if offlineQueueIsEmpty model.offlineQueue then
+                                                Nothing
+
+                                            else
+                                                Just model.offlineQueue
+                                        , lastSyncedAt = justSyncedAt
+                                      }
+                                    , if offlineQueueIsEmpty model.offlineQueue then
+                                        Cmd.none
+
+                                      else
+                                        Api.sendChanges
+                                            { operations = queueToOperations model.offlineQueue
+                                            , lastSyncedAt = justSyncedAt
+                                            , currentData =
+                                                { notes = model.notes |> List.map .id |> labelIDsSplitter |> Tuple.second
+                                                , labels = model.labels |> List.map .id |> labelIDsSplitter |> Tuple.second
+                                                }
+                                            }
+                                            ReceivedChangesResp
+                                            |> Cmd.map LoggedInView
+                                    )
 
                                 -- TODO: error handling here
                                 Err _ ->
@@ -860,8 +864,8 @@ qAddToQueue fn ( model, cmds ) =
                     { operations = queueToOperations currentOperations
                     , lastSyncedAt = model.lastSyncedAt
                     , currentData =
-                        { notes = []
-                        , labels = []
+                        { notes = model.notes |> List.map .id |> labelIDsSplitter |> Tuple.second
+                        , labels = model.labels |> List.map .id |> labelIDsSplitter |> Tuple.second
                         }
                     }
                     ReceivedChangesResp
@@ -872,6 +876,16 @@ qAddToQueue fn ( model, cmds ) =
 
         Just _ ->
             ( { model | offlineQueue = currentOperations }, cmds )
+
+
+offlineQueueIsEmpty : OfflineQueueOps -> Bool
+offlineQueueIsEmpty { createLabels, deleteLabels, createNotes, deleteNotes, editNotes, changeLabelNames } =
+    List.isEmpty createLabels
+        && List.isEmpty deleteLabels
+        && List.isEmpty createNotes
+        && List.isEmpty deleteNotes
+        && List.isEmpty editNotes
+        && List.isEmpty changeLabelNames
 
 
 qNewLabel : OQCreateLabel -> OfflineQueueOps -> OfflineQueueOps
@@ -1019,8 +1033,8 @@ queueToOperations { createLabels, deleteLabels, createNotes, deleteNotes, editNo
         ++ ifNotEmpty1 changeLabelNames (List.map ChangeLabelName changeLabelNames)
 
 
-labelIDsSplitter : List ID -> List String -> List Int -> ( List String, List Int )
-labelIDsSplitter ids offlineIds dbIds =
+labelIDsSplitterHelper : List ID -> List String -> List Int -> ( List String, List Int )
+labelIDsSplitterHelper ids offlineIds dbIds =
     -- TODO: use List.partition instead?
     case ids of
         [] ->
@@ -1029,10 +1043,15 @@ labelIDsSplitter ids offlineIds dbIds =
         x :: xs ->
             case x of
                 OfflineID offlineId ->
-                    labelIDsSplitter xs (offlineId :: offlineIds) dbIds
+                    labelIDsSplitterHelper xs (offlineId :: offlineIds) dbIds
 
                 DatabaseID dbID ->
-                    labelIDsSplitter xs offlineIds (dbID :: dbIds)
+                    labelIDsSplitterHelper xs offlineIds (dbID :: dbIds)
+
+
+labelIDsSplitter : List ID -> ( List String, List Int )
+labelIDsSplitter ids =
+    labelIDsSplitterHelper ids [] []
 
 
 
