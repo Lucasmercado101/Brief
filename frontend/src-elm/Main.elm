@@ -1654,9 +1654,22 @@ partitionFirstHelper arr pred ( first, checked ) =
                 partitionFirstHelper xs pred ( Nothing, checked ++ [ x ] )
 
 
+
+{-
+   Like List.partition but only returns the first element that matches the predicate
+   and the rest of the elements with that first element missing
+
+   or Nothing and the original array if it's not there
+-}
+
+
 partitionFirst : List a -> (a -> Bool) -> ( Maybe a, List a )
 partitionFirst arr pred =
     partitionFirstHelper arr pred ( Nothing, [] )
+
+
+
+-- CSS Helpers
 
 
 displayGrid : Style
