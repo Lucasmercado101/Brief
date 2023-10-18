@@ -402,9 +402,15 @@ type Optional a
 
 
 type Operation
-    = DeleteLabels (List Int)
+    = -- delete ids will get changed to DatabaseID once
+      -- previous create returns with the DB's ID
+      -- TODO: main.elm could have a different operation type
+      -- and these would be onlineID only as much as possible instead?
+      -- as they would get filtered out beforehand and only real "Operation"
+      -- type would be created only JUST before we actually make the request
+      DeleteLabels (List OfflineFirstId)
+    | DeleteNotes (List OfflineFirstId)
     | CreateLabels (List { offlineId : String, name : String })
-    | DeleteNotes (List Int)
     | CreateNotes
         (List
             { offlineId : String
@@ -443,7 +449,7 @@ operationEncoder operation =
         DeleteLabels ids ->
             JE.object
                 [ ( "operation", JE.string "DELETE_LABELS" )
-                , ( "ids", JE.list JE.int ids )
+                , ( "ids", JE.list offlineFirstEncoder ids )
                 ]
 
         CreateLabels data ->
@@ -464,7 +470,7 @@ operationEncoder operation =
         DeleteNotes ids ->
             JE.object
                 [ ( "operation", JE.string "DELETE_NOTES" )
-                , ( "ids", JE.list JE.int ids )
+                , ( "ids", JE.list offlineFirstEncoder ids )
                 ]
 
         CreateNotes data ->
