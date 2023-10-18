@@ -475,9 +475,8 @@ update msg model =
                         DeleteLabel labelId ->
                             { model | labels = model.labels |> List.filter (\l -> idDiff l.id labelId) }
                                 |> pure
+                                |> qAddToQueue (qDeleteLabel labelId)
 
-                        -- TODO: ADD TO QUEUE
-                        -- |> addToQueue (QDeleteLabel labelId)
                         BeginWritingNewNote ->
                             { model
                                 | isWritingANewNote =
