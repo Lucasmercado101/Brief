@@ -17,6 +17,7 @@ import Random.Char
 import Random.Extra
 import Random.String
 import Svg.Styled
+import Task
 import Time exposing (Posix)
 
 
@@ -48,6 +49,19 @@ dummyNewNote =
         , content = ""
         , labels = Nothing
         }
+
+
+getNewTimeForCreateNewNote :
+    { id : String
+    , title : String
+    , content : String
+    , pinned : Bool
+    , labels : List ID
+    }
+    -> Cmd Msg
+getNewTimeForCreateNewNote data =
+    Task.perform (GotCurrentTimeForNewNote data) Time.now
+        |> Cmd.map LoggedInView
 
 
 
@@ -82,9 +96,11 @@ type alias UniqueStr =
 
 type alias Note =
     { id : ID
-    , title : String
+    , title : Maybe String
     , content : String
     , pinned : Bool
+    , createdAt : Posix
+    , updatedAt : Posix
     , labels : List ID
     }
 
@@ -191,14 +207,22 @@ type LoggedOutMsg
 
 
 type LoggedInMsg
-    = ChangeNotePinned ( ID, Bool )
+    = GotCurrentTimeForNewNote
+        { id : String
+        , title : String
+        , content : String
+        , pinned : Bool
+        , labels : List ID
+        }
+        Posix
+    | ChangeNotePinned ( ID, Bool )
     | NewTitleChange String
     | NewNotePlainTextContentChange String
     | ReceivedRandomValues (List Int)
     | DeleteNote ID
     | DeleteLabel ID
     | BeginWritingNewNote
-    | CreateNewNote
+    | RequestTimeForCreateNewNote
     | BeginAddingNewNoteLabels
     | SearchLabelsQueryChange String
     | AddLabelToNewNote ID
@@ -207,12 +231,6 @@ type LoggedInMsg
     | ChangeNewLabelName String
     | CreateNewLabel
     | ReceivedChangesResp (Result Http.Error Api.ChangesResponse)
-    | PostNewNoteResp String (Result Http.Error Api.PostNewNoteResponse)
-    | EditNoteResp (Result Http.Error Api.EditNoteResp)
-    | NewLabelResp String (Result Http.Error Api.NewLabelResponse)
-    | ToggleNotePinResp (Result Http.Error Api.ToggleNotePinnedResp)
-    | DeleteNoteResp (Result Http.Error ())
-    | DeleteLabelResp (Result Http.Error ())
 
 
 type Msg
@@ -367,19 +385,6 @@ update msg model =
                                         }
                                     )
 
-                        ToggleNotePinResp res ->
-                            case res of
-                                Ok _ ->
-                                    -- NOTE: we don't need to change anything internal
-                                    -- as it was already changed offline when first toggled pin
-                                    model |> pure
-
-                                -- TODO: handle next in queue
-                                -- |> handleNextInQueue
-                                Err err ->
-                                    -- TODO: handle 403
-                                    model |> pure
-
                         RemoveLabelFromNote { noteID, labelID } ->
                             -- TODO: online sync
                             { model
@@ -425,20 +430,6 @@ update msg model =
 
                         -- TODO: ADD TO QUEUE
                         -- |> addToQueue (QDeleteNote toDeleteNoteID)
-                        DeleteNoteResp res ->
-                            case res of
-                                Ok _ ->
-                                    -- NOTE: already deleted the note when queued
-                                    -- no need to delete it here
-                                    model
-                                        |> pure
-
-                                -- TODO: HANDLE NEXT IN QUEUE
-                                -- |> handleNextInQueue
-                                Err err ->
-                                    -- TODO: handle errors / 403
-                                    model |> pure
-
                         ChangeNewLabelName newName ->
                             { model | newLabelName = newName }
                                 |> pure
@@ -470,101 +461,6 @@ update msg model =
 
                         -- TODO: ADD TO QUEUE
                         -- |> addToQueue (QNewLabel { name = model.newLabelName, offlineId = newLabelOfflineId })
-                        NewLabelResp originalLabelOfflineId res ->
-                            case res of
-                                Ok resLabel ->
-                                    ( { model
-                                        | labels =
-                                            model.labels
-                                                |> List.map
-                                                    (\e ->
-                                                        if e.name == resLabel.name then
-                                                            { id = DatabaseID resLabel.id, name = resLabel.name }
-
-                                                        else
-                                                            e
-                                                    )
-                                        , notes =
-                                            model.notes
-                                                |> List.map
-                                                    (\l ->
-                                                        { l
-                                                            | labels =
-                                                                l.labels
-                                                                    |> List.map
-                                                                        (\e ->
-                                                                            if e == OfflineID originalLabelOfflineId then
-                                                                                DatabaseID resLabel.id
-
-                                                                            else
-                                                                                e
-                                                                        )
-                                                        }
-                                                    )
-
-                                        -- TODO: HANDLE RESPONSE IN REGARDS TO QUEUE
-                                        -- , offlineQueue =
-                                        --     model.offlineQueue
-                                        --         |> List.map
-                                        --             (\l ->
-                                        --                 case l of
-                                        --                     QNewNote { offlineId, offlineLabelIds, data } ->
-                                        --                         let
-                                        --                             containsOldOfflineLabelThatIJustCreated =
-                                        --                                 List.any (\e -> e == originalLabelOfflineId) offlineLabelIds
-                                        --                         in
-                                        --                         if containsOldOfflineLabelThatIJustCreated then
-                                        --                             QNewNote
-                                        --                                 { offlineId = offlineId
-                                        --                                 , offlineLabelIds = offlineLabelIds |> List.filter (\e -> e /= originalLabelOfflineId)
-                                        --                                 , data = { data | labels = resLabel.id :: data.labels }
-                                        --                                 }
-                                        --                         else
-                                        --                             l
-                                        --                     QDeleteLabel id ->
-                                        --                         if sameId id (OfflineID originalLabelOfflineId) then
-                                        --                             QDeleteLabel (DatabaseID resLabel.id)
-                                        --                         else
-                                        --                             l
-                                        --                     QEditNote _ offlineLabels data ->
-                                        --                         case data.labels of
-                                        --                             Nothing ->
-                                        --                                 l
-                                        --                             Just labelsList ->
-                                        --                                 case labelsList of
-                                        --                                     [] ->
-                                        --                                         l
-                                        --                                     labels ->
-                                        --                                         let
-                                        --                                             containsOldOfflineLabelThatIJustCreated : Bool
-                                        --                                             containsOldOfflineLabelThatIJustCreated =
-                                        --                                                 offlineLabels
-                                        --                                                     |> List.any (\e -> e == originalLabelOfflineId)
-                                        --                                         in
-                                        --                                         if containsOldOfflineLabelThatIJustCreated then
-                                        --                                             QEditNote
-                                        --                                                 (DatabaseID resLabel.id)
-                                        --                                                 (offlineLabels |> List.filter (\e -> e /= originalLabelOfflineId))
-                                        --                                                 { data | labels = Just (resLabel.id :: labels) }
-                                        --                                         else
-                                        --                                             l
-                                        --                     QNewLabel _ ->
-                                        --                         l
-                                        --                     QDeleteNote _ ->
-                                        --                         l
-                                        --                     QPinNote _ ->
-                                        --                         l
-                                        --             )
-                                      }
-                                    , Cmd.none
-                                    )
-
-                                -- TODO: HANDLE NEXT IN QUEUE
-                                -- |> handleNextInQueue
-                                Err err ->
-                                    -- TODO: handle 403
-                                    model |> pure
-
                         ReceivedRandomValues values ->
                             { model | seeds = List.map Random.initialSeed values }
                                 |> pure
@@ -575,20 +471,6 @@ update msg model =
 
                         -- TODO: ADD TO QUEUE
                         -- |> addToQueue (QDeleteLabel labelId)
-                        DeleteLabelResp res ->
-                            case res of
-                                Ok _ ->
-                                    -- NOTE: already deleted the note when queued
-                                    -- no need to delete it here
-                                    model
-                                        |> pure
-
-                                -- TODO: HANDLE NEXT IN QUEUE
-                                -- |> handleNextInQueue
-                                Err _ ->
-                                    -- TODO: handle 403 & 404
-                                    model |> pure
-
                         BeginWritingNewNote ->
                             { model
                                 | isWritingANewNote =
@@ -685,76 +567,61 @@ update msg model =
                             }
                                 |> pure
 
-                        EditNoteResp res ->
-                            case res of
-                                Ok data ->
-                                    { model
-                                        | notes =
-                                            model.notes
-                                                |> List.map
-                                                    (\n ->
-                                                        if sameId n.id (DatabaseID data.id) then
-                                                            { title = Maybe.withDefault n.title data.title
-                                                            , content = data.content
-                                                            , pinned = data.pinned
-                                                            , labels =
-                                                                case data.labels of
-                                                                    [] ->
-                                                                        n.labels
-
-                                                                    newLabels ->
-                                                                        newLabels
-                                                                            |> List.map (.id >> DatabaseID)
-                                                            , id = DatabaseID data.id
-                                                            }
-
-                                                        else
-                                                            n
-                                                    )
-                                    }
-                                        |> pure
-
-                                -- TODO: HANDLE NEXT IN QUEUE
-                                -- |> handleNextInQueue
-                                Err _ ->
-                                    -- TODO: handle 403
-                                    model |> pure
-
-                        CreateNewNote ->
+                        RequestTimeForCreateNewNote ->
                             case model.isWritingANewNote of
                                 Nothing ->
                                     model |> pure
 
                                 Just newNoteData ->
-                                    -- TODO: offline sync
-                                    let
-                                        newNoteOfflineId =
-                                            generateUID model.seeds |> Tuple.first
-
-                                        newNote =
-                                            { id = OfflineID newNoteOfflineId
-                                            , title = newNoteData.title
-                                            , content = newNoteData.content
-                                            , pinned = False
-                                            , labels =
-                                                case newNoteData.labels of
-                                                    Just { labels } ->
-                                                        labels
-
-                                                    Nothing ->
-                                                        []
-                                            }
-                                    in
                                     if String.length newNoteData.content == 0 then
                                         model |> pure
 
                                     else
-                                        ( { model
-                                            | isWritingANewNote = Nothing
-                                            , notes = newNote :: model.notes
-                                          }
-                                        , requestRandomValues ()
+                                        let
+                                            newNoteOfflineId =
+                                                generateUID model.seeds |> Tuple.first
+
+                                            newNote =
+                                                { id = newNoteOfflineId
+                                                , title = newNoteData.title
+                                                , content = newNoteData.content
+                                                , pinned = False
+                                                , labels =
+                                                    case newNoteData.labels of
+                                                        Just { labels } ->
+                                                            labels
+
+                                                        Nothing ->
+                                                            []
+                                                }
+                                        in
+                                        ( model
+                                        , Cmd.batch [ requestRandomValues (), getNewTimeForCreateNewNote newNote ]
                                         )
+
+                        GotCurrentTimeForNewNote noteData time ->
+                            let
+                                newNote : Note
+                                newNote =
+                                    { id = OfflineID noteData.id
+                                    , title =
+                                        if String.length noteData.title == 0 then
+                                            Nothing
+
+                                        else
+                                            Just noteData.title
+                                    , content = noteData.content
+                                    , pinned = noteData.pinned
+                                    , labels = noteData.labels
+                                    , createdAt = time
+                                    , updatedAt = time
+                                    }
+                            in
+                            { model
+                                | isWritingANewNote = Nothing
+                                , notes = newNote :: model.notes
+                            }
+                                |> pure
 
                         -- TODO: ADD TO QUEUE
                         -- |> (let
@@ -781,58 +648,6 @@ update msg model =
                         --             }
                         --         )
                         --    )
-                        PostNewNoteResp originalOfflineID res ->
-                            case res of
-                                Ok newNote ->
-                                    { model
-                                        | notes =
-                                            model.notes
-                                                |> List.map
-                                                    (\n ->
-                                                        if sameId n.id (OfflineID originalOfflineID) then
-                                                            { n | id = DatabaseID newNote.id }
-
-                                                        else
-                                                            n
-                                                    )
-
-                                        -- TODO: HANDLE RESPONSE IN REGARDS TO QUEUE
-                                        -- , offlineQueue =
-                                        --     model.offlineQueue
-                                        --         |> List.map
-                                        --             (\l ->
-                                        --                 case l of
-                                        --                     QDeleteNote id ->
-                                        --                         if sameId id (OfflineID originalOfflineID) then
-                                        --                             QDeleteNote (DatabaseID newNote.id)
-                                        --                         else
-                                        --                             l
-                                        --                     QPinNote ( id, newPinStatus ) ->
-                                        --                         if sameId id (OfflineID originalOfflineID) then
-                                        --                             QPinNote ( DatabaseID newNote.id, newPinStatus )
-                                        --                         else
-                                        --                             l
-                                        --                     QEditNote id offlineLabelIds data ->
-                                        --                         if sameId id (OfflineID originalOfflineID) then
-                                        --                             QEditNote (DatabaseID newNote.id) offlineLabelIds data
-                                        --                         else
-                                        --                             l
-                                        --                     QNewLabel _ ->
-                                        --                         l
-                                        --                     QDeleteLabel _ ->
-                                        --                         l
-                                        --                     QNewNote _ ->
-                                        --                         l
-                                        --             )
-                                    }
-                                        |> pure
-
-                                -- TODO: HANDLE NEXT IN QUEUE
-                                -- |> handleNextInQueue
-                                Err _ ->
-                                    -- TODO: handle 403
-                                    model |> pure
-
                         BeginAddingNewNoteLabels ->
                             case model.isWritingANewNote of
                                 Just data ->
@@ -853,9 +668,62 @@ update msg model =
                                     model
                                         |> pure
 
-                        ReceivedChangesResp _ ->
-                            -- TODO: HERE
-                            model |> pure
+                        ReceivedChangesResp resp ->
+                            -- deleted :
+                            -- { notes : List ID
+                            -- , labels : List ID
+                            -- }
+                            -- , failedToCreate : List OfflineId
+                            -- , failedToEdit :
+                            -- { notes : List OfflineFirstId
+                            -- , labels : List OfflineFirstId
+                            -- }
+                            -- , justSyncedAt : Posix
+                            -- , downSyncedData :
+                            -- { notes : List Note
+                            -- , labels : List Label
+                            -- }
+                            -- , justCreatedData :
+                            -- { notes : List ( Note, OfflineId )
+                            -- , labels : List ( Label, OfflineId )
+                            -- }
+                            case resp of
+                                Ok { deleted, failedToCreate, failedToEdit, justSyncedAt, downSyncedData, justCreatedData } ->
+                                    { model
+                                        | notes =
+                                            let
+                                                ( _, notOutdatedNotes ) =
+                                                    List.partition
+                                                        (\e -> List.any (\l -> sameId (DatabaseID l.id) e.id) downSyncedData.notes)
+                                                        model.notes
+
+                                                updatedNotes : List Note
+                                                updatedNotes =
+                                                    downSyncedData.notes
+                                                        |> List.map
+                                                            (\e ->
+                                                                { id = DatabaseID e.id
+                                                                , title = e.title
+                                                                , content = e.content
+                                                                , pinned = e.pinned
+                                                                , createdAt = e.createdAt
+                                                                , updatedAt = e.updatedAt
+                                                                , labels = e.labels |> List.map DatabaseID
+                                                                }
+                                                            )
+                                            in
+                                            (notOutdatedNotes ++ updatedNotes)
+                                                -- remove the ones that were failed to create
+                                                |> List.filter (\l -> not (List.any (\e -> sameId l.id (OfflineID e)) failedToCreate))
+                                                -- remove the ones that don't exist in DB
+                                                |> List.filter (\l -> not (List.any (\e -> sameId l.id (DatabaseID e)) deleted.notes))
+                                                |> (++) updatedNotes
+                                    }
+                                        |> pure
+
+                                -- TODO: error handling here
+                                Err _ ->
+                                    model |> pure
 
                 -- TODO: Change later
                 LoggedOutView _ ->
@@ -871,16 +739,12 @@ update msg model =
                                     List.map
                                         (\l ->
                                             { id = DatabaseID l.id
-                                            , title =
-                                                case l.title of
-                                                    Just val ->
-                                                        val
-
-                                                    Nothing ->
-                                                        ""
+                                            , title = l.title
                                             , content = l.content
                                             , pinned = l.pinned
                                             , labels = List.map DatabaseID l.labels
+                                            , createdAt = l.createdAt
+                                            , updatedAt = l.updatedAt
                                             }
                                         )
                                         notes
@@ -1229,7 +1093,7 @@ mainView model =
                                 , margin2 (px 0) auto
                                 , minWidth (px 500)
                                 ]
-                            , onSubmit CreateNewNote
+                            , onSubmit RequestTimeForCreateNewNote
                             ]
                             [ -- TODO: Add focus on input task
                               input
@@ -1426,18 +1290,19 @@ note model data =
                 [ Filled.close 32 Inherit |> Svg.Styled.fromUnstyled ]
             ]
         , div []
-            [ if String.length data.title == 0 then
-                div [] []
+            [ case data.title of
+                Nothing ->
+                    div [] []
 
-              else
-                div
-                    [ css
-                        [ publicSans
-                        , borderBottom3 (px 1) solid (rgb 0 0 0)
-                        , padding (px 10)
+                Just title ->
+                    div
+                        [ css
+                            [ publicSans
+                            , borderBottom3 (px 1) solid (rgb 0 0 0)
+                            , padding (px 10)
+                            ]
                         ]
-                    ]
-                    [ text data.title ]
+                        [ text title ]
             , p [ css [ publicSans, padding (px 10) ] ]
                 (let
                     -- NOTE: \n doesn't break into a newline so I do this
