@@ -56,7 +56,7 @@ getNewTimeForCreateNewNote :
     , title : String
     , content : String
     , pinned : Bool
-    , labels : List ID
+    , labels : List Api.OfflineFirstId
     }
     -> Cmd Msg
 getNewTimeForCreateNewNote data =
@@ -552,7 +552,6 @@ update msg model =
                                 |> pure
 
                         RemoveLabelFromNewNote labelID ->
-                            -- TODO: offline sync
                             { model
                                 | isWritingANewNote =
                                     model.isWritingANewNote
@@ -627,32 +626,16 @@ update msg model =
                                 , notes = newNote :: model.notes
                             }
                                 |> pure
+                                |> qAddToQueue
+                                    (qCreateNewNote
+                                        { offlineId = noteData.id
+                                        , title = newNote.title
+                                        , content = newNote.content
+                                        , pinned = newNote.pinned
+                                        , labels = newNote.labels
+                                        }
+                                    )
 
-                        -- TODO: ADD TO QUEUE
-                        -- |> (let
-                        --         ( offlineLabelIDs, dbLabelIDs ) =
-                        --             labelIDsSplitter newNote.labels [] []
-                        --     in
-                        --     addToQueue
-                        --         (QNewNote
-                        --             { offlineId = newNoteOfflineId
-                        --             , offlineLabelIds = offlineLabelIDs
-                        --             , data =
-                        --                 { title =
-                        --                     if String.length newNoteData.title == 0 then
-                        --                         Nothing
-                        --                     else
-                        --                         Just newNoteData.title
-                        --                 , content = newNoteData.content
-                        --                 , pinned = Nothing
-                        --                 , labels =
-                        --                     -- NOTE: currently cannot create note WITH new labels in it
-                        --                     -- so labels are created separately beforehand
-                        --                     dbLabelIDs
-                        --                 }
-                        --             }
-                        --         )
-                        --    )
                         BeginAddingNewNoteLabels ->
                             case model.isWritingANewNote of
                                 Just data ->
