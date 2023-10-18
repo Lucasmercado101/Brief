@@ -396,11 +396,6 @@ type OfflineFirstId
     | DatabaseID ID
 
 
-type Optional a
-    = HasIt a
-    | Undefined
-
-
 type Operation
     = -- delete ids will get changed to DatabaseID once
       -- previous create returns with the DB's ID
@@ -414,7 +409,7 @@ type Operation
     | CreateNotes
         (List
             { offlineId : String
-            , title : Optional String
+            , title : Maybe String
             , content : String
             , pinned : Bool
             , labels : List OfflineFirstId
@@ -422,10 +417,10 @@ type Operation
         )
     | EditNote
         { id : OfflineFirstId
-        , title : Optional String
-        , content : Optional String
-        , pinned : Optional Bool
-        , labels : Optional (List OfflineFirstId)
+        , title : Maybe String
+        , content : Maybe String
+        , pinned : Maybe Bool
+        , labels : Maybe (List OfflineFirstId)
         }
     | ChangeLabelName
         { name : String
@@ -486,13 +481,13 @@ operationEncoder operation =
                                  , ( "labels", JE.list offlineFirstEncoder n.labels )
                                  ]
                                     ++ (case n.title of
-                                            HasIt t ->
+                                            Just t ->
                                                 [ ( "title"
                                                   , JE.string t
                                                   )
                                                 ]
 
-                                            Undefined ->
+                                            Nothing ->
                                                 []
                                        )
                                 )
@@ -507,43 +502,43 @@ operationEncoder operation =
                  , ( "offlineId", offlineFirstEncoder data.id )
                  ]
                     ++ (case data.title of
-                            HasIt t ->
+                            Just t ->
                                 [ ( "title"
                                   , JE.string t
                                   )
                                 ]
 
-                            Undefined ->
+                            Nothing ->
                                 []
                        )
                     ++ (case data.content of
-                            HasIt t ->
+                            Just t ->
                                 [ ( "content"
                                   , JE.string t
                                   )
                                 ]
 
-                            Undefined ->
+                            Nothing ->
                                 []
                        )
                     ++ (case data.pinned of
-                            HasIt t ->
+                            Just t ->
                                 [ ( "pinned"
                                   , JE.bool t
                                   )
                                 ]
 
-                            Undefined ->
+                            Nothing ->
                                 []
                        )
                     ++ (case data.labels of
-                            HasIt t ->
+                            Just t ->
                                 [ ( "labels"
                                   , JE.list offlineFirstEncoder t
                                   )
                                 ]
 
-                            Undefined ->
+                            Nothing ->
                                 []
                        )
                 )
