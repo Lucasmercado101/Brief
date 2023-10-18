@@ -281,25 +281,41 @@ export default () =>
           const editNotesPromises = editNotes
             .filter((e) => typeof e.id === "number")
             .map(({ id, title, content, pinned, labels }) => {
+              // if some label failed to create or just got given
+              // offline id then just ignore it and don't connect it
+              const labelsIds = labels
+                ?.filter((e): e is number => typeof e === "number")
+                .map((label) => ({
+                  id: label
+                }));
+
               const editNote = prisma.note
                 .update({
                   where: {
-                    id: id as number
+                    id: id as number,
+                    userId: userId
+                  },
+                  select: {
+                    id: true,
+                    title: true,
+                    content: true,
+                    pinned: true,
+                    createdAt: true,
+                    updatedAt: true,
+                    userId: true,
+                    labels: {
+                      select: { id: true }
+                    }
                   },
                   data: {
                     title,
                     content,
                     pinned,
-                    labels: {
-                      // if some label failed to create or just got given
-                      // offline id then just ignore it and don't connect it
-                      connect:
-                        labels
-                          ?.filter((e): e is number => typeof e === "number")
-                          .map((label) => ({
-                            id: label
-                          })) ?? []
-                    }
+                    ...(labels !== undefined && {
+                      labels: {
+                        set: labelsIds
+                      }
+                    })
                   }
                 })
                 .then((e) => ({ ...e, offlineId: id }));
