@@ -423,9 +423,9 @@ type Operation
     | EditNote
         { id : OfflineFirstId
         , title : Optional String
-        , content : String
-        , pinned : Bool
-        , labels : List OfflineFirstId
+        , content : Optional String
+        , pinned : Optional Bool
+        , labels : Optional (List OfflineFirstId)
         }
     | ChangeLabelName
         { name : String
@@ -505,14 +505,41 @@ operationEncoder operation =
             JE.object
                 ([ ( "operation", JE.string "EDIT_NOTE" )
                  , ( "offlineId", offlineFirstEncoder data.id )
-                 , ( "content", JE.string data.content )
-                 , ( "pinned", JE.bool data.pinned )
-                 , ( "labels", JE.list offlineFirstEncoder data.labels )
                  ]
                     ++ (case data.title of
                             HasIt t ->
                                 [ ( "title"
                                   , JE.string t
+                                  )
+                                ]
+
+                            Undefined ->
+                                []
+                       )
+                    ++ (case data.content of
+                            HasIt t ->
+                                [ ( "content"
+                                  , JE.string t
+                                  )
+                                ]
+
+                            Undefined ->
+                                []
+                       )
+                    ++ (case data.pinned of
+                            HasIt t ->
+                                [ ( "pinned"
+                                  , JE.bool t
+                                  )
+                                ]
+
+                            Undefined ->
+                                []
+                       )
+                    ++ (case data.labels of
+                            HasIt t ->
+                                [ ( "labels"
+                                  , JE.list offlineFirstEncoder t
                                   )
                                 ]
 
