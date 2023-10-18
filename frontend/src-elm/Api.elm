@@ -4,7 +4,7 @@ import Either exposing (Either(..))
 import Http exposing (riskyRequest)
 import Json.Decode as JD exposing (Decoder, bool, field, int, list, map2, map4, map5, map6, map7, map8, maybe, oneOf, string)
 import Json.Encode as JE
-import Time exposing (Posix, millisToPosix)
+import Time exposing (Posix, millisToPosix, posixToMillis)
 
 
 riskyGet : String -> Http.Body -> Http.Expect msg -> Cmd msg
@@ -699,6 +699,25 @@ changesResponseDecoder =
         (field "failedToEdit" failedToEditDecoder)
         (field "justSyncedAt" posixTime)
         (field "data" downSyncedDataDecoder)
+
+
+sendChanges : ChangesInput -> (Result Http.Error ChangesResponse -> msg) -> Cmd msg
+sendChanges inputData msg =
+    riskyPost "changes"
+        (Http.jsonBody
+            (JE.object
+                [ ( "operations", JE.list operationEncoder inputData.operations )
+                , ( "lastSyncedAt", JE.int (posixToMillis inputData.lastSyncedAt) )
+                , ( "currentData"
+                  , JE.object
+                        [ ( "notes", JE.list JE.int inputData.currentData.notes )
+                        , ( "labels", JE.list JE.int inputData.currentData.labels )
+                        ]
+                  )
+                ]
+            )
+        )
+        (Http.expectJson msg changesResponseDecoder)
 
 
 posixTime : Decoder Posix
