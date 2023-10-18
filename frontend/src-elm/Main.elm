@@ -380,7 +380,7 @@ update msg model =
                                         model.notes
                             }
                                 |> pure
-                                |> qAddToQueue
+                                |> addToQueue
                                     (qEditNote
                                         { id = uid
                                         , title = Nothing
@@ -406,7 +406,7 @@ update msg model =
                                             { noteData | labels = noteData.labels |> List.filter (idDiff labelID) } :: restNotes
                                     }
                                         |> pure
-                                        |> qAddToQueue
+                                        |> addToQueue
                                             (qEditNote
                                                 { id = noteID
                                                 , title = Nothing
@@ -422,7 +422,7 @@ update msg model =
                                     List.filter (\n -> idDiff n.id toDeleteNoteID) model.notes
                             }
                                 |> pure
-                                |> qAddToQueue (qDeleteNote toDeleteNoteID)
+                                |> addToQueue (qDeleteNote toDeleteNoteID)
 
                         ChangeNewLabelName newName ->
                             { model | newLabelName = newName }
@@ -461,7 +461,7 @@ update msg model =
                                         :: model.labels
                             }
                                 |> pure
-                                |> qAddToQueue (qNewLabel { offlineId = data.id, name = data.name })
+                                |> addToQueue (qNewLabel { offlineId = data.id, name = data.name })
 
                         ReceivedRandomValues values ->
                             { model | seeds = List.map Random.initialSeed values }
@@ -470,7 +470,7 @@ update msg model =
                         DeleteLabel labelId ->
                             { model | labels = model.labels |> List.filter (\l -> idDiff l.id labelId) }
                                 |> pure
-                                |> qAddToQueue (qDeleteLabel labelId)
+                                |> addToQueue (qDeleteLabel labelId)
 
                         BeginWritingNewNote ->
                             { model
@@ -622,7 +622,7 @@ update msg model =
                                 , notes = newNote :: model.notes
                             }
                                 |> pure
-                                |> qAddToQueue
+                                |> addToQueue
                                     (qCreateNewNote
                                         { offlineId = noteData.id
                                         , title = newNote.title
@@ -813,8 +813,8 @@ update msg model =
 -- QUEUE
 
 
-qAddToQueue : (OfflineQueueOps -> OfflineQueueOps) -> ( Model, Cmd Msg ) -> ( Model, Cmd Msg )
-qAddToQueue fn ( model, cmds ) =
+addToQueue : (OfflineQueueOps -> OfflineQueueOps) -> ( Model, Cmd Msg ) -> ( Model, Cmd Msg )
+addToQueue fn ( model, cmds ) =
     let
         currentOperations =
             model.offlineQueue |> fn
