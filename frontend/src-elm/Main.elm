@@ -129,10 +129,10 @@ type alias OQDeleteNote =
 
 type alias OQEditNote =
     { id : OfflineFirstId
-    , title : Api.Optional String
-    , content : String
-    , pinned : Bool
-    , labels : List OfflineFirstId
+    , title : Maybe (Api.Optional String)
+    , content : Maybe String
+    , pinned : Maybe Bool
+    , labels : Maybe (List OfflineFirstId)
     }
 
 
@@ -914,7 +914,7 @@ qDeleteLabel labelId queue =
                                 { l
                                     | labels =
                                         l.labels
-                                            |> List.filter (\e -> idDiff e labelId)
+                                            |> Maybe.map (List.filter (\e -> idDiff e labelId))
                                 }
                             )
             }
@@ -929,6 +929,31 @@ qDeleteLabel labelId queue =
 qCreateNewNote : OQCreateNote -> OfflineQueueOperations -> OfflineQueueOperations
 qCreateNewNote data queue =
     { queue | createNotes = data :: queue.createNotes }
+
+
+qEditNote : OQEditNote -> OfflineQueueOperations -> OfflineQueueOperations
+qEditNote data queue =
+    let
+        ( toEditNote, restEditNotes ) =
+            queue.editNotes
+                |> partitionFirst (\l -> sameId l.id data.id)
+    in
+    case toEditNote of
+        -- already a previous op to edit note
+        Just prevEdit ->
+            { queue
+                | editNotes =
+                    { id = prevEdit.id
+                    , title = data.title |> or prevEdit.title
+                    , content = data.content |> or prevEdit.content
+                    , pinned = data.pinned |> or prevEdit.pinned
+                    , labels = data.labels |> or prevEdit.labels
+                    }
+                        :: restEditNotes
+            }
+
+        Nothing ->
+            { queue | editNotes = data :: queue.editNotes }
 
 
 qDeleteNote : OQDeleteNote -> OfflineQueueOperations -> OfflineQueueOperations
@@ -1741,6 +1766,22 @@ partitionFirstHelper arr pred ( first, checked ) =
 partitionFirst : (a -> Bool) -> List a -> ( Maybe a, List a )
 partitionFirst pred arr =
     partitionFirstHelper arr pred ( Nothing, [] )
+
+
+
+{-
+   Returns the first value that is present, like the boolean ||.
+-}
+
+
+or : Maybe a -> Maybe a -> Maybe a
+or default new =
+    case new of
+        Just v ->
+            Just v
+
+        Nothing ->
+            default
 
 
 
