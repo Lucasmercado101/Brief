@@ -576,6 +576,10 @@ type alias ChangesResponse =
         , labels : List OfflineFirstId
         }
     , justSyncedAt : Posix
+
+    -- Brings latest data, only those that were edited
+    -- after justSyncedAt is older than their UpdatedAt
+    -- are returned
     , downSyncedData :
         { notes : List Note
         , labels : List Label
