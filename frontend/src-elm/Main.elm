@@ -396,39 +396,30 @@ update msg model =
 
                         RemoveLabelFromNote { noteID, labelID } ->
                             -- TODO: online sync
-                            { model
-                                | notes =
-                                    List.map
-                                        (\n ->
-                                            if sameId n.id noteID then
-                                                { n | labels = n.labels |> List.filter (idDiff labelID) }
+                            let
+                                ( noteExists, restNotes ) =
+                                    partitionFirst (\n -> sameId n.id noteID) model.notes
+                            in
+                            case noteExists of
+                                Nothing ->
+                                    model |> pure
 
-                                            else
-                                                n
-                                        )
-                                        model.notes
-                            }
-                                |> pure
+                                Just noteData ->
+                                    { model
+                                        | notes =
+                                            { noteData | labels = noteData.labels |> List.filter (idDiff labelID) } :: restNotes
+                                    }
+                                        |> pure
+                                        |> qAddToQueue
+                                            (qEditNote
+                                                { id = noteID
+                                                , title = Nothing
+                                                , content = Nothing
+                                                , pinned = Nothing
+                                                , labels = Just (noteData.labels |> List.filter (idDiff labelID))
+                                                }
+                                            )
 
-                        -- TODO: ADD TO QUEUE
-                        -- |> (let
-                        --         ( offlineIds, dbIds ) =
-                        --             case List.filter (.id >> sameId noteID) model.notes of
-                        --                 [] ->
-                        --                     ( [], [] )
-                        --                 noteFound :: _ ->
-                        --                     labelIDsSplitter (noteFound.labels |> List.filter (idDiff labelID)) [] []
-                        --     in
-                        --     addToQueue
-                        --         (QEditNote noteID
-                        --             offlineIds
-                        --             { title = Nothing
-                        --             , content = Nothing
-                        --             , pinned = Nothing
-                        --             , labels = Just dbIds
-                        --             }
-                        --         )
-                        --    )
                         DeleteNote toDeleteNoteID ->
                             -- TODO: offline sync
                             { model
