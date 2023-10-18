@@ -864,6 +864,7 @@ qCreateNewNote data queue =
 
 qEditNote : OQEditNote -> OfflineQueueOps -> OfflineQueueOps
 qEditNote data queue =
+    -- TODO: if not created then combine edit as create
     let
         ( toEditNote, restEditNotes ) =
             queue.editNotes
@@ -1544,20 +1545,3 @@ mx l =
 my : Css.LengthOrAuto a -> Style
 my l =
     Css.batch [ Css.marginTop l, Css.marginBottom l ]
-
-
-
---- Queue
-
-
-type alias OfflineQueue =
-    List OfflineQueueAction
-
-
-type OfflineQueueAction
-    = QNewLabel { name : String, offlineId : String }
-    | QDeleteNote ID
-    | QDeleteLabel ID
-    | QPinNote ( ID, Bool )
-    | QEditNote ID (List String) Api.EditNoteInput
-    | QNewNote { offlineId : String, offlineLabelIds : List String, data : Api.PostNewNoteInput }
