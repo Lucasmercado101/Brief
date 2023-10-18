@@ -64,9 +64,9 @@ getNewTimeForCreateNewNote data =
         |> Cmd.map LoggedInView
 
 
-getNewTimeForCreatingNewLabel : { id : String, name : String } -> Cmd Msg
-getNewTimeForCreatingNewLabel data =
-    Task.perform (GotCurrentTimeForNewLabel data) Time.now
+getNewTimeAndCreateLabel : { id : String, name : String } -> Cmd Msg
+getNewTimeAndCreateLabel data =
+    Task.perform (CreateNewLabel data) Time.now
         |> Cmd.map LoggedInView
 
 
@@ -219,7 +219,7 @@ type LoggedInMsg
     | NewTitleChange String
     | NewNotePlainTextContentChange String
     | RequestTimeForNewLabelCreation
-    | GotCurrentTimeForNewLabel { id : String, name : String } Posix
+    | CreateNewLabel { id : String, name : String } Posix
     | ReceivedRandomValues (List Int)
     | DeleteNote ID
     | DeleteLabel ID
@@ -437,7 +437,7 @@ update msg model =
                                 model |> pure
 
                             else if List.any (\l -> l.name == model.newLabelName) model.labels then
-                                -- TODO: make this visual to the user
+                                -- TODO: make this visual to the user in the form of an error
                                 model |> pure
 
                             else
@@ -451,9 +451,9 @@ update msg model =
                                         , name = model.newLabelName
                                         }
                                 in
-                                ( model, Cmd.batch [ requestRandomValues (), getNewTimeForCreatingNewLabel newLabel ] )
+                                ( model, Cmd.batch [ requestRandomValues (), getNewTimeAndCreateLabel newLabel ] )
 
-                        GotCurrentTimeForNewLabel data time ->
+                        CreateNewLabel data time ->
                             { model
                                 | newLabelName = ""
                                 , labels =
@@ -465,9 +465,8 @@ update msg model =
                                         :: model.labels
                             }
                                 |> pure
+                                |> qAddToQueue (qNewLabel { offlineId = data.id, name = data.name })
 
-                        -- TODO: ADD TO QUEUE
-                        -- |> addToQueue (QNewLabel { name = model.newLabelName, offlineId = newLabelOfflineId })
                         ReceivedRandomValues values ->
                             { model | seeds = List.map Random.initialSeed values }
                                 |> pure
