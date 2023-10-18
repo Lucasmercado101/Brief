@@ -403,6 +403,7 @@ type Operation
       -- and these would be onlineID only as much as possible instead?
       -- as they would get filtered out beforehand and only real "Operation"
       -- type would be created only JUST before we actually make the request
+      -- TODO: also be a record like in Main.elm and just share the same alias?
       DeleteLabels (List SyncableID)
     | DeleteNotes (List SyncableID)
     | CreateLabels (List { offlineId : String, name : String })
