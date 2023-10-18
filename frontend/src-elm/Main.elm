@@ -64,6 +64,12 @@ getNewTimeForCreateNewNote data =
         |> Cmd.map LoggedInView
 
 
+getNewTimeForCreatingNewLabel : { id : String, name : String } -> Cmd Msg
+getNewTimeForCreatingNewLabel data =
+    Task.perform (GotCurrentTimeForNewLabel data) Time.now
+        |> Cmd.map LoggedInView
+
+
 
 -- MODEL
 
@@ -108,6 +114,8 @@ type alias Note =
 type alias Label =
     { id : ID
     , name : UniqueStr
+    , createdAt : Posix
+    , updatedAt : Posix
     }
 
 
@@ -207,7 +215,17 @@ type LoggedOutMsg
 
 
 type LoggedInMsg
-    = GotCurrentTimeForNewNote
+    = ChangeNotePinned ( ID, Bool )
+    | NewTitleChange String
+    | NewNotePlainTextContentChange String
+    | RequestTimeForNewLabelCreation
+    | GotCurrentTimeForNewLabel { id : String, name : String } Posix
+    | ReceivedRandomValues (List Int)
+    | DeleteNote ID
+    | DeleteLabel ID
+    | BeginWritingNewNote
+    | RequestTimeForCreateNewNote
+    | GotCurrentTimeForNewNote
         { id : String
         , title : String
         , content : String
@@ -215,21 +233,12 @@ type LoggedInMsg
         , labels : List ID
         }
         Posix
-    | ChangeNotePinned ( ID, Bool )
-    | NewTitleChange String
-    | NewNotePlainTextContentChange String
-    | ReceivedRandomValues (List Int)
-    | DeleteNote ID
-    | DeleteLabel ID
-    | BeginWritingNewNote
-    | RequestTimeForCreateNewNote
     | BeginAddingNewNoteLabels
     | SearchLabelsQueryChange String
     | AddLabelToNewNote ID
     | RemoveLabelFromNewNote ID
     | RemoveLabelFromNote { noteID : ID, labelID : ID }
     | ChangeNewLabelName String
-    | CreateNewLabel
     | ReceivedChangesResp (Result Http.Error Api.ChangesResponse)
 
 
@@ -434,7 +443,7 @@ update msg model =
                             { model | newLabelName = newName }
                                 |> pure
 
-                        CreateNewLabel ->
+                        RequestTimeForNewLabelCreation ->
                             if String.length model.newLabelName == 0 then
                                 model |> pure
 
@@ -444,20 +453,29 @@ update msg model =
 
                             else
                                 let
+                                    newLabelOfflineId : String
                                     newLabelOfflineId =
                                         generateUID model.seeds |> Tuple.first
 
                                     newLabel =
-                                        { offlineID = newLabelOfflineId
+                                        { id = newLabelOfflineId
                                         , name = model.newLabelName
                                         }
                                 in
-                                ( { model
-                                    | newLabelName = ""
-                                    , labels = { id = OfflineID newLabel.offlineID, name = newLabel.name } :: model.labels
-                                  }
-                                , requestRandomValues ()
-                                )
+                                ( model, Cmd.batch [ requestRandomValues (), getNewTimeForCreatingNewLabel newLabel ] )
+
+                        GotCurrentTimeForNewLabel data time ->
+                            { model
+                                | newLabelName = ""
+                                , labels =
+                                    { id = OfflineID data.id
+                                    , name = data.name
+                                    , updatedAt = time
+                                    , createdAt = time
+                                    }
+                                        :: model.labels
+                            }
+                                |> pure
 
                         -- TODO: ADD TO QUEUE
                         -- |> addToQueue (QNewLabel { name = model.newLabelName, offlineId = newLabelOfflineId })
@@ -735,6 +753,45 @@ update msg model =
                                                                 l
                                                     )
                                                 |> (++) updatedNotes
+                                        , labels =
+                                            let
+                                                ( _, notOutdatedLabels ) =
+                                                    List.partition
+                                                        (\e -> List.any (\l -> sameId (DatabaseID l.id) e.id) downSyncedData.labels)
+                                                        model.labels
+
+                                                updatedLabels : List Label
+                                                updatedLabels =
+                                                    downSyncedData.labels
+                                                        |> List.map
+                                                            (\e ->
+                                                                { id = DatabaseID e.id
+                                                                , name = e.name
+                                                                , createdAt = e.createdAt
+                                                                , updatedAt = e.updatedAt
+                                                                }
+                                                            )
+                                            in
+                                            notOutdatedLabels
+                                                -- remove the ones that were failed to create
+                                                |> List.filter (\l -> not (List.any (\e -> sameId l.id (OfflineID e)) failedToCreate))
+                                                -- remove the ones that don't exist in DB
+                                                |> List.filter (\l -> not (List.any (\e -> sameId l.id (DatabaseID e)) deleted.labels))
+                                                -- update just created
+                                                |> List.map
+                                                    (\l ->
+                                                        case listFirst (\( _, offlineId ) -> sameId l.id (OfflineID offlineId)) justCreatedData.labels of
+                                                            Just ( v, _ ) ->
+                                                                { id = DatabaseID v.id
+                                                                , name = v.name
+                                                                , createdAt = v.createdAt
+                                                                , updatedAt = v.updatedAt
+                                                                }
+
+                                                            Nothing ->
+                                                                l
+                                                    )
+                                                |> (++) updatedLabels
                                     }
                                         |> pure
 
@@ -751,7 +808,16 @@ update msg model =
                         -- TODO:
                         Ok ( notes, labels ) ->
                             { model
-                                | labels = List.map (\e -> { name = e.name, id = DatabaseID e.id }) labels
+                                | labels =
+                                    List.map
+                                        (\l ->
+                                            { name = l.name
+                                            , id = DatabaseID l.id
+                                            , createdAt = l.createdAt
+                                            , updatedAt = l.updatedAt
+                                            }
+                                        )
+                                        labels
                                 , notes =
                                     List.map
                                         (\l ->
@@ -1066,7 +1132,7 @@ mainView model =
                     )
                     model.labels
                 )
-            , form [ onSubmit CreateNewLabel ]
+            , form [ onSubmit RequestTimeForNewLabelCreation ]
                 [ input [ placeholder "School", value model.newLabelName, onInput ChangeNewLabelName ] []
                 , button [ type_ "submit" ] [ text "Create label" ]
                 ]
@@ -1153,7 +1219,7 @@ mainView model =
                                             -- TODO: design empty state
                                             form
                                                 [ css [ displayFlex, flexDirection column, publicSans, color (hex "fff"), padding (px 15) ]
-                                                , onSubmit CreateNewLabel
+                                                , onSubmit RequestTimeForNewLabelCreation
                                                 ]
                                                 [ text "No labels, create some"
                                                 , label []
