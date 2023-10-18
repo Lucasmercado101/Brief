@@ -217,7 +217,7 @@ type LoggedOutMsg
 type LoggedInMsg
     = ChangeNotePinned ( ID, Bool )
     | NewTitleChange String
-    | NewNotePlainTextContentChange String
+    | NewNoteContentChange String
     | RequestTimeForNewLabelCreation
     | CreateNewLabel { id : String, name : String } Posix
     | ReceivedRandomValues (List Int)
@@ -500,7 +500,7 @@ update msg model =
                             }
                                 |> pure
 
-                        NewNotePlainTextContentChange s ->
+                        NewNoteContentChange s ->
                             { model
                                 | isWritingANewNote =
                                     Maybe.map
@@ -1214,7 +1214,7 @@ mainView model =
                                     , minHeight (px 150)
                                     ]
                                 , placeholder "Milk, eggs, bread, and fruits."
-                                , onInput NewNotePlainTextContentChange
+                                , onInput NewNoteContentChange
                                 , value data.content
                                 ]
                                 []
