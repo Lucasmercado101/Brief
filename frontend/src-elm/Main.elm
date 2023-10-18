@@ -910,7 +910,7 @@ qAddToQueue fn ( model, cmds ) =
               }
             , Cmd.batch
                 [ Api.sendChanges
-                    { operations = qQueueToOperations currentOperations
+                    { operations = queueToOperations currentOperations
                     , lastSyncedAt = model.lastSyncedAt
                     , currentData =
                         { notes = []
@@ -1046,15 +1046,29 @@ qEditLabelName editData queue =
             { queue | changeLabelNames = editData :: queue.changeLabelNames }
 
 
-qQueueToOperations : OfflineQueueOps -> List Operation
-qQueueToOperations { createLabels, deleteLabels, createNotes, deleteNotes, editNotes, changeLabelNames } =
-    [ DeleteLabels deleteLabels
-    , DeleteNotes deleteNotes
-    , CreateLabels createLabels
-    , CreateNotes createNotes
-    ]
-        ++ List.map EditNote editNotes
-        ++ List.map ChangeLabelName changeLabelNames
+queueToOperations : OfflineQueueOps -> List Operation
+queueToOperations { createLabels, deleteLabels, createNotes, deleteNotes, editNotes, changeLabelNames } =
+    let
+        ifNotEmpty l e =
+            if List.isEmpty l then
+                []
+
+            else
+                [ e l ]
+
+        ifNotEmpty1 l e =
+            if List.isEmpty l then
+                []
+
+            else
+                e
+    in
+    ifNotEmpty deleteLabels DeleteLabels
+        ++ ifNotEmpty deleteNotes DeleteNotes
+        ++ ifNotEmpty createLabels CreateLabels
+        ++ ifNotEmpty createNotes CreateNotes
+        ++ ifNotEmpty1 editNotes (List.map EditNote editNotes)
+        ++ ifNotEmpty1 changeLabelNames (List.map ChangeLabelName changeLabelNames)
 
 
 labelIDsSplitter : List ID -> List String -> List Int -> ( List String, List Int )
