@@ -910,28 +910,47 @@ qCreateNewNote data queue =
 
 qEditNote : OQEditNote -> OfflineQueueOps -> OfflineQueueOps
 qEditNote data queue =
-    -- TODO: if not created then combine edit as create
     let
-        ( toEditNote, restEditNotes ) =
-            queue.editNotes
-                |> partitionFirst (\l -> sameId l.id data.id)
+        ( toCreateNote, restCreateNotes ) =
+            queue.createNotes
+                |> partitionFirst (\l -> sameId (OfflineID l.offlineId) data.id)
     in
-    case toEditNote of
-        -- already a previous op to edit note
-        Just prevEdit ->
+    case toCreateNote of
+        Just createData ->
+            -- hasn't even been created so just combine edit as create
             { queue
-                | editNotes =
-                    { id = prevEdit.id
-                    , title = data.title |> or prevEdit.title
-                    , content = data.content |> or prevEdit.content
-                    , pinned = data.pinned |> or prevEdit.pinned
-                    , labels = data.labels |> or prevEdit.labels
+                | createNotes =
+                    { offlineId = createData.offlineId
+                    , title = data.title |> or createData.title
+                    , content = Maybe.withDefault createData.content data.content
+                    , pinned = Maybe.withDefault createData.pinned data.pinned
+                    , labels = Maybe.withDefault createData.labels data.labels
                     }
-                        :: restEditNotes
+                        :: restCreateNotes
             }
 
         Nothing ->
-            { queue | editNotes = data :: queue.editNotes }
+            let
+                ( toEditNote, restEditNotes ) =
+                    queue.editNotes
+                        |> partitionFirst (\l -> sameId l.id data.id)
+            in
+            case toEditNote of
+                -- already a previous op to edit note
+                Just prevEdit ->
+                    { queue
+                        | editNotes =
+                            { id = prevEdit.id
+                            , title = data.title |> or prevEdit.title
+                            , content = data.content |> or prevEdit.content
+                            , pinned = data.pinned |> or prevEdit.pinned
+                            , labels = data.labels |> or prevEdit.labels
+                            }
+                                :: restEditNotes
+                    }
+
+                Nothing ->
+                    { queue | editNotes = data :: queue.editNotes }
 
 
 qDeleteNote : OQDeleteNote -> OfflineQueueOps -> OfflineQueueOps
