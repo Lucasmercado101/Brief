@@ -421,15 +421,13 @@ update msg model =
                                             )
 
                         DeleteNote toDeleteNoteID ->
-                            -- TODO: offline sync
                             { model
                                 | notes =
                                     List.filter (\n -> idDiff n.id toDeleteNoteID) model.notes
                             }
                                 |> pure
+                                |> qAddToQueue (qDeleteNote toDeleteNoteID)
 
-                        -- TODO: ADD TO QUEUE
-                        -- |> addToQueue (QDeleteNote toDeleteNoteID)
                         ChangeNewLabelName newName ->
                             { model | newLabelName = newName }
                                 |> pure
