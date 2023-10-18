@@ -717,6 +717,23 @@ update msg model =
                                                 |> List.filter (\l -> not (List.any (\e -> sameId l.id (OfflineID e)) failedToCreate))
                                                 -- remove the ones that don't exist in DB
                                                 |> List.filter (\l -> not (List.any (\e -> sameId l.id (DatabaseID e)) deleted.notes))
+                                                -- update just created
+                                                |> List.map
+                                                    (\l ->
+                                                        case listFirst (\( _, offlineId ) -> sameId l.id (OfflineID offlineId)) justCreatedData.notes of
+                                                            Just ( v, _ ) ->
+                                                                { id = DatabaseID v.id
+                                                                , title = v.title
+                                                                , content = v.content
+                                                                , pinned = v.pinned
+                                                                , createdAt = v.createdAt
+                                                                , updatedAt = v.updatedAt
+                                                                , labels = v.labels |> List.map DatabaseID
+                                                                }
+
+                                                            Nothing ->
+                                                                l
+                                                    )
                                                 |> (++) updatedNotes
                                     }
                                         |> pure
@@ -1473,6 +1490,20 @@ or default new =
 
         Nothing ->
             default
+
+
+listFirst : (a -> Bool) -> List a -> Maybe a
+listFirst pred list =
+    case list of
+        [] ->
+            Nothing
+
+        x :: xs ->
+            if pred x then
+                Just x
+
+            else
+                listFirst pred xs
 
 
 
