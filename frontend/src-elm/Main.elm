@@ -37,7 +37,6 @@ port receiveRandomValues : (List Int -> msg) -> Sub msg
 
 subscriptions : Model -> Sub Msg
 subscriptions _ =
-    -- TODO: if case model is logged in?
     receiveRandomValues ReceivedRandomValues
         |> Sub.map LoggedInView
 
@@ -391,7 +390,6 @@ update msg model =
                                     )
 
                         RemoveLabelFromNote { noteID, labelID } ->
-                            -- TODO: online sync
                             let
                                 ( noteExists, restNotes ) =
                                     partitionFirst (\n -> sameId n.id noteID) model.notes
