@@ -198,7 +198,7 @@ export default () =>
 
           createNotes = createNotes.map((note) => ({
             ...note,
-            labels: note.labels.map((label) => {
+            labels: note.labels?.map((label) => {
               const onlineLabel = newLabels.find((l) => l.offlineId === label);
               // replace offline label with db label
               if (onlineLabel) return onlineLabel.id;
@@ -240,11 +240,12 @@ export default () =>
                   labels: {
                     // if some label failed to create or just got given
                     // offline id then just ignore it and don't connect it
-                    connect: labels
-                      .filter((e) => typeof e === "number")
-                      .map((label) => ({
-                        id: label as number
-                      }))
+                    connect:
+                      labels
+                        ?.filter((e) => typeof e === "number")
+                        .map((label) => ({
+                          id: label as number
+                        })) ?? []
                   }
                 }
               });
@@ -292,11 +293,12 @@ export default () =>
                     labels: {
                       // if some label failed to create or just got given
                       // offline id then just ignore it and don't connect it
-                      connect: labels
-                        .filter((e) => typeof e === "number")
-                        .map((label) => ({
-                          id: label as number
-                        }))
+                      connect:
+                        labels
+                          ?.filter((e): e is number => typeof e === "number")
+                          .map((label) => ({
+                            id: label
+                          })) ?? []
                     }
                   }
                 })
@@ -500,7 +502,7 @@ type NewNote = {
   title?: string;
   content: string;
   pinned: boolean;
-  labels: (string | number)[];
+  labels?: (string | number)[];
 };
 
 type CreateNotes = {
