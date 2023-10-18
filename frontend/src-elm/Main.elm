@@ -1100,17 +1100,16 @@ mainView model =
                     ]
                 ]
                 [ text "Notes" ]
+            , (case model.runningQueueOn of
+                Nothing ->
+                    Outlined.cloud
 
-            -- TODO: HANDLE QUEUE STATUS HERE
-            -- , (case model.offlineQueue of
-            --     [] ->
-            --         Outlined.cloud
-            --     _ ->
-            --         Outlined.sync
-            --   )
-            --     28
-            --     Inherit
-            --     |> Svg.Styled.fromUnstyled
+                Just _ ->
+                    Outlined.sync
+              )
+                28
+                Inherit
+                |> Svg.Styled.fromUnstyled
             ]
 
         -- TODO: placeholder
