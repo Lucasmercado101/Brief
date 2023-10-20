@@ -1254,7 +1254,7 @@ mainView model =
                                                                 [ text l.name ]
                                                         )
                                                         (model.labels
-                                                            |> List.filter (\l -> List.any (\j -> j == l.id) labels |> not)
+                                                            |> exclude (\l -> List.any (\j -> j == l.id) labels)
                                                             |> List.filter (.name >> String.toLower >> String.contains labelsSearchQuery)
                                                         )
                                                     )
