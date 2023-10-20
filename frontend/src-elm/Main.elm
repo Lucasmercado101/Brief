@@ -395,10 +395,7 @@ update msg model =
                                         newNotes =
                                             noteData.labels |> exclude (sameId labelID)
                                     in
-                                    { model
-                                        | notes =
-                                            { noteData | labels = newNotes } :: restNotes
-                                    }
+                                    { model | notes = { noteData | labels = newNotes } :: restNotes }
                                         |> pure
                                         |> addToQueue (qEditNoteLabels noteID (Just newNotes))
 
