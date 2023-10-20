@@ -864,15 +864,13 @@ qDeleteLabel labelId queue =
                 | createLabels = restCreateLabels
                 , changeLabelNames =
                     queue.changeLabelNames
-                        |> List.filter (\l -> idDiff l.id labelId)
+                        |> exclude (.id >> sameId labelId)
                 , createNotes =
                     queue.createNotes
                         |> List.map
                             (\l ->
                                 { l
-                                    | labels =
-                                        l.labels
-                                            |> List.filter (\e -> idDiff e labelId)
+                                    | labels = l.labels |> exclude (sameId labelId)
                                 }
                             )
                 , editNotes =
@@ -880,9 +878,7 @@ qDeleteLabel labelId queue =
                         |> List.map
                             (\l ->
                                 { l
-                                    | labels =
-                                        l.labels
-                                            |> Maybe.map (List.filter (\e -> idDiff e labelId))
+                                    | labels = l.labels |> Maybe.map (exclude (sameId labelId))
                                 }
                             )
             }
