@@ -399,20 +399,16 @@ update msg model =
                                     model |> pure
 
                                 Just noteData ->
+                                    let
+                                        newNotes =
+                                            noteData.labels |> exclude (sameId labelID)
+                                    in
                                     { model
                                         | notes =
-                                            { noteData | labels = noteData.labels |> List.filter (idDiff labelID) } :: restNotes
+                                            { noteData | labels = newNotes } :: restNotes
                                     }
                                         |> pure
-                                        |> addToQueue
-                                            (qEditNote
-                                                { id = noteID
-                                                , title = Nothing
-                                                , content = Nothing
-                                                , pinned = Nothing
-                                                , labels = Just (noteData.labels |> List.filter (idDiff labelID))
-                                                }
-                                            )
+                                        |> addToQueue (qEditNoteLabels noteID (Just newNotes))
 
                         DeleteNote toDeleteNoteID ->
                             { model
@@ -949,6 +945,17 @@ qEditNote data queue =
 
                 Nothing ->
                     { queue | editNotes = data :: queue.editNotes }
+
+
+qEditNoteLabels : SyncableID -> Maybe (List SyncableID) -> OfflineQueueOps -> OfflineQueueOps
+qEditNoteLabels id labels =
+    qEditNote
+        { id = id
+        , title = Nothing
+        , content = Nothing
+        , pinned = Nothing
+        , labels = labels
+        }
 
 
 qDeleteNote : OQDeleteNote -> OfflineQueueOps -> OfflineQueueOps
