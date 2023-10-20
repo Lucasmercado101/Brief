@@ -379,15 +379,7 @@ update msg model =
                                         model.notes
                             }
                                 |> pure
-                                |> addToQueue
-                                    (qEditNote
-                                        { id = uid
-                                        , title = Nothing
-                                        , content = Nothing
-                                        , pinned = Just newPinnedVal
-                                        , labels = Nothing
-                                        }
-                                    )
+                                |> addToQueue (qToggleNotePin uid (Just newPinnedVal))
 
                         RemoveLabelFromNote { noteID, labelID } ->
                             let
@@ -948,6 +940,17 @@ qEditNoteLabels id labels =
         , content = Nothing
         , pinned = Nothing
         , labels = labels
+        }
+
+
+qToggleNotePin : SyncableID -> Maybe Bool -> OfflineQueueOps -> OfflineQueueOps
+qToggleNotePin id newPinnedVal =
+    qEditNote
+        { id = id
+        , title = Nothing
+        , content = Nothing
+        , pinned = newPinnedVal
+        , labels = Nothing
         }
 
 
