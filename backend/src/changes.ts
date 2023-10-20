@@ -198,7 +198,7 @@ export default () =>
 
           createNotes = createNotes.map((note) => ({
             ...note,
-            labels: note.labels.map((label) => {
+            labels: note.labels?.map((label) => {
               const onlineLabel = newLabels.find((l) => l.offlineId === label);
               // replace offline label with db label
               if (onlineLabel) return onlineLabel.id;
@@ -240,11 +240,12 @@ export default () =>
                   labels: {
                     // if some label failed to create or just got given
                     // offline id then just ignore it and don't connect it
-                    connect: labels
-                      .filter((e) => typeof e === "number")
-                      .map((label) => ({
-                        id: label as number
-                      }))
+                    connect:
+                      labels
+                        ?.filter((e) => typeof e === "number")
+                        .map((label) => ({
+                          id: label as number
+                        })) ?? []
                   }
                 }
               });
@@ -280,24 +281,41 @@ export default () =>
           const editNotesPromises = editNotes
             .filter((e) => typeof e.id === "number")
             .map(({ id, title, content, pinned, labels }) => {
+              // if some label failed to create or just got given
+              // offline id then just ignore it and don't connect it
+              const labelsIds = labels
+                ?.filter((e): e is number => typeof e === "number")
+                .map((label) => ({
+                  id: label
+                }));
+
               const editNote = prisma.note
                 .update({
                   where: {
-                    id: id as number
+                    id: id as number,
+                    userId: userId
+                  },
+                  select: {
+                    id: true,
+                    title: true,
+                    content: true,
+                    pinned: true,
+                    createdAt: true,
+                    updatedAt: true,
+                    userId: true,
+                    labels: {
+                      select: { id: true }
+                    }
                   },
                   data: {
                     title,
                     content,
                     pinned,
-                    labels: {
-                      // if some label failed to create or just got given
-                      // offline id then just ignore it and don't connect it
-                      connect: labels
-                        .filter((e) => typeof e === "number")
-                        .map((label) => ({
-                          id: label as number
-                        }))
-                    }
+                    ...(labels !== undefined && {
+                      labels: {
+                        set: labelsIds
+                      }
+                    })
                   }
                 })
                 .then((e) => ({ ...e, offlineId: id }));
@@ -313,7 +331,7 @@ export default () =>
           // NOTE: don't inquire further, if it couldn't create then don't
           // retry, don't fail, just send as "not edited" in response
           notesNotEdited = editNotes.filter(
-            ({ id }) => !newNotes.find((note) => note.offlineId === id)
+            ({ id }) => !editedNotes.find((note) => note.offlineId === id)
           );
         }
 
@@ -500,7 +518,7 @@ type NewNote = {
   title?: string;
   content: string;
   pinned: boolean;
-  labels: (string | number)[];
+  labels?: (string | number)[];
 };
 
 type CreateNotes = {
