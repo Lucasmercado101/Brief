@@ -965,7 +965,7 @@ qDeleteNote noteId queue =
                 | createNotes = restCreateNotes
                 , editNotes =
                     queue.editNotes
-                        |> List.filter (\l -> idDiff l.id noteId)
+                        |> exclude (.id >> sameId noteId)
             }
 
         -- has already created the note or creation is in progress
