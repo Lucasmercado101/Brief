@@ -411,10 +411,7 @@ update msg model =
                                         |> addToQueue (qEditNoteLabels noteID (Just newNotes))
 
                         DeleteNote toDeleteNoteID ->
-                            { model
-                                | notes =
-                                    List.filter (\n -> idDiff n.id toDeleteNoteID) model.notes
-                            }
+                            { model | notes = model.notes |> exclude (.id >> sameId toDeleteNoteID) }
                                 |> pure
                                 |> addToQueue (qDeleteNote toDeleteNoteID)
 
