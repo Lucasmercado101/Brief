@@ -459,7 +459,7 @@ update msg model =
                                 |> pure
 
                         DeleteLabel labelId ->
-                            { model | labels = model.labels |> List.filter (\l -> idDiff l.id labelId) }
+                            { model | labels = model.labels |> exclude (.id >> sameId labelId) }
                                 |> pure
                                 |> addToQueue (qDeleteLabel labelId)
 
