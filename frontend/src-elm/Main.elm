@@ -851,9 +851,7 @@ qDeleteLabel labelId queue =
         Just _ ->
             { queue
                 | createLabels = restCreateLabels
-                , changeLabelNames =
-                    queue.changeLabelNames
-                        |> exclude (.id >> sameId labelId)
+                , changeLabelNames = queue.changeLabelNames |> exclude (.id >> sameId labelId)
                 , createNotes =
                     queue.createNotes
                         |> List.map
