@@ -549,7 +549,7 @@ update msg model =
                                                         data.labels
                                                             |> Maybe.map
                                                                 (\{ labelsSearchQuery, labels } ->
-                                                                    { labels = labels |> List.filter (idDiff labelID)
+                                                                    { labels = labels |> exclude (sameId labelID)
                                                                     , labelsSearchQuery = labelsSearchQuery
                                                                     }
                                                                 )
