@@ -175,9 +175,9 @@ type alias OfflineQueueOps =
 type alias Model =
     { seeds : List Random.Seed
     , notes : List Note
+    , labels : List Label
     , isWritingANewNote : Maybe NewNoteData
     , newLabelName : String
-    , labels : List Label
     , user : User
 
     -- sync stuff
@@ -678,9 +678,9 @@ update msg model =
                                             in
                                             notOutdatedNotes
                                                 -- remove the ones that were failed to create
-                                                |> List.filter (\l -> not (List.any (\e -> sameId l.id (OfflineID e)) failedToCreate))
+                                                |> exclude (\l -> List.any (\e -> sameId l.id (OfflineID e)) failedToCreate)
                                                 -- remove the ones that don't exist in DB
-                                                |> List.filter (\l -> not (List.any (\e -> sameId l.id (DatabaseID e)) deleted.notes))
+                                                |> exclude (\l -> List.any (\e -> sameId l.id (DatabaseID e)) deleted.notes)
                                                 -- update just created
                                                 |> List.map
                                                     (\l ->
@@ -1513,6 +1513,12 @@ alphaNumericGenerator strLength =
 
 
 -- Helpers
+-- It's just `filterNot` https://package.elm-lang.org/packages/elm-community/list-extra/8.7.0/List-Extra#filterNot
+
+
+exclude : (a -> Bool) -> List a -> List a
+exclude pred list =
+    List.filter (not << pred) list
 
 
 partitionFirstHelper : List a -> (a -> Bool) -> ( Maybe a, List a ) -> ( Maybe a, List a )
