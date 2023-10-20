@@ -720,9 +720,9 @@ update msg model =
                                             in
                                             notOutdatedLabels
                                                 -- remove the ones that were failed to create
-                                                |> List.filter (\l -> not (List.any (\e -> sameId l.id (OfflineID e)) failedToCreate))
+                                                |> exclude (\l -> List.any (\e -> sameId l.id (OfflineID e)) failedToCreate)
                                                 -- remove the ones that don't exist in DB
-                                                |> List.filter (\l -> not (List.any (\e -> sameId l.id (DatabaseID e)) deleted.labels))
+                                                |> exclude (\l -> List.any (\e -> sameId l.id (DatabaseID e)) deleted.labels)
                                                 -- update just created
                                                 |> List.map
                                                     (\l ->
