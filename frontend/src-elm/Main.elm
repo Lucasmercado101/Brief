@@ -28,6 +28,9 @@ import Time exposing (Posix)
 port requestRandomValues : () -> Cmd msg
 
 
+port updateLastSyncedAt : Int -> Cmd msg
+
+
 port receiveRandomValues : (List Int -> msg) -> Sub msg
 
 
@@ -248,7 +251,7 @@ type Msg
 
 
 type alias Flags =
-    { seeds : List Int, hasSessionCookie : Bool }
+    { seeds : List Int, hasSessionCookie : Bool, lastSyncedAt : Int }
 
 
 emptyOfflineQueue =
@@ -285,7 +288,7 @@ init flags =
       -- sync stuff
       , offlineQueue = emptyOfflineQueue
       , runningQueueOn = Nothing
-      , lastSyncedAt = Time.millisToPosix 1
+      , lastSyncedAt = Time.millisToPosix flags.lastSyncedAt
       }
       -- TODO: full-sync with regards to indexedDb
     , if flags.hasSessionCookie then
@@ -729,20 +732,23 @@ update msg model =
                                                 Just model.offlineQueue
                                         , lastSyncedAt = justSyncedAt
                                       }
-                                    , if offlineQueueIsEmpty model.offlineQueue then
-                                        Cmd.none
+                                    , Cmd.batch
+                                        [ updateLastSyncedAt (Time.posixToMillis justSyncedAt)
+                                        , if offlineQueueIsEmpty model.offlineQueue then
+                                            Cmd.none
 
-                                      else
-                                        Api.sendChanges
-                                            { operations = queueToOperations model.offlineQueue
-                                            , lastSyncedAt = justSyncedAt
-                                            , currentData =
-                                                { notes = model.notes |> List.map .id |> labelIDsSplitter |> Tuple.second
-                                                , labels = model.labels |> List.map .id |> labelIDsSplitter |> Tuple.second
+                                          else
+                                            Api.sendChanges
+                                                { operations = queueToOperations model.offlineQueue
+                                                , lastSyncedAt = justSyncedAt
+                                                , currentData =
+                                                    { notes = model.notes |> List.map .id |> labelIDsSplitter |> Tuple.second
+                                                    , labels = model.labels |> List.map .id |> labelIDsSplitter |> Tuple.second
+                                                    }
                                                 }
-                                            }
-                                            ReceivedChangesResp
-                                            |> Cmd.map LoggedInView
+                                                ReceivedChangesResp
+                                                |> Cmd.map LoggedInView
+                                        ]
                                     )
 
                                 -- TODO: error handling here

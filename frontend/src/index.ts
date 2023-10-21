@@ -55,11 +55,13 @@ const hasSessionCookie = document.cookie.match(
   new RegExp(`^(.*;)?\s*${cookieName}\s*=\s*[^;]+(.*)?$`)
 );
 
+let lastSyncedAt = localStorage.getItem("lastSyncedAt");
 // @ts-ignore
 const app = Elm.Main.init({
   flags: {
     seeds: Array.from(self.crypto.getRandomValues(new Uint32Array(4))),
-    hasSessionCookie: !!hasSessionCookie
+    hasSessionCookie: !!hasSessionCookie,
+    lastSyncedAt: lastSyncedAt ? Number(lastSyncedAt) : 1
   },
   node: document.getElementById("root")
 });
@@ -68,4 +70,8 @@ app.ports.requestRandomValues.subscribe(function () {
   app.ports.receiveRandomValues.send(
     Array.from(self.crypto.getRandomValues(new Uint32Array(4)))
   );
+});
+
+app.ports.updateLastSyncedAt.subscribe(function (lastSyncedAt: string) {
+  localStorage.setItem("lastSyncedAt", lastSyncedAt);
 });
