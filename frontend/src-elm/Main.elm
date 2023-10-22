@@ -1204,11 +1204,18 @@ labelsMenuColumn model =
             , borderRight3 (px 3) solid black
             ]
         ]
-        [ ul [ css [ paddingLeft (px 10), paddingTop (px 5), fontWeight (int 600) ] ]
+        [ ul [ css [ paddingTop (px 5), fontWeight (int 600) ] ]
             (List.map
                 (\e ->
                     li
-                        [ css [ publicSans, padY (px 5), cursor pointer ] ]
+                        [ css
+                            [ paddingLeft (px 10)
+                            , publicSans
+                            , padY (px 5)
+                            , cursor pointer
+                            , hover [ textColor white, backgroundColor black ]
+                            ]
+                        ]
                         [ text e.name ]
                 )
                 (model.labels
@@ -1257,7 +1264,11 @@ mainView model =
                 |> Svg.Styled.fromUnstyled
             ]
         , div [ css [ displayFlex, height (pct 100) ] ]
-            [ labelsMenuColumn model
+            [ if model.labelsMenu == True then
+                labelsMenuColumn model
+
+              else
+                text ""
             , div [ css [ width (pct 100) ] ]
                 [ div [ css [ padding (px 15), color (hex "fff"), publicSans ] ]
                     [ text "Labels (PLACEHOLDER):"
