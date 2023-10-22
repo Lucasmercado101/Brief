@@ -216,7 +216,8 @@ type LoggedOutMsg
 type LoggedInMsg
     = ChangeNotePinned ( SyncableID, Bool )
       -- Labels menu
-    | OpenLabelsMenu Bool
+    | OpenLabelsMenu
+    | CloseLabelsMenu
       --
     | NewTitleChange String
     | NewNoteContentChange String
@@ -373,8 +374,12 @@ update msg model =
             case msg of
                 LoggedInView loggedInMsg ->
                     case loggedInMsg of
-                        OpenLabelsMenu open ->
-                            { model | labelsMenu = open }
+                        OpenLabelsMenu ->
+                            { model | labelsMenu = True }
+                                |> pure
+
+                        CloseLabelsMenu ->
+                            { model | labelsMenu = False }
                                 |> pure
 
                         ChangeNotePinned ( uid, newPinnedVal ) ->
@@ -1109,7 +1114,7 @@ closedLabelsMenuBtn =
             , fontWeight bold
             ]
         , type_ "button"
-        , onClick (OpenLabelsMenu True)
+        , onClick OpenLabelsMenu
         ]
         [ div
             [ css
@@ -1124,6 +1129,59 @@ closedLabelsMenuBtn =
             ]
         , div [ css [ width (px 50), height (px 32), displayFlex, justifyContent center, alignItems center ] ]
             [ Filled.arrow_drop_down 32
+                Inherit
+                |> Svg.Styled.fromUnstyled
+            ]
+        ]
+
+
+openLabelsMenuBtn : Html LoggedInMsg
+openLabelsMenuBtn =
+    div
+        [ css
+            [ paddingLeft (px 8)
+            , maxWidth (px 277)
+            , minWidth (px 277)
+            , backgroundColor black
+            , textColor white
+            , border (px 0)
+            , borderRight3 (px 3) solid black
+            , displayFlex
+            , publicSans
+            , alignItems center
+            , justifyContent spaceBetween
+            , fontSize (px 16)
+            , fontWeight bold
+            ]
+        ]
+        [ div
+            [ css
+                [ displayFlex
+                , alignItems center
+                , padY (px 8)
+                ]
+            ]
+            [ Filled.label 32
+                Inherit
+                |> Svg.Styled.fromUnstyled
+            , p [ css [ marginLeft (px 10) ] ] [ text "Labels" ]
+            ]
+        , button
+            [ css
+                [ width (px 50)
+                , height (pct 100)
+                , displayFlex
+                , justifyContent center
+                , alignItems center
+                , border (px 0)
+                , backgroundColor error
+                , cursor pointer
+                , textColor white
+                ]
+            , type_ "button"
+            , onClick CloseLabelsMenu
+            ]
+            [ Filled.close 32
                 Inherit
                 |> Svg.Styled.fromUnstyled
             ]
@@ -1146,7 +1204,11 @@ mainView model =
                 , justifyContent spaceBetween
                 ]
             ]
-            [ closedLabelsMenuBtn
+            [ if model.labelsMenu == True then
+                openLabelsMenuBtn
+
+              else
+                closedLabelsMenuBtn
             , p
                 [ css
                     [ fontSize (px 25)
@@ -1697,3 +1759,8 @@ black =
 textColor : ColorValue compatible -> Style
 textColor =
     color
+
+
+error : Color
+error =
+    rgb 255 0 0
