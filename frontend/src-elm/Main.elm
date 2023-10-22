@@ -6,7 +6,7 @@ import Cmd.Extra exposing (pure)
 import Css exposing (..)
 import Either exposing (Either(..))
 import Html.Styled exposing (Html, br, button, div, form, input, label, li, nav, p, text, textarea, ul)
-import Html.Styled.Attributes exposing (class, css, disabled, id, placeholder, style, type_, value)
+import Html.Styled.Attributes exposing (class, css, for, id, placeholder, style, type_, value)
 import Html.Styled.Events exposing (onClick, onInput, onSubmit)
 import Http
 import Material.Icons as Filled
@@ -1249,7 +1249,38 @@ labelsMenuColumn { labels, filters } =
             , borderRight3 (px 3) solid black
             ]
         ]
-        [ ul [ css [ fontWeight (int 600), height (pct 100), overflowY auto ] ]
+        [ div
+            [ css
+                [ height (px 42)
+                , displayFlex
+                , alignItems center
+                , borderBottom3 (px 2) solid black
+                , backgroundColor primary
+                ]
+            ]
+            [ label
+                [ css [ padX (px 10), height (pct 100), displayFlex, alignItems center ]
+                , for "search-labels"
+                ]
+                [ Outlined.search 24 Inherit
+                    |> Svg.Styled.fromUnstyled
+                ]
+            , input
+                [ css
+                    [ fontWeight bold
+                    , publicSans
+                    , height (pct 100)
+                    , width (pct 100)
+                    , border (px 0)
+                    , fontSize (px 16)
+                    , backgroundColor transparent
+                    ]
+                , id "search-labels"
+                , placeholder "Search labels..."
+                ]
+                []
+            ]
+        , ul [ css [ fontWeight (int 600), height (pct 100), overflowY auto ] ]
             (List.indexedMap
                 (\i e ->
                     div
@@ -1893,3 +1924,8 @@ transparent =
 userSelectNone : Style
 userSelectNone =
     property "user-select" "none"
+
+
+primary : Color
+primary =
+    rgb 106 192 255

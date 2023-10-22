@@ -12,3 +12,8 @@
 .note:hover .note-top-actions {
   display: flex;
 }
+
+#search-labels::placeholder {
+  /* TODO: a better color? */
+  color: #414141;
+}
