@@ -182,6 +182,7 @@ type alias Model =
     , isWritingANewNote : Maybe NewNoteData
     , newLabelName : String
     , user : User
+    , labelsMenu : Bool
 
     -- sync stuff
     , offlineQueue : OfflineQueueOps
@@ -214,6 +215,9 @@ type LoggedOutMsg
 
 type LoggedInMsg
     = ChangeNotePinned ( SyncableID, Bool )
+      -- Labels menu
+    | OpenLabelsMenu Bool
+      --
     | NewTitleChange String
     | NewNoteContentChange String
     | RequestTimeForNewLabelCreation
@@ -275,6 +279,7 @@ init flags =
       , isWritingANewNote = Nothing
       , newLabelName = ""
       , labels = []
+      , labelsMenu = False
       , user =
             if flags.hasSessionCookie then
                 LoggedIn
@@ -368,6 +373,10 @@ update msg model =
             case msg of
                 LoggedInView loggedInMsg ->
                     case loggedInMsg of
+                        OpenLabelsMenu open ->
+                            { model | labelsMenu = open }
+                                |> pure
+
                         ChangeNotePinned ( uid, newPinnedVal ) ->
                             { model
                                 | notes =
@@ -1081,7 +1090,7 @@ logInView { username, password } =
 
 closedLabelsMenuBtn : Html LoggedInMsg
 closedLabelsMenuBtn =
-    div
+    button
         [ css
             [ padY (px 8)
             , paddingLeft (px 8)
@@ -1089,11 +1098,18 @@ closedLabelsMenuBtn =
             , minWidth (px 277)
             , backgroundColor white
             , textColor black
+            , border (px 0)
             , borderRight3 (px 3) solid black
             , displayFlex
+            , publicSans
             , alignItems center
             , justifyContent spaceBetween
+            , cursor pointer
+            , fontSize (px 16)
+            , fontWeight bold
             ]
+        , type_ "button"
+        , onClick (OpenLabelsMenu True)
         ]
         [ div
             [ css
