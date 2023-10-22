@@ -1079,6 +1079,41 @@ logInView { username, password } =
         ]
 
 
+closedLabelsMenuBtn : Html LoggedInMsg
+closedLabelsMenuBtn =
+    div
+        [ css
+            [ padY (px 8)
+            , paddingLeft (px 8)
+            , maxWidth (px 277)
+            , minWidth (px 277)
+            , backgroundColor white
+            , textColor black
+            , borderRight3 (px 3) solid black
+            , displayFlex
+            , alignItems center
+            , justifyContent spaceBetween
+            ]
+        ]
+        [ div
+            [ css
+                [ displayFlex
+                , alignItems center
+                ]
+            ]
+            [ Filled.label 32
+                Inherit
+                |> Svg.Styled.fromUnstyled
+            , p [ css [ marginLeft (px 10) ] ] [ text "Labels" ]
+            ]
+        , div [ css [ width (px 50), height (px 32), displayFlex, justifyContent center, alignItems center ] ]
+            [ Filled.arrow_drop_down 32
+                Inherit
+                |> Svg.Styled.fromUnstyled
+            ]
+        ]
+
+
 mainView : Model -> Html LoggedInMsg
 mainView model =
     div [ css [ height (pct 100), overflow auto ] ]
@@ -1086,7 +1121,6 @@ mainView model =
             [ css
                 [ backgroundColor (rgb 140 20 254)
                 , color (rgb 255 255 255)
-                , padding2 (px 10) (px 30)
                 , publicSans
                 , fontWeight bolder
                 , borderBottom3 (px 3) solid (rgb 0 0 0)
@@ -1096,7 +1130,8 @@ mainView model =
                 , justifyContent spaceBetween
                 ]
             ]
-            [ p
+            [ closedLabelsMenuBtn
+            , p
                 [ css
                     [ fontSize (px 25)
                     ]
@@ -1621,3 +1656,28 @@ mx l =
 my : Css.LengthOrAuto a -> Style
 my l =
     Css.batch [ Css.marginTop l, Css.marginBottom l ]
+
+
+padY : Css.Length compatible units -> Style
+padY l =
+    Css.batch [ Css.paddingTop l, Css.paddingBottom l ]
+
+
+padX : Css.Length compatible units -> Style
+padX l =
+    Css.batch [ Css.paddingLeft l, Css.paddingRight l ]
+
+
+white : Color
+white =
+    rgb 255 255 255
+
+
+black : Color
+black =
+    rgb 0 0 0
+
+
+textColor : ColorValue compatible -> Style
+textColor =
+    color
