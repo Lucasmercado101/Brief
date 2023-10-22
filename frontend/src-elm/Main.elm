@@ -5,7 +5,7 @@ import Browser
 import Cmd.Extra exposing (pure)
 import Css exposing (..)
 import Either exposing (Either(..))
-import Html.Styled exposing (Html, br, button, div, form, input, label, nav, p, text, textarea)
+import Html.Styled exposing (Html, br, button, div, form, input, label, li, nav, p, text, textarea, ul)
 import Html.Styled.Attributes exposing (class, css, disabled, id, placeholder, style, type_, value)
 import Html.Styled.Events exposing (onClick, onInput, onSubmit)
 import Http
@@ -1093,14 +1093,19 @@ logInView { username, password } =
         ]
 
 
+labelsMenuWidth : Float
+labelsMenuWidth =
+    277
+
+
 closedLabelsMenuBtn : Html LoggedInMsg
 closedLabelsMenuBtn =
     button
         [ css
             [ padY (px 8)
             , paddingLeft (px 8)
-            , maxWidth (px 277)
-            , minWidth (px 277)
+            , maxWidth (px labelsMenuWidth)
+            , minWidth (px labelsMenuWidth)
             , backgroundColor white
             , textColor black
             , border (px 0)
@@ -1140,8 +1145,8 @@ openLabelsMenuBtn =
     div
         [ css
             [ paddingLeft (px 8)
-            , maxWidth (px 277)
-            , minWidth (px 277)
+            , maxWidth (px labelsMenuWidth)
+            , minWidth (px labelsMenuWidth)
             , backgroundColor black
             , textColor white
             , border (px 0)
@@ -1188,9 +1193,34 @@ openLabelsMenuBtn =
         ]
 
 
+labelsMenuColumn : Model -> Html LoggedInMsg
+labelsMenuColumn model =
+    div
+        [ css
+            [ maxWidth (px labelsMenuWidth)
+            , minWidth (px labelsMenuWidth)
+            , backgroundColor secondary
+            , height (pct 100)
+            , borderRight3 (px 3) solid black
+            ]
+        ]
+        [ ul [ css [ paddingLeft (px 10), paddingTop (px 5), fontWeight (int 600) ] ]
+            (List.map
+                (\e ->
+                    li
+                        [ css [ publicSans, padY (px 5), cursor pointer ] ]
+                        [ text e.name ]
+                )
+                (model.labels
+                    |> List.sortBy (.createdAt >> Time.posixToMillis)
+                )
+            )
+        ]
+
+
 mainView : Model -> Html LoggedInMsg
 mainView model =
-    div [ css [ height (pct 100), overflow auto ] ]
+    div [ css [ displayFlex, flexDirection column, height (pct 100), overflow auto ] ]
         [ nav
             [ css
                 [ backgroundColor (rgb 140 20 254)
@@ -1226,208 +1256,211 @@ mainView model =
                 Inherit
                 |> Svg.Styled.fromUnstyled
             ]
-
-        -- TODO: placeholder
-        , div [ css [ padding (px 15), color (hex "fff"), publicSans ] ]
-            [ text "Labels (PLACEHOLDER):"
-            , div []
-                (List.map
-                    (\l ->
-                        div []
-                            [ text l.name
-                            , button
-                                [ css
-                                    [ border (px 0)
-                                    , backgroundColor (hex "ff0000")
-                                    , cursor pointer
-                                    , color (hex "fff")
+        , div [ css [ displayFlex, height (pct 100) ] ]
+            [ labelsMenuColumn model
+            , div [ css [ width (pct 100) ] ]
+                [ div [ css [ padding (px 15), color (hex "fff"), publicSans ] ]
+                    [ text "Labels (PLACEHOLDER):"
+                    , div []
+                        (List.map
+                            (\l ->
+                                div []
+                                    [ text l.name
+                                    , button
+                                        [ css
+                                            [ border (px 0)
+                                            , backgroundColor (hex "ff0000")
+                                            , cursor pointer
+                                            , color (hex "fff")
+                                            ]
+                                        , onClick (DeleteLabel l.id)
+                                        ]
+                                        [ Filled.close 24 Inherit |> Svg.Styled.fromUnstyled ]
                                     ]
-                                , onClick (DeleteLabel l.id)
+                            )
+                            model.labels
+                        )
+                    , form [ onSubmit RequestTimeForNewLabelCreation ]
+                        [ input [ placeholder "School", value model.newLabelName, onInput ChangeNewLabelName ] []
+                        , button [ type_ "submit" ] [ text "Create label" ]
+                        ]
+                    ]
+                , div []
+                    (case model.isWritingANewNote of
+                        Nothing ->
+                            [ div [ css [ fullWidth, displayFlex, marginTop (px 30) ] ]
+                                [ div [ css [ margin2 (px 0) auto, width (px 500) ] ]
+                                    [ input
+                                        [ onClick BeginWritingNewNote
+                                        , css
+                                            [ border3 (px 3) solid (rgb 0 0 0)
+                                            , publicSans
+                                            , fontWeight bold
+                                            , padding (px 8)
+                                            , margin2 (px 0) auto
+                                            , fullWidth
+                                            , backgroundColor (rgb 255 203 127)
+                                            ]
+                                        , placeholder "TAKE A NEW NOTE"
+                                        ]
+                                        []
+                                    ]
                                 ]
-                                [ Filled.close 24 Inherit |> Svg.Styled.fromUnstyled ]
+                            ]
+
+                        Just data ->
+                            [ div
+                                [ css
+                                    [ displayFlex
+                                    , marginTop (px 30)
+                                    ]
+                                ]
+                                [ form
+                                    [ css
+                                        [ displayFlex
+                                        , margin2 auto auto
+                                        , flexDirection column
+                                        , border3 (px 3) solid (rgb 0 0 0)
+                                        , hover [ boxShadow4 (px 6) (px 6) (px 0) (rgb 0 0 0) ]
+                                        , margin2 (px 0) auto
+                                        , minWidth (px 500)
+                                        ]
+                                    , onSubmit RequestTimeForCreateNewNote
+                                    ]
+                                    [ -- TODO: Add focus on input task
+                                      input
+                                        [ css
+                                            [ publicSans
+                                            , border (px 0)
+                                            , backgroundColor (rgb 255 203 127)
+                                            , padding (px 8)
+                                            , fontSize (px 16)
+                                            , margin2 (px 0) auto
+                                            , fullWidth
+                                            ]
+                                        , placeholder "Grocery List"
+                                        , onInput NewTitleChange
+                                        , value data.title
+                                        ]
+                                        []
+                                    , textarea
+                                        [ css
+                                            [ backgroundColor (rgb 255 203 127)
+                                            , border (px 0)
+                                            , publicSans
+                                            , padding (px 8)
+                                            , fontSize (px 16)
+                                            , margin2 (px 0) auto
+                                            , fullWidth
+                                            , minWidth (px 494)
+                                            , minHeight (px 150)
+                                            ]
+                                        , placeholder "Milk, eggs, bread, and fruits."
+                                        , onInput NewNoteContentChange
+                                        , value data.content
+                                        ]
+                                        []
+                                    , case data.labels of
+                                        Just { labels, labelsSearchQuery } ->
+                                            case model.labels of
+                                                [] ->
+                                                    -- TODO: design empty state
+                                                    form
+                                                        [ css [ displayFlex, flexDirection column, publicSans, color (hex "fff"), padding (px 15) ]
+                                                        , onSubmit RequestTimeForNewLabelCreation
+                                                        ]
+                                                        [ text "No labels, create some"
+                                                        , label []
+                                                            [ text "Label:"
+                                                            , input
+                                                                [ placeholder "School"
+                                                                , onInput ChangeNewLabelName
+                                                                ]
+                                                                []
+                                                            ]
+                                                        , button
+                                                            [ type_ "submit"
+                                                            , Html.Styled.Attributes.disabled (String.length model.newLabelName == 0)
+                                                            ]
+                                                            [ text "Create label" ]
+                                                        ]
+
+                                                _ ->
+                                                    div [ css [ marginTop (px 8) ] ]
+                                                        [ label [ css [ color (hex "fff"), mx (px 15) ] ] [ text "Labels:" ]
+                                                        , input [ placeholder "Search label", value labelsSearchQuery, onInput SearchLabelsQueryChange ] []
+                                                        , div
+                                                            []
+                                                            -- TODO: fix styles
+                                                            (List.map
+                                                                (\l ->
+                                                                    button
+                                                                        [ css [ margin (px 5), padding2 (px 5) (px 10) ]
+                                                                        , onClick (AddLabelToNewNote l.id)
+                                                                        , type_ "button"
+                                                                        ]
+                                                                        [ text l.name ]
+                                                                )
+                                                                (model.labels
+                                                                    |> exclude (\l -> List.any (\j -> j == l.id) labels)
+                                                                    |> List.filter (.name >> String.toLower >> String.contains labelsSearchQuery)
+                                                                )
+                                                            )
+                                                        , div [ css [ color (hex "fff"), mx (px 15) ] ] [ text "Selected labels:" ]
+                                                        , div
+                                                            []
+                                                            (List.map
+                                                                (\l ->
+                                                                    button
+                                                                        [ css
+                                                                            [ margin (px 5), padding2 (px 5) (px 10) ]
+                                                                        , onClick (RemoveLabelFromNewNote l.id)
+                                                                        , type_ "button"
+                                                                        ]
+                                                                        [ text l.name ]
+                                                                )
+                                                                (List.filter (\r -> List.any (\e -> e == r.id) labels) model.labels)
+                                                            )
+                                                        ]
+
+                                        Nothing ->
+                                            div []
+                                                [ button
+                                                    [ -- TODO: style
+                                                      css [ padding (px 15) ]
+                                                    , onClick BeginAddingNewNoteLabels
+                                                    , type_ "button"
+                                                    ]
+                                                    [ text "Add label" ]
+                                                ]
+                                    , button
+                                        [ css
+                                            [ padding (px 15)
+                                            , fontSize (px 16)
+                                            ]
+                                        , type_ "submit"
+                                        , Html.Styled.Attributes.disabled (String.length data.content == 0)
+                                        ]
+                                        [ text "Create note" ]
+                                    ]
+                                ]
                             ]
                     )
-                    model.labels
-                )
-            , form [ onSubmit RequestTimeForNewLabelCreation ]
-                [ input [ placeholder "School", value model.newLabelName, onInput ChangeNewLabelName ] []
-                , button [ type_ "submit" ] [ text "Create label" ]
-                ]
-            ]
-        , div []
-            (case model.isWritingANewNote of
-                Nothing ->
-                    [ div [ css [ fullWidth, displayFlex, marginTop (px 30) ] ]
-                        [ div [ css [ margin2 (px 0) auto, width (px 500) ] ]
-                            [ input
-                                [ onClick BeginWritingNewNote
-                                , css
-                                    [ border3 (px 3) solid (rgb 0 0 0)
-                                    , publicSans
-                                    , fontWeight bold
-                                    , padding (px 8)
-                                    , margin2 (px 0) auto
-                                    , fullWidth
-                                    , backgroundColor (rgb 255 203 127)
-                                    ]
-                                , placeholder "TAKE A NEW NOTE"
-                                ]
-                                []
-                            ]
+
+                -- TODO: add no notes empty state design
+                , div
+                    [ -- TODO: give the tiled effect of google keep
+                      -- using translate and transitions
+                      css
+                        [ displayFlex
+                        , flexDirection row
+                        , flexWrap wrap
+                        , marginTop (px 30)
                         ]
                     ]
-
-                Just data ->
-                    [ div
-                        [ css
-                            [ displayFlex
-                            , marginTop (px 30)
-                            ]
-                        ]
-                        [ form
-                            [ css
-                                [ displayFlex
-                                , margin2 auto auto
-                                , flexDirection column
-                                , border3 (px 3) solid (rgb 0 0 0)
-                                , hover [ boxShadow4 (px 6) (px 6) (px 0) (rgb 0 0 0) ]
-                                , margin2 (px 0) auto
-                                , minWidth (px 500)
-                                ]
-                            , onSubmit RequestTimeForCreateNewNote
-                            ]
-                            [ -- TODO: Add focus on input task
-                              input
-                                [ css
-                                    [ publicSans
-                                    , border (px 0)
-                                    , backgroundColor (rgb 255 203 127)
-                                    , padding (px 8)
-                                    , fontSize (px 16)
-                                    , margin2 (px 0) auto
-                                    , fullWidth
-                                    ]
-                                , placeholder "Grocery List"
-                                , onInput NewTitleChange
-                                , value data.title
-                                ]
-                                []
-                            , textarea
-                                [ css
-                                    [ backgroundColor (rgb 255 203 127)
-                                    , border (px 0)
-                                    , publicSans
-                                    , padding (px 8)
-                                    , fontSize (px 16)
-                                    , margin2 (px 0) auto
-                                    , fullWidth
-                                    , minWidth (px 494)
-                                    , minHeight (px 150)
-                                    ]
-                                , placeholder "Milk, eggs, bread, and fruits."
-                                , onInput NewNoteContentChange
-                                , value data.content
-                                ]
-                                []
-                            , case data.labels of
-                                Just { labels, labelsSearchQuery } ->
-                                    case model.labels of
-                                        [] ->
-                                            -- TODO: design empty state
-                                            form
-                                                [ css [ displayFlex, flexDirection column, publicSans, color (hex "fff"), padding (px 15) ]
-                                                , onSubmit RequestTimeForNewLabelCreation
-                                                ]
-                                                [ text "No labels, create some"
-                                                , label []
-                                                    [ text "Label:"
-                                                    , input
-                                                        [ placeholder "School"
-                                                        , onInput ChangeNewLabelName
-                                                        ]
-                                                        []
-                                                    ]
-                                                , button
-                                                    [ type_ "submit"
-                                                    , Html.Styled.Attributes.disabled (String.length model.newLabelName == 0)
-                                                    ]
-                                                    [ text "Create label" ]
-                                                ]
-
-                                        _ ->
-                                            div [ css [ marginTop (px 8) ] ]
-                                                [ label [ css [ color (hex "fff"), mx (px 15) ] ] [ text "Labels:" ]
-                                                , input [ placeholder "Search label", value labelsSearchQuery, onInput SearchLabelsQueryChange ] []
-                                                , div
-                                                    []
-                                                    -- TODO: fix styles
-                                                    (List.map
-                                                        (\l ->
-                                                            button
-                                                                [ css [ margin (px 5), padding2 (px 5) (px 10) ]
-                                                                , onClick (AddLabelToNewNote l.id)
-                                                                , type_ "button"
-                                                                ]
-                                                                [ text l.name ]
-                                                        )
-                                                        (model.labels
-                                                            |> exclude (\l -> List.any (\j -> j == l.id) labels)
-                                                            |> List.filter (.name >> String.toLower >> String.contains labelsSearchQuery)
-                                                        )
-                                                    )
-                                                , div [ css [ color (hex "fff"), mx (px 15) ] ] [ text "Selected labels:" ]
-                                                , div
-                                                    []
-                                                    (List.map
-                                                        (\l ->
-                                                            button
-                                                                [ css
-                                                                    [ margin (px 5), padding2 (px 5) (px 10) ]
-                                                                , onClick (RemoveLabelFromNewNote l.id)
-                                                                , type_ "button"
-                                                                ]
-                                                                [ text l.name ]
-                                                        )
-                                                        (List.filter (\r -> List.any (\e -> e == r.id) labels) model.labels)
-                                                    )
-                                                ]
-
-                                Nothing ->
-                                    div []
-                                        [ button
-                                            [ -- TODO: style
-                                              css [ padding (px 15) ]
-                                            , onClick BeginAddingNewNoteLabels
-                                            , type_ "button"
-                                            ]
-                                            [ text "Add label" ]
-                                        ]
-                            , button
-                                [ css
-                                    [ padding (px 15)
-                                    , fontSize (px 16)
-                                    ]
-                                , type_ "submit"
-                                , Html.Styled.Attributes.disabled (String.length data.content == 0)
-                                ]
-                                [ text "Create note" ]
-                            ]
-                        ]
-                    ]
-            )
-
-        -- TODO: add no notes empty state design
-        , div
-            [ -- TODO: give the tiled effect of google keep
-              -- using translate and transitions
-              css
-                [ displayFlex
-                , flexDirection row
-                , flexWrap wrap
-                , marginTop (px 30)
+                    (List.map (note model) (model.notes |> prioritizePinned))
                 ]
             ]
-            (List.map (note model) (model.notes |> prioritizePinned))
         ]
 
 
@@ -1764,3 +1797,8 @@ textColor =
 error : Color
 error =
     rgb 255 0 0
+
+
+secondary : Color
+secondary =
+    rgb 255 203 127
