@@ -1239,7 +1239,7 @@ openLabelsMenuBtn labelsCount =
 
 
 labelsMenuColumn : Model -> Html LoggedInMsg
-labelsMenuColumn { labels, filters } =
+labelsMenuColumn { labels, filters, labelsMenu } =
     div
         [ css
             [ maxWidth (px labelsMenuWidth)
@@ -1275,6 +1275,8 @@ labelsMenuColumn { labels, filters } =
                     , fontSize (px 16)
                     , backgroundColor transparent
                     ]
+                , value (Maybe.withDefault "" labelsMenu)
+                , onInput ChangeLabelsSearchQuery
                 , id "search-labels"
                 , placeholder "Search labels..."
                 ]
@@ -1322,7 +1324,17 @@ labelsMenuColumn { labels, filters } =
                         [ text e.name
                         ]
                 )
-                (labels |> List.sortBy (.createdAt >> Time.posixToMillis))
+                (labels
+                    |> List.sortBy (.createdAt >> Time.posixToMillis)
+                    |> (\l ->
+                            case labelsMenu of
+                                Just filterQuery ->
+                                    l |> List.filter (\e -> String.contains (filterQuery |> String.toLower) (e.name |> String.toLower))
+
+                                Nothing ->
+                                    l
+                       )
+                )
             )
         ]
 
