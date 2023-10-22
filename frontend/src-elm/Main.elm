@@ -402,9 +402,23 @@ update msg model =
                                 |> pure
 
                         SelectLabelToFilterBy id ->
+                            let
+                                newFilter : Maybe SyncableID
+                                newFilter =
+                                    case model.filters.label of
+                                        Nothing ->
+                                            Just id
+
+                                        Just oldId ->
+                                            if sameId oldId id then
+                                                Nothing
+
+                                            else
+                                                Just id
+                            in
                             { model
                                 | filters =
-                                    { label = Just id
+                                    { label = newFilter
                                     , content = model.filters.content
                                     }
                             }
@@ -1526,7 +1540,19 @@ mainView model =
                         , marginTop (px 30)
                         ]
                     ]
-                    (List.map (note model) (model.notes |> prioritizePinned))
+                    (List.map (note model)
+                        (model.notes
+                            |> prioritizePinned
+                            |> (\e ->
+                                    case model.filters.label of
+                                        Just label ->
+                                            e |> List.filter (\l -> List.any (\j -> j == label) l.labels)
+
+                                        Nothing ->
+                                            e
+                               )
+                        )
+                    )
                 ]
             ]
         ]
