@@ -175,6 +175,10 @@ type alias OfflineQueueOps =
     }
 
 
+type alias LabelsColumnMenu =
+    Maybe String
+
+
 type alias Model =
     { seeds : List Random.Seed
     , notes : List Note
@@ -182,7 +186,11 @@ type alias Model =
     , isWritingANewNote : Maybe NewNoteData
     , newLabelName : String
     , user : User
-    , labelsMenu : Bool
+    , labelsMenu : LabelsColumnMenu
+    , filters :
+        { label : Maybe SyncableID
+        , content : Maybe String
+        }
 
     -- sync stuff
     , offlineQueue : OfflineQueueOps
@@ -216,8 +224,10 @@ type LoggedOutMsg
 type LoggedInMsg
     = ChangeNotePinned ( SyncableID, Bool )
       -- Labels menu
+    | SelectLabelToFilterBy SyncableID
     | OpenLabelsMenu
     | CloseLabelsMenu
+    | ChangeLabelsSearchQuery String
       --
     | NewTitleChange String
     | NewNoteContentChange String
@@ -280,7 +290,11 @@ init flags =
       , isWritingANewNote = Nothing
       , newLabelName = ""
       , labels = []
-      , labelsMenu = False
+      , labelsMenu = Nothing
+      , filters =
+            { label = Nothing
+            , content = Nothing
+            }
       , user =
             if flags.hasSessionCookie then
                 LoggedIn
@@ -374,14 +388,29 @@ update msg model =
             case msg of
                 LoggedInView loggedInMsg ->
                     case loggedInMsg of
+                        -- Labels column menu
                         OpenLabelsMenu ->
-                            { model | labelsMenu = True }
+                            { model | labelsMenu = Just "" }
                                 |> pure
 
                         CloseLabelsMenu ->
-                            { model | labelsMenu = False }
+                            { model | labelsMenu = Nothing }
                                 |> pure
 
+                        ChangeLabelsSearchQuery s ->
+                            { model | labelsMenu = Maybe.map (\_ -> s) model.labelsMenu }
+                                |> pure
+
+                        SelectLabelToFilterBy id ->
+                            { model
+                                | filters =
+                                    { label = Just id
+                                    , content = model.filters.content
+                                    }
+                            }
+                                |> pure
+
+                        ---------------------
                         ChangeNotePinned ( uid, newPinnedVal ) ->
                             { model
                                 | notes =
@@ -1194,7 +1223,7 @@ openLabelsMenuBtn =
 
 
 labelsMenuColumn : Model -> Html LoggedInMsg
-labelsMenuColumn model =
+labelsMenuColumn { labels, filters } =
     div
         [ css
             [ maxWidth (px labelsMenuWidth)
@@ -1204,23 +1233,49 @@ labelsMenuColumn model =
             , borderRight3 (px 3) solid black
             ]
         ]
-        [ ul [ css [ paddingTop (px 5), fontWeight (int 600) ] ]
-            (List.map
-                (\e ->
-                    li
+        [ ul [ css [ fontWeight (int 600) ] ]
+            (List.indexedMap
+                (\i e ->
+                    div
                         [ css
-                            [ paddingLeft (px 10)
-                            , publicSans
-                            , padY (px 5)
-                            , cursor pointer
-                            , hover [ textColor white, backgroundColor black ]
-                            ]
+                            ([ paddingLeft (px 10)
+                             , padY (px 5)
+                             , cursor pointer
+                             , hover [ textColor white, backgroundColor black ]
+                             , publicSans
+                             , border (px 0)
+                             , fontSize (px 16)
+                             , cursor pointer
+                             , backgroundColor transparent
+                             , fontWeight (int 600)
+                             , textColor inherit
+                             , userSelectNone
+                             ]
+                                ++ (case filters.label of
+                                        Nothing ->
+                                            []
+
+                                        Just v ->
+                                            if sameId v e.id then
+                                                [ textColor white, backgroundColor black ]
+
+                                            else
+                                                []
+                                   )
+                                ++ (if i == 0 then
+                                        [ paddingTop (px 10) ]
+
+                                    else
+                                        []
+                                   )
+                            )
+                        , type_ "button"
+                        , onClick (SelectLabelToFilterBy e.id)
                         ]
-                        [ text e.name ]
+                        [ text e.name
+                        ]
                 )
-                (model.labels
-                    |> List.sortBy (.createdAt >> Time.posixToMillis)
-                )
+                (labels |> List.sortBy (.createdAt >> Time.posixToMillis))
             )
         ]
 
@@ -1241,11 +1296,12 @@ mainView model =
                 , justifyContent spaceBetween
                 ]
             ]
-            [ if model.labelsMenu == True then
-                openLabelsMenuBtn
+            [ case model.labelsMenu of
+                Just _ ->
+                    openLabelsMenuBtn
 
-              else
-                closedLabelsMenuBtn
+                Nothing ->
+                    closedLabelsMenuBtn
             , p
                 [ css
                     [ fontSize (px 25)
@@ -1264,11 +1320,12 @@ mainView model =
                 |> Svg.Styled.fromUnstyled
             ]
         , div [ css [ displayFlex, height (pct 100) ] ]
-            [ if model.labelsMenu == True then
-                labelsMenuColumn model
+            [ case model.labelsMenu of
+                Just _ ->
+                    labelsMenuColumn model
 
-              else
-                text ""
+                Nothing ->
+                    text ""
             , div [ css [ width (pct 100) ] ]
                 [ div [ css [ padding (px 15), color (hex "fff"), publicSans ] ]
                     [ text "Labels (PLACEHOLDER):"
@@ -1813,3 +1870,13 @@ error =
 secondary : Color
 secondary =
     rgb 255 203 127
+
+
+transparent : Color
+transparent =
+    rgba 0 0 0 0
+
+
+userSelectNone : Style
+userSelectNone =
+    property "user-select" "none"
