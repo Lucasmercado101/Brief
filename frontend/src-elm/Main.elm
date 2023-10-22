@@ -1247,6 +1247,8 @@ labelsMenuColumn { labels, filters, labelsMenu } =
             , backgroundColor secondary
             , height (pct 100)
             , borderRight3 (px 3) solid black
+            , displayFlex
+            , flexDirection column
             ]
         ]
         [ div
@@ -1282,10 +1284,18 @@ labelsMenuColumn { labels, filters, labelsMenu } =
                 ]
                 []
             ]
-        , ul [ css [ fontWeight (int 600), height (pct 100), overflowY auto ] ]
+        , ul
+            [ css
+                [ fontWeight (int 600)
+                , height (pct 100)
+                , overflowY auto
+                , displayFlex
+                , flexDirection column
+                ]
+            ]
             (List.indexedMap
                 (\i e ->
-                    div
+                    button
                         [ css
                             ([ paddingLeft (px 10)
                              , padY (px 5)
@@ -1321,7 +1331,15 @@ labelsMenuColumn { labels, filters, labelsMenu } =
                         , type_ "button"
                         , onClick (SelectLabelToFilterBy e.id)
                         ]
-                        [ text e.name
+                        [ p
+                            [ css
+                                [ whiteSpace noWrap
+                                , textOverflow ellipsis
+                                , overflow hidden
+                                , textAlign start
+                                ]
+                            ]
+                            [ text e.name ]
                         ]
                 )
                 (labels
