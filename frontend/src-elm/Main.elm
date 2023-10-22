@@ -1141,8 +1141,8 @@ labelsMenuWidth =
     277
 
 
-closedLabelsMenuBtn : Html LoggedInMsg
-closedLabelsMenuBtn =
+closedLabelsMenuBtn : String -> Html LoggedInMsg
+closedLabelsMenuBtn labelsCount =
     button
         [ css
             [ padY (px 8)
@@ -1174,6 +1174,7 @@ closedLabelsMenuBtn =
                 Inherit
                 |> Svg.Styled.fromUnstyled
             , p [ css [ marginLeft (px 10) ] ] [ text "Labels" ]
+            , p [ css [ marginLeft (px 10) ] ] [ text ("(" ++ labelsCount ++ ")") ]
             ]
         , div [ css [ width (px 50), height (px 32), displayFlex, justifyContent center, alignItems center ] ]
             [ Filled.arrow_drop_down 32
@@ -1183,8 +1184,8 @@ closedLabelsMenuBtn =
         ]
 
 
-openLabelsMenuBtn : Html LoggedInMsg
-openLabelsMenuBtn =
+openLabelsMenuBtn : String -> Html LoggedInMsg
+openLabelsMenuBtn labelsCount =
     div
         [ css
             [ paddingLeft (px 8)
@@ -1213,6 +1214,7 @@ openLabelsMenuBtn =
                 Inherit
                 |> Svg.Styled.fromUnstyled
             , p [ css [ marginLeft (px 10) ] ] [ text "Labels" ]
+            , p [ css [ marginLeft (px 10) ] ] [ text ("(" ++ labelsCount ++ ")") ]
             ]
         , button
             [ css
@@ -1247,7 +1249,7 @@ labelsMenuColumn { labels, filters } =
             , borderRight3 (px 3) solid black
             ]
         ]
-        [ ul [ css [ fontWeight (int 600) ] ]
+        [ ul [ css [ fontWeight (int 600), height (pct 100), overflowY auto ] ]
             (List.indexedMap
                 (\i e ->
                     div
@@ -1310,12 +1312,16 @@ mainView model =
                 , justifyContent spaceBetween
                 ]
             ]
-            [ case model.labelsMenu of
+            [ let
+                labelsCount =
+                    model.labels |> List.length |> String.fromInt
+              in
+              case model.labelsMenu of
                 Just _ ->
-                    openLabelsMenuBtn
+                    openLabelsMenuBtn labelsCount
 
                 Nothing ->
-                    closedLabelsMenuBtn
+                    closedLabelsMenuBtn labelsCount
             , p
                 [ css
                     [ fontSize (px 25)
@@ -1333,35 +1339,16 @@ mainView model =
                 Inherit
                 |> Svg.Styled.fromUnstyled
             ]
-        , div [ css [ displayFlex, height (pct 100) ] ]
+        , div [ css [ displayFlex, height (pct 100), overflow hidden ] ]
             [ case model.labelsMenu of
                 Just _ ->
                     labelsMenuColumn model
 
                 Nothing ->
                     text ""
-            , div [ css [ width (pct 100) ] ]
+            , div [ css [ width (pct 100), overflowY auto ] ]
                 [ div [ css [ padding (px 15), color (hex "fff"), publicSans ] ]
                     [ text "Labels (PLACEHOLDER):"
-                    , div []
-                        (List.map
-                            (\l ->
-                                div []
-                                    [ text l.name
-                                    , button
-                                        [ css
-                                            [ border (px 0)
-                                            , backgroundColor (hex "ff0000")
-                                            , cursor pointer
-                                            , color (hex "fff")
-                                            ]
-                                        , onClick (DeleteLabel l.id)
-                                        ]
-                                        [ Filled.close 24 Inherit |> Svg.Styled.fromUnstyled ]
-                                    ]
-                            )
-                            model.labels
-                        )
                     , form [ onSubmit RequestTimeForNewLabelCreation ]
                         [ input [ placeholder "School", value model.newLabelName, onInput ChangeNewLabelName ] []
                         , button [ type_ "submit" ] [ text "Create label" ]
