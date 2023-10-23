@@ -1716,6 +1716,11 @@ editLabelsView model { selected, searchQuery, confirmLabelDeletion, editingLabel
                     )
                 )
 
+        newLabelBtn =
+            button [ css [ cursor pointer, fontWeight (int 800), publicSans, fontSize (px 16), backgroundColor white, padY (px 12), border (px 0), borderTop3 (px 3) solid black ] ]
+                [ text "ADD NEW LABEL"
+                ]
+
         labelCard { name, id } isFirst =
             div
                 [ css
@@ -1930,6 +1935,7 @@ editLabelsView model { selected, searchQuery, confirmLabelDeletion, editingLabel
                 [ header
                 , searchBar
                 , itemsList
+                , newLabelBtn
                 ]
             ]
         , div [ css [ overflowY auto, height (pct 100), padY (px 45), padX (px 32) ] ]
