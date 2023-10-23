@@ -2496,6 +2496,103 @@ mainViewNotesList model =
 
 note : Model -> Note -> Html LoggedInMsg
 note model data =
+    let
+        noteTitle =
+            case data.title of
+                Nothing ->
+                    text ""
+
+                Just title ->
+                    div
+                        [ css
+                            [ delaGothicOne
+                            , borderBottom3 (px 1) solid (rgb 0 0 0)
+                            , padding (px 10)
+                            ]
+                        ]
+                        [ text title ]
+
+        content =
+            p [ css [ publicSans, padding (px 10) ] ]
+                (let
+                    -- NOTE: \n doesn't break into a newline so I do this
+                    makeParagraph : List (Html msg) -> List String -> List (Html msg)
+                    makeParagraph total next =
+                        case next of
+                            [] ->
+                                total
+
+                            x :: xs ->
+                                makeParagraph (total ++ [ br [] [], text x ]) xs
+                 in
+                 data.content
+                    |> String.split "\n"
+                    |> (\r ->
+                            case r of
+                                [] ->
+                                    [ text data.content ]
+
+                                h :: t ->
+                                    if List.length t > 0 then
+                                        makeParagraph [ text h ] t
+
+                                    else
+                                        [ text h ]
+                       )
+                )
+
+        labelsFooter =
+            case data.labels of
+                [] ->
+                    div [] []
+
+                labels ->
+                    div
+                        [ css
+                            [ borderTop3 (px 1) solid (rgb 0 0 0)
+                            , padding (px 10)
+                            , displayFlex
+                            , flexWrap wrap
+                            , gap 5
+                            ]
+                        ]
+                        (List.map
+                            (\l ->
+                                div
+                                    [ css
+                                        [ backgroundColor (hex "#6ac0ff")
+                                        , padding (px 2)
+                                        , border3 (px 1) solid (rgb 0 0 0)
+                                        , hover [ boxShadow4 (px 3) (px 3) (px 0) (rgb 0 0 0) ]
+                                        , displayFlex
+                                        ]
+                                    , class "note-label"
+                                    ]
+                                    [ text l.name
+                                    , button
+                                        [ class "note-label-remove-button"
+                                        , css
+                                            [ border3 (px 1) solid (rgb 0 0 0)
+                                            , padding2 (px 0) (px 2)
+                                            , marginLeft (px 3)
+                                            , backgroundColor (hex "ff0000")
+                                            , color (hex "fff")
+                                            , cursor pointer
+                                            ]
+                                        , type_ "button"
+                                        , onClick
+                                            (RemoveLabelFromNote
+                                                { noteID = data.id
+                                                , labelID = l.id
+                                                }
+                                            )
+                                        ]
+                                        [ text "X" ]
+                                    ]
+                            )
+                            (model.labels |> List.filter (\e -> List.any (\r -> r == e.id) labels))
+                        )
+    in
     div
         [ css
             [ border3 (px 3) solid (rgb 0 0 0)
@@ -2554,96 +2651,9 @@ note model data =
                 [ Filled.close 32 Inherit |> Svg.Styled.fromUnstyled ]
             ]
         , div []
-            [ case data.title of
-                Nothing ->
-                    text ""
-
-                Just title ->
-                    div
-                        [ css
-                            [ delaGothicOne
-                            , borderBottom3 (px 1) solid (rgb 0 0 0)
-                            , padding (px 10)
-                            ]
-                        ]
-                        [ text title ]
-            , p [ css [ publicSans, padding (px 10) ] ]
-                (let
-                    -- NOTE: \n doesn't break into a newline so I do this
-                    makeParagraph : List (Html msg) -> List String -> List (Html msg)
-                    makeParagraph total next =
-                        case next of
-                            [] ->
-                                total
-
-                            x :: xs ->
-                                makeParagraph (total ++ [ br [] [], text x ]) xs
-                 in
-                 data.content
-                    |> String.split "\n"
-                    |> (\r ->
-                            case r of
-                                [] ->
-                                    [ text data.content ]
-
-                                h :: t ->
-                                    if List.length t > 0 then
-                                        makeParagraph [ text h ] t
-
-                                    else
-                                        [ text h ]
-                       )
-                )
-            , case data.labels of
-                [] ->
-                    div [] []
-
-                labels ->
-                    div
-                        [ css
-                            [ borderTop3 (px 1) solid (rgb 0 0 0)
-                            , padding (px 10)
-                            , displayFlex
-                            , flexWrap wrap
-                            , gap 5
-                            ]
-                        ]
-                        (List.map
-                            (\l ->
-                                div
-                                    [ css
-                                        [ backgroundColor (hex "#6ac0ff")
-                                        , padding (px 2)
-                                        , border3 (px 1) solid (rgb 0 0 0)
-                                        , hover [ boxShadow4 (px 3) (px 3) (px 0) (rgb 0 0 0) ]
-                                        , displayFlex
-                                        ]
-                                    , class "note-label"
-                                    ]
-                                    [ text l.name
-                                    , button
-                                        [ class "note-label-remove-button"
-                                        , css
-                                            [ border3 (px 1) solid (rgb 0 0 0)
-                                            , padding2 (px 0) (px 2)
-                                            , marginLeft (px 3)
-                                            , backgroundColor (hex "ff0000")
-                                            , color (hex "fff")
-                                            , cursor pointer
-                                            ]
-                                        , type_ "button"
-                                        , onClick
-                                            (RemoveLabelFromNote
-                                                { noteID = data.id
-                                                , labelID = l.id
-                                                }
-                                            )
-                                        ]
-                                        [ text "X" ]
-                                    ]
-                            )
-                            (model.labels |> List.filter (\e -> List.any (\r -> r == e.id) labels))
-                        )
+            [ noteTitle
+            , content
+            , labelsFooter
             ]
         ]
 
