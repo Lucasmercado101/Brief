@@ -254,7 +254,6 @@ type LoggedInMsg
     | CreateNewLabel { id : String, name : String } Posix
     | ReceivedRandomValues (List Int)
     | DeleteNote SyncableID
-    | DeleteLabel SyncableID
     | BeginWritingNewNote
     | RequestTimeForCreateNewNote
     | GotCurrentTimeForNewNote
@@ -702,11 +701,6 @@ update msg model =
                         ReceivedRandomValues values ->
                             { model | seeds = List.map Random.initialSeed values }
                                 |> pure
-
-                        DeleteLabel labelId ->
-                            { model | labels = model.labels |> exclude (.id >> sameId labelId) }
-                                |> pure
-                                |> addToQueue (qDeleteLabel labelId)
 
                         BeginWritingNewNote ->
                             { model
@@ -1738,7 +1732,7 @@ editLabelsView model { selected, searchQuery, confirmLabelDeletion, editingLabel
                             ]
                         , onClick (RequestDeleteLabel id)
                         ]
-                        [ Filled.close 42 Inherit |> Svg.Styled.fromUnstyled ]
+                        [ Filled.delete 42 Inherit |> Svg.Styled.fromUnstyled ]
                     ]
                 , div [ css [ padX (px 32), paddingTop (px 16), paddingBottom (px 32) ] ]
                     [ p [ css [ delaGothicOne, fontSize (px 38) ] ] [ text name ]
