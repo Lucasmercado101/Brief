@@ -2556,12 +2556,12 @@ note model data =
         , div []
             [ case data.title of
                 Nothing ->
-                    div [] []
+                    text ""
 
                 Just title ->
                     div
                         [ css
-                            [ publicSans
+                            [ delaGothicOne
                             , borderBottom3 (px 1) solid (rgb 0 0 0)
                             , padding (px 10)
                             ]
