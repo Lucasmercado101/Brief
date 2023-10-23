@@ -4,9 +4,10 @@ import Api exposing (Operation(..), SyncableID(..))
 import Browser
 import Cmd.Extra exposing (pure)
 import Css exposing (..)
+import Dog exposing (dogSvg)
 import Either exposing (Either(..))
-import Html.Styled exposing (Html, br, button, div, form, input, label, li, nav, p, span, strong, text, textarea, ul)
-import Html.Styled.Attributes exposing (class, css, for, id, placeholder, style, title, type_, value)
+import Html.Styled exposing (Html, br, button, div, form, img, input, label, li, nav, p, span, strong, text, textarea, ul)
+import Html.Styled.Attributes exposing (class, css, for, id, placeholder, src, style, title, type_, value)
 import Html.Styled.Events exposing (onClick, onInput, onSubmit)
 import Http
 import Material.Icons as Filled
@@ -2208,7 +2209,14 @@ editLabelsView model { selected, searchQuery, confirmDeleteAllSelectedLabels } =
                 selectedActions (selected |> List.length |> String.fromInt)
 
               else
-                text ""
+                div [ css [ displayFlex, alignItems center, flexDirection column, justifyContent center, height (pct 80) ] ]
+                    [ dogSvg |> Svg.Styled.fromUnstyled
+                    , p [ css [ publicSans, fontSize (px 42), fontWeight (int 300), textAlign center, textColor white ] ]
+                        [ text "Select a label to edit"
+                        , br [] []
+                        , text "and it will appear here"
+                        ]
+                    ]
             , ul []
                 (List.indexedMap
                     (\i ( label, labelKind ) ->
