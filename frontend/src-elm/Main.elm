@@ -195,6 +195,8 @@ type alias Model =
         Maybe
             { selected : List SyncableID
             , searchQuery : String
+            , confirmLabelDeletion : List SyncableID
+            , editingLabels : List ( SyncableID, String )
             }
 
     -- sync stuff
@@ -238,6 +240,13 @@ type LoggedInMsg
     | ExitEditingLabelsView
     | ChangeEditLabelsSearchQuery String
     | SelectLabel SyncableID
+    | RequestDeleteLabel SyncableID
+    | ConfirmDeleteLabel SyncableID
+    | CancelDeleteLabel SyncableID
+    | EditLabel ( SyncableID, String )
+    | ChangeEditingLabelName ( SyncableID, String )
+    | SaveEditingLabelName ( SyncableID, String )
+    | CancelEditingLabelName SyncableID
       --
     | NewTitleChange String
     | NewNoteContentChange String
@@ -441,6 +450,8 @@ update msg model =
                                     Just
                                         { selected = []
                                         , searchQuery = ""
+                                        , confirmLabelDeletion = []
+                                        , editingLabels = []
                                         }
                                 , labelsMenu = Nothing
                             }
@@ -475,6 +486,126 @@ update msg model =
 
                                                         else
                                                             id :: data.selected
+                                                }
+                                            )
+                            }
+                                |> pure
+
+                        RequestDeleteLabel id ->
+                            { model
+                                | editLabelsScreen =
+                                    model.editLabelsScreen
+                                        |> Maybe.map
+                                            (\data ->
+                                                { data
+                                                    | confirmLabelDeletion =
+                                                        id :: data.confirmLabelDeletion
+                                                }
+                                            )
+                            }
+                                |> pure
+
+                        ConfirmDeleteLabel id ->
+                            { model
+                                | labels = model.labels |> exclude (.id >> sameId id)
+                                , editLabelsScreen =
+                                    model.editLabelsScreen
+                                        |> Maybe.map
+                                            (\data ->
+                                                { data
+                                                    | confirmLabelDeletion =
+                                                        data.confirmLabelDeletion |> exclude (sameId id)
+                                                    , selected = data.selected |> exclude (sameId id)
+                                                }
+                                            )
+                            }
+                                |> pure
+                                |> addToQueue (qDeleteLabel id)
+
+                        CancelDeleteLabel id ->
+                            { model
+                                | editLabelsScreen =
+                                    model.editLabelsScreen
+                                        |> Maybe.map
+                                            (\data ->
+                                                { data
+                                                    | confirmLabelDeletion =
+                                                        data.confirmLabelDeletion |> exclude (sameId id)
+                                                }
+                                            )
+                            }
+                                |> pure
+
+                        EditLabel label ->
+                            { model
+                                | editLabelsScreen =
+                                    model.editLabelsScreen
+                                        |> Maybe.map
+                                            (\data ->
+                                                { data
+                                                    | editingLabels =
+                                                        label :: data.editingLabels
+                                                }
+                                            )
+                            }
+                                |> pure
+
+                        ChangeEditingLabelName ( id, newName ) ->
+                            { model
+                                | editLabelsScreen =
+                                    model.editLabelsScreen
+                                        |> Maybe.map
+                                            (\data ->
+                                                { data
+                                                    | editingLabels =
+                                                        data.editingLabels
+                                                            |> List.map
+                                                                (\( lId, lName ) ->
+                                                                    if sameId lId id then
+                                                                        ( id, newName )
+
+                                                                    else
+                                                                        ( lId, lName )
+                                                                )
+                                                }
+                                            )
+                            }
+                                |> pure
+
+                        SaveEditingLabelName ( id, newName ) ->
+                            { model
+                                | labels =
+                                    model.labels
+                                        |> List.map
+                                            (\l ->
+                                                if sameId l.id id then
+                                                    { l | name = newName }
+
+                                                else
+                                                    l
+                                            )
+                                , editLabelsScreen =
+                                    model.editLabelsScreen
+                                        |> Maybe.map
+                                            (\data ->
+                                                { data
+                                                    | editingLabels =
+                                                        data.editingLabels |> exclude (Tuple.first >> sameId id)
+                                                }
+                                            )
+                            }
+                                |> pure
+                                |> addToQueue (qEditLabelName { name = newName, id = id })
+
+                        CancelEditingLabelName id ->
+                            { model
+                                | editLabelsScreen =
+                                    model.editLabelsScreen
+                                        |> Maybe.map
+                                            (\data ->
+                                                { data
+                                                    | editingLabels =
+                                                        data.editingLabels |> exclude (Tuple.first >> sameId id)
                                                 }
                                             )
                             }
@@ -1432,7 +1563,15 @@ labelsMenuColumn { labels, filters, labelsMenu } =
         ]
 
 
-editLabelsView : Model -> { selected : List SyncableID, searchQuery : String } -> Html LoggedInMsg
+editLabelsView :
+    Model
+    ->
+        { selected : List SyncableID
+        , searchQuery : String
+        , confirmLabelDeletion : List SyncableID
+        , editingLabels : List ( SyncableID, String )
+        }
+    -> Html LoggedInMsg
 editLabelsView model { selected, searchQuery } =
     let
         header =
@@ -1623,7 +1762,7 @@ editLabelsView model { selected, searchQuery } =
                 , itemsList
                 ]
             ]
-        , ul [ css [ overflowY auto, height (pct 100), paddingTop (px 45) ] ]
+        , ul [ css [ overflowY auto, height (pct 100), padY (px 45) ] ]
             (List.indexedMap (\i label -> labelCard { name = label.name } (i == 0))
                 (model.labels |> List.filter (\e -> List.any (\r -> sameId e.id r) selected))
             )
