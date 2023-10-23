@@ -1572,7 +1572,7 @@ editLabelsView :
         , editingLabels : List ( SyncableID, String )
         }
     -> Html LoggedInMsg
-editLabelsView model { selected, searchQuery } =
+editLabelsView model { selected, searchQuery, confirmLabelDeletion, editingLabels } =
     let
         header =
             div
@@ -1741,7 +1741,7 @@ editLabelsView model { selected, searchQuery } =
                     ]
                 ]
 
-        confirmDeleteCard isFirst =
+        confirmDeleteCard { name, id } isFirst =
             div
                 [ css
                     [ backgroundColor secondary
@@ -1766,12 +1766,20 @@ editLabelsView model { selected, searchQuery } =
                     [ p [ css [ publicSans, fontSize (px 18), display inline ] ] [ text "Are you sure you want to " ]
                     , p [ css [ publicSans, fontSize (px 18), display inline ] ] [ text "delete" ]
                     , p [ css [ publicSans, fontSize (px 18), display inline ] ] [ text " label \"" ]
-                    , strong [ css [ fontWeight (int 900), publicSans, fontSize (px 18), display inline ] ] [ text "School" ]
+                    , strong [ css [ fontWeight (int 900), publicSans, fontSize (px 18), display inline ] ] [ text name ]
                     , p [ css [ publicSans, fontSize (px 18), display inline ] ] [ text "\"?" ]
                     ]
                 , div [ css [ displayFlex, marginTop (px 16), backgroundColor white ] ]
-                    [ button [ css [ hover [ textColor white, backgroundColor black ], cursor pointer, fontWeight bold, backgroundColor transparent, border (px 0), publicSans, fontSize (px 22), borderTop3 (px 5) solid black, width (pct 100), padY (px 10), textAlign center ] ] [ text "Cancel" ]
-                    , button [ css [ hover [ textColor white, backgroundColor black ], cursor pointer, fontWeight bold, backgroundColor transparent, border (px 0), publicSans, fontSize (px 22), width (pct 100), borderLeft3 (px 5) solid black, borderTop3 (px 5) solid black, padY (px 10), textAlign center ] ] [ text "Confirm" ]
+                    [ button
+                        [ css [ hover [ textColor white, backgroundColor black ], cursor pointer, fontWeight bold, backgroundColor transparent, border (px 0), publicSans, fontSize (px 22), borderTop3 (px 5) solid black, width (pct 100), padY (px 10), textAlign center ]
+                        , onClick (CancelDeleteLabel id)
+                        ]
+                        [ text "Cancel" ]
+                    , button
+                        [ css [ hover [ textColor white, backgroundColor black ], cursor pointer, fontWeight bold, backgroundColor transparent, border (px 0), publicSans, fontSize (px 22), width (pct 100), borderLeft3 (px 5) solid black, borderTop3 (px 5) solid black, padY (px 10), textAlign center ]
+                        , onClick (ConfirmDeleteLabel id)
+                        ]
+                        [ text "Confirm" ]
                     ]
                 ]
     in
@@ -1801,8 +1809,15 @@ editLabelsView model { selected, searchQuery } =
         , ul [ css [ overflowY auto, height (pct 100), padY (px 45) ] ]
             (List.indexedMap
                 (\i label ->
-                    confirmDeleteCard (i == 0)
-                 -- labelCard { name = label.name, id = label.id } (i == 0)
+                    let
+                        isContemplatingDeletion =
+                            List.any (\e -> sameId e label.id) confirmLabelDeletion
+                    in
+                    if isContemplatingDeletion then
+                        confirmDeleteCard { name = label.name, id = label.id } (i == 0)
+
+                    else
+                        labelCard { name = label.name, id = label.id } (i == 0)
                 )
                 (model.labels |> List.filter (\e -> List.any (\r -> sameId e.id r) selected))
             )
