@@ -573,29 +573,38 @@ update msg model =
                                 |> pure
 
                         ConfirmEditingLabelName ( id, newName ) ->
-                            { model
-                                | labels =
-                                    model.labels
-                                        |> List.map
-                                            (\l ->
-                                                if sameId l.id id then
-                                                    { l | name = newName }
+                            if newName == "" then
+                                model |> pure
 
-                                                else
-                                                    l
-                                            )
-                                , editLabelsScreen =
-                                    model.editLabelsScreen
-                                        |> Maybe.map
-                                            (\data ->
-                                                { data
-                                                    | editingLabels =
-                                                        data.editingLabels |> exclude (Tuple.first >> sameId id)
-                                                }
-                                            )
-                            }
-                                |> pure
-                                |> addToQueue (qEditLabelName { name = newName, id = id })
+                            else if List.any (\l -> (l.name |> String.toLower) == (newName |> String.toLower)) model.labels then
+                                -- TODO: show message to the user "This label already exists"
+                                -- and disable create button
+                                model |> pure
+
+                            else
+                                { model
+                                    | labels =
+                                        model.labels
+                                            |> List.map
+                                                (\l ->
+                                                    if sameId l.id id then
+                                                        { l | name = newName }
+
+                                                    else
+                                                        l
+                                                )
+                                    , editLabelsScreen =
+                                        model.editLabelsScreen
+                                            |> Maybe.map
+                                                (\data ->
+                                                    { data
+                                                        | editingLabels =
+                                                            data.editingLabels |> exclude (Tuple.first >> sameId id)
+                                                    }
+                                                )
+                                }
+                                    |> pure
+                                    |> addToQueue (qEditLabelName { name = newName, id = id })
 
                         CancelEditingLabelName id ->
                             { model
