@@ -1537,10 +1537,69 @@ editLabelsView model { selected, searchQuery } =
                                 ]
                             ]
                     )
-                    model.labels
+                    (model.labels
+                        |> List.filter (.name >> String.toLower >> String.contains searchQuery)
+                    )
                 )
+
+        labelCard { name } isFirst =
+            div
+                [ css
+                    [ backgroundColor secondary
+                    , border3 (px 5) solid black
+                    , displayFlex
+                    , flexDirection column
+                    , maxWidth (px 480)
+                    , marginTop
+                        (px
+                            (if isFirst then
+                                0
+
+                             else
+                                32
+                            )
+                        )
+                    ]
+                ]
+                [ div [ css [ backgroundColor white, displayFlex, justifyContent spaceBetween, borderBottom3 (px 5) solid black ] ]
+                    [ button
+                        [ css
+                            [ displayFlex
+                            , justifyContent center
+                            , alignItems center
+                            , textColor black
+                            , border (px 0)
+                            , backgroundColor transparent
+                            , borderRight3 (px 5) solid black
+                            , cursor pointer
+                            ]
+                        ]
+                        [ Filled.edit 42 Inherit |> Svg.Styled.fromUnstyled ]
+                    , button
+                        [ css
+                            [ displayFlex
+                            , justifyContent center
+                            , alignItems center
+                            , backgroundColor error
+                            , textColor white
+                            , border (px 0)
+                            , borderLeft3 (px 5) solid black
+                            ]
+                        ]
+                        [ Filled.close 42 Inherit |> Svg.Styled.fromUnstyled ]
+                    ]
+                , div [ css [ padX (px 32), paddingTop (px 16), paddingBottom (px 32) ] ]
+                    [ p [ css [ delaGothicOne, fontSize (px 38) ] ] [ text name ]
+                    , p [ css [ publicSans, fontSize (px 18), marginBottom (px 26) ] ] [ text "Created on: July 30th at 12:05 PM" ]
+                    , p [ css [ publicSans, fontSize (px 22) ] ] [ text "Last Updated on: July 30th at 12:05 PM" ]
+                    , div [ css [ marginTop (px 12) ] ]
+                        [ p [ css [ publicSans, textDecoration underline, fontSize (px 22), display inline ] ] [ text "50 Notes" ]
+                        , p [ css [ publicSans, fontSize (px 22), display inline ] ] [ text " using this label" ]
+                        ]
+                    ]
+                ]
     in
-    div [ css [ displayFlex, flexDirection column, height (pct 100), padY (px 45) ] ]
+    div [ css [ displayFlex, flexDirection row, height (pct 100), padY (px 45) ] ]
         [ div
             [ css
                 [ backgroundColor secondary
@@ -1551,12 +1610,20 @@ editLabelsView model { selected, searchQuery } =
                 , minWidth (px 345)
                 , width (px 345)
                 , overflow hidden
+
+                -- TODO: more consistent spacing between them
+                , marginRight (px 200)
+                , marginLeft (px 200)
                 ]
             ]
             [ header
             , searchBar
             , itemsList
             ]
+        , ul []
+            (List.indexedMap (\i label -> labelCard { name = label.name } (i == 0))
+                (model.labels |> List.filter (\e -> List.any (\r -> sameId e.id r) selected))
+            )
         ]
 
 
