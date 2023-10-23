@@ -1740,6 +1740,34 @@ editLabelsView model { selected, searchQuery } =
                         ]
                     ]
                 ]
+
+        confirmDeleteCard isFirst =
+            div
+                [ css
+                    [ backgroundColor secondary
+                    , border3 (px 5) solid black
+                    , displayFlex
+                    , flexDirection column
+                    , maxWidth (px 480)
+                    , minWidth (px 480)
+                    , marginTop
+                        (px
+                            (if isFirst then
+                                0
+
+                             else
+                                32
+                            )
+                        )
+                    ]
+                ]
+                [ p [ css [ delaGothicOne, fontSize (px 38), marginTop (px 12), marginBottom (px 16), textAlign center ] ] [ text "Really?" ]
+                , p [ css [ publicSans, fontSize (px 18), textAlign center ] ] [ text "Are you sure you want to delete label School?" ]
+                , div [ css [ displayFlex, marginTop (px 16), backgroundColor white ] ]
+                    [ button [ css [ hover [ textColor white, backgroundColor black ], cursor pointer, fontWeight bold, backgroundColor transparent, border (px 0), publicSans, fontSize (px 22), borderTop3 (px 5) solid black, width (pct 100), padY (px 10), textAlign center ] ] [ text "Cancel" ]
+                    , button [ css [ hover [ textColor white, backgroundColor black ], cursor pointer, fontWeight bold, backgroundColor transparent, border (px 0), publicSans, fontSize (px 22), width (pct 100), borderLeft3 (px 5) solid black, borderTop3 (px 5) solid black, padY (px 10), textAlign center ] ] [ text "Confirm" ]
+                    ]
+                ]
     in
     div [ css [ displayFlex, flexDirection row, height (pct 100) ] ]
         [ div [ css [ displayFlex, padY (px 45), height (pct 100) ] ]
@@ -1767,7 +1795,8 @@ editLabelsView model { selected, searchQuery } =
         , ul [ css [ overflowY auto, height (pct 100), padY (px 45) ] ]
             (List.indexedMap
                 (\i label ->
-                    labelCard { name = label.name, id = label.id } (i == 0)
+                    confirmDeleteCard (i == 0)
+                 -- labelCard { name = label.name, id = label.id } (i == 0)
                 )
                 (model.labels |> List.filter (\e -> List.any (\r -> sameId e.id r) selected))
             )
