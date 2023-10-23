@@ -242,15 +242,16 @@ type Msg
 type LoggedInMsg
     = ChangeNotePinned ( SyncableID, Bool )
     | EditLabelsView EditLabelsViewMsg
+    | RequestTimeForNewLabelCreation
       -- Labels menu
     | SelectLabelToFilterBy SyncableID
     | OpenLabelsMenu
     | CloseLabelsMenu
     | ChangeLabelsSearchQuery String
     | GoToEditLabelsScreen
+      --
     | NewTitleChange String
     | NewNoteContentChange String
-    | RequestTimeForNewLabelCreation
     | CreateNewLabel { id : String, name : String } Posix
     | ReceivedRandomValues (List Int)
     | DeleteNote SyncableID
@@ -276,6 +277,7 @@ type LoggedInMsg
 type EditLabelsViewMsg
     = ExitEditingLabelsView
     | ChangeEditLabelsSearchQuery String
+    | CreateNewLabelEditLabelsView
     | SelectLabel SyncableID
     | ClearEditLabelsSelections
     | RequestDeleteLabel SyncableID
@@ -433,6 +435,27 @@ update msg model =
                                         ChangeEditLabelsSearchQuery newQuery ->
                                             { model | editLabelsScreen = Just { editLabelsScreenData | searchQuery = newQuery } }
                                                 |> pure
+
+                                        CreateNewLabelEditLabelsView ->
+                                            if String.length editLabelsScreenData.searchQuery == 0 then
+                                                model |> pure
+
+                                            else if List.any (\l -> l.name == editLabelsScreenData.searchQuery) model.labels then
+                                                -- TODO: make this visual to the user in the form of an error
+                                                model |> pure
+
+                                            else
+                                                let
+                                                    newLabelOfflineId : String
+                                                    newLabelOfflineId =
+                                                        generateUID model.seeds |> Tuple.first
+
+                                                    newLabel =
+                                                        { id = newLabelOfflineId
+                                                        , name = editLabelsScreenData.searchQuery
+                                                        }
+                                                in
+                                                ( { model | editLabelsScreen = Just { editLabelsScreenData | searchQuery = "" } }, Cmd.batch [ requestRandomValues (), getNewTimeAndCreateLabel newLabel ] )
 
                                         SelectLabel id ->
                                             { model
@@ -1880,14 +1903,16 @@ editLabelsView model { selected, searchQuery, confirmDeleteAllSelectedLabels } =
                             ]
                     )
                     (model.labels
-                        |> List.filter (.name >> String.toLower >> String.contains searchQuery)
+                        |> List.filter (.name >> String.toLower >> String.contains (String.toLower searchQuery))
                     )
                 )
 
         newLabelBtn =
-            button [ css [ cursor pointer, fontWeight (int 800), publicSans, fontSize (px 16), backgroundColor white, padY (px 12), border (px 0), borderTop3 (px 3) solid black ] ]
-                [ text "ADD NEW LABEL"
+            button
+                [ css [ cursor pointer, fontWeight (int 800), publicSans, fontSize (px 16), backgroundColor white, padY (px 12), border (px 0), borderTop3 (px 3) solid black ]
+                , onClick CreateNewLabelEditLabelsView
                 ]
+                [ text "CREATE NEW LABEL" ]
 
         labelCard { name, id } isFirst =
             div
@@ -2171,7 +2196,11 @@ editLabelsView model { selected, searchQuery, confirmDeleteAllSelectedLabels } =
                 [ header
                 , searchBar
                 , itemsList
-                , newLabelBtn
+                , if (searchQuery /= "") && (List.filter (.name >> String.toLower >> (==) (String.toLower searchQuery)) model.labels |> List.isEmpty) then
+                    newLabelBtn
+
+                  else
+                    text ""
                 ]
             ]
         , div [ css [ overflowY auto, height (pct 100), padY (px 45), padX (px 32) ] ]
