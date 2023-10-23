@@ -1689,6 +1689,7 @@ editLabelsView model { selected, searchQuery, confirmLabelDeletion, editingLabel
                                      , border (px 0)
                                      , cursor pointer
                                      , fontSize (px 16)
+                                     , fontWeight (int 600)
                                      ]
                                         ++ (if List.any (\e -> sameId e label.id) selected then
                                                 [ textColor white, backgroundColor black ]
