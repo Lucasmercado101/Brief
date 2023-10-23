@@ -1599,28 +1599,30 @@ editLabelsView model { selected, searchQuery } =
                     ]
                 ]
     in
-    div [ css [ displayFlex, flexDirection row, height (pct 100), padY (px 45) ] ]
-        [ div
-            [ css
-                [ backgroundColor secondary
-                , border3 (px 3) solid black
-                , displayFlex
-                , flexDirection column
-                , maxWidth (px 345)
-                , minWidth (px 345)
-                , width (px 345)
-                , overflow hidden
+    div [ css [ displayFlex, flexDirection row, height (pct 100) ] ]
+        [ div [ css [ displayFlex, padY (px 45), height (pct 100) ] ]
+            [ div
+                [ css
+                    [ backgroundColor secondary
+                    , border3 (px 3) solid black
+                    , displayFlex
+                    , flexDirection column
+                    , maxWidth (px 345)
+                    , minWidth (px 345)
+                    , width (px 345)
+                    , overflow hidden
 
-                -- TODO: more consistent spacing between them
-                , marginRight (px 200)
-                , marginLeft (px 200)
+                    -- TODO: more consistent spacing between them
+                    , marginRight (px 200)
+                    , marginLeft (px 200)
+                    ]
+                ]
+                [ header
+                , searchBar
+                , itemsList
                 ]
             ]
-            [ header
-            , searchBar
-            , itemsList
-            ]
-        , ul []
+        , ul [ css [ overflowY auto, height (pct 100), paddingTop (px 45) ] ]
             (List.indexedMap (\i label -> labelCard { name = label.name } (i == 0))
                 (model.labels |> List.filter (\e -> List.any (\r -> sameId e.id r) selected))
             )
