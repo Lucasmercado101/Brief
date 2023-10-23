@@ -1604,7 +1604,7 @@ editLabelsView model { selected, searchQuery } =
             [ div
                 [ css
                     [ backgroundColor secondary
-                    , border3 (px 3) solid black
+                    , border3 (px 5) solid black
                     , displayFlex
                     , flexDirection column
                     , maxWidth (px 345)
