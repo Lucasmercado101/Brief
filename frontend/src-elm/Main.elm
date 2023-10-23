@@ -746,7 +746,7 @@ update msg model =
                                                     model.labels
                                                         |> exclude (\l -> List.any (sameId l.id) deletedIds)
                                                 , editLabelsScreen =
-                                                    Just { editLabelsScreenData | selected = [] }
+                                                    Just { editLabelsScreenData | selected = [], confirmDeleteAllSelectedLabels = False }
                                             }
                                                 |> pure
                                                 |> addToQueue (qDeleteLabels deletedIds)
