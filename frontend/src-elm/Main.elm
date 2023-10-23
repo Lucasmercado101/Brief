@@ -2327,14 +2327,7 @@ mainView model =
 mainViewNotesList : Model -> Html LoggedInMsg
 mainViewNotesList model =
     div [ css [ width (pct 100), overflowY auto ] ]
-        [ div [ css [ padding (px 15), color (hex "fff"), publicSans ] ]
-            [ text "Labels (PLACEHOLDER):"
-            , form [ onSubmit RequestTimeForNewLabelCreation ]
-                [ input [ placeholder "School", value model.newLabelName, onInput ChangeNewLabelName ] []
-                , button [ type_ "submit" ] [ text "Create label" ]
-                ]
-            ]
-        , div []
+        [ div []
             (case model.isWritingANewNote of
                 Nothing ->
                     [ div [ css [ fullWidth, displayFlex, marginTop (px 30) ] ]
