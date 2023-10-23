@@ -245,7 +245,7 @@ type LoggedInMsg
     | CancelDeleteLabel SyncableID
     | EditLabel ( SyncableID, String )
     | ChangeEditingLabelName ( SyncableID, String )
-    | SaveEditingLabelName ( SyncableID, String )
+    | ConfirmEditingLabelName ( SyncableID, String )
     | CancelEditingLabelName SyncableID
       --
     | NewTitleChange String
@@ -572,7 +572,7 @@ update msg model =
                             }
                                 |> pure
 
-                        SaveEditingLabelName ( id, newName ) ->
+                        ConfirmEditingLabelName ( id, newName ) ->
                             { model
                                 | labels =
                                     model.labels
@@ -1783,6 +1783,52 @@ editLabelsView model { selected, searchQuery, confirmLabelDeletion, editingLabel
                         [ text "Confirm" ]
                     ]
                 ]
+
+        editLabelCard { name, id } isFirst newName =
+            div
+                [ css
+                    [ backgroundColor secondary
+                    , border3 (px 5) solid black
+                    , displayFlex
+                    , flexDirection column
+                    , maxWidth (px 480)
+                    , minWidth (px 480)
+                    , marginTop
+                        (px
+                            (if isFirst then
+                                0
+
+                             else
+                                32
+                            )
+                        )
+                    ]
+                ]
+                [ p [ css [ delaGothicOne, fontSize (px 38), marginTop (px 12), marginBottom (px 16), textAlign center ] ] [ text name ]
+                , label [ css [ publicSans, fontSize (px 18), padX (px 16) ] ]
+                    [ text "New Name:"
+                    , input
+                        [ css [ padY (px 12), marginLeft (px 12), border3 (px 3) solid black, publicSans, fontSize (px 18) ]
+                        , class "label-edit-input"
+                        , placeholder name
+                        , value newName
+                        , onInput (\e -> ChangeEditingLabelName ( id, e ))
+                        ]
+                        []
+                    ]
+                , div [ css [ displayFlex, marginTop (px 16), backgroundColor white ] ]
+                    [ button
+                        [ css [ hover [ textColor white, backgroundColor black ], cursor pointer, fontWeight bold, backgroundColor transparent, border (px 0), publicSans, fontSize (px 22), borderTop3 (px 5) solid black, width (pct 100), padY (px 10), textAlign center ]
+                        , onClick (CancelEditingLabelName id)
+                        ]
+                        [ text "Cancel" ]
+                    , button
+                        [ css [ hover [ textColor white, backgroundColor black ], cursor pointer, fontWeight bold, backgroundColor transparent, border (px 0), publicSans, fontSize (px 22), width (pct 100), borderLeft3 (px 5) solid black, borderTop3 (px 5) solid black, padY (px 10), textAlign center ]
+                        , onClick (ConfirmEditingLabelName ( id, newName ))
+                        ]
+                        [ text "Confirm" ]
+                    ]
+                ]
     in
     div [ css [ displayFlex, flexDirection row, height (pct 100) ] ]
         [ div [ css [ displayFlex, padY (px 45), height (pct 100) ] ]
@@ -1813,12 +1859,20 @@ editLabelsView model { selected, searchQuery, confirmLabelDeletion, editingLabel
                     let
                         isContemplatingDeletion =
                             List.any (\e -> sameId e label.id) confirmLabelDeletion
+
+                        isBeingEdited =
+                            editingLabels |> listFirst (\e -> sameId (Tuple.first e) label.id)
                     in
                     if isContemplatingDeletion then
                         confirmDeleteCard { name = label.name, id = label.id } (i == 0)
 
                     else
-                        labelCard { name = label.name, id = label.id } (i == 0)
+                        case isBeingEdited of
+                            Just ( _, newName ) ->
+                                editLabelCard { name = label.name, id = label.id } (i == 0) newName
+
+                            Nothing ->
+                                labelCard { name = label.name, id = label.id } (i == 0)
                 )
                 (model.labels |> List.filter (\e -> List.any (\r -> sameId e.id r) selected))
             )

@@ -22,3 +22,8 @@
   /* TODO: a better color? */
   color: #414141;
 }
+
+.label-edit-input::placeholder {
+  /* TODO: a better color? */
+  color: #414141;
+}
