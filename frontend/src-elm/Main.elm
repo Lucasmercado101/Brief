@@ -1681,7 +1681,7 @@ editLabelsView model { selected, searchQuery } =
                     )
                 )
 
-        labelCard { name } isFirst =
+        labelCard { name, id } isFirst =
             div
                 [ css
                     [ backgroundColor secondary
@@ -1712,6 +1712,7 @@ editLabelsView model { selected, searchQuery } =
                             , borderRight3 (px 5) solid black
                             , cursor pointer
                             ]
+                        , onClick (EditLabel ( id, name ))
                         ]
                         [ Filled.edit 42 Inherit |> Svg.Styled.fromUnstyled ]
                     , button
@@ -1725,6 +1726,7 @@ editLabelsView model { selected, searchQuery } =
                             , borderLeft3 (px 5) solid black
                             , cursor pointer
                             ]
+                        , onClick (RequestDeleteLabel id)
                         ]
                         [ Filled.close 42 Inherit |> Svg.Styled.fromUnstyled ]
                     ]
@@ -1763,7 +1765,10 @@ editLabelsView model { selected, searchQuery } =
                 ]
             ]
         , ul [ css [ overflowY auto, height (pct 100), padY (px 45) ] ]
-            (List.indexedMap (\i label -> labelCard { name = label.name } (i == 0))
+            (List.indexedMap
+                (\i label ->
+                    labelCard { name = label.name, id = label.id } (i == 0)
+                )
                 (model.labels |> List.filter (\e -> List.any (\r -> sameId e.id r) selected))
             )
         ]
