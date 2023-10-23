@@ -1584,6 +1584,7 @@ editLabelsView model { selected, searchQuery } =
                             , textColor white
                             , border (px 0)
                             , borderLeft3 (px 5) solid black
+                            , cursor pointer
                             ]
                         ]
                         [ Filled.close 42 Inherit |> Svg.Styled.fromUnstyled ]
