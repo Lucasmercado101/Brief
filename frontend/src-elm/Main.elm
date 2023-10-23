@@ -248,6 +248,7 @@ type LoggedInMsg
     | ChangeEditingLabelName ( SyncableID, String )
     | ConfirmEditingLabelName ( SyncableID, String )
     | CancelEditingLabelName SyncableID
+    | RemoveLabelFromSelected SyncableID
       --
     | NewTitleChange String
     | NewNoteContentChange String
@@ -635,7 +636,21 @@ update msg model =
                             }
                                 |> pure
 
-                        --
+                        RemoveLabelFromSelected id ->
+                            { model
+                                | editLabelsScreen =
+                                    model.editLabelsScreen
+                                        |> Maybe.map
+                                            (\data ->
+                                                { data
+                                                    | selected =
+                                                        data.selected |> exclude (sameId id)
+                                                }
+                                            )
+                            }
+                                |> pure
+
+                        --------------------------------
                         ChangeNotePinned ( uid, newPinnedVal ) ->
                             { model
                                 | notes =
@@ -1725,30 +1740,48 @@ editLabelsView model { selected, searchQuery, confirmLabelDeletion, editingLabel
                             [ displayFlex
                             , justifyContent center
                             , alignItems center
-                            , textColor black
-                            , border (px 0)
-                            , backgroundColor transparent
-                            , borderRight3 (px 5) solid black
-                            , cursor pointer
-                            , hover [ backgroundColor black, textColor white ]
-                            ]
-                        , onClick (EditLabel ( id, name ))
-                        ]
-                        [ Filled.edit 42 Inherit |> Svg.Styled.fromUnstyled ]
-                    , button
-                        [ css
-                            [ displayFlex
-                            , justifyContent center
-                            , alignItems center
                             , backgroundColor error
                             , textColor white
                             , border (px 0)
-                            , borderLeft3 (px 5) solid black
+                            , borderRight3 (px 5) solid black
                             , cursor pointer
+                            , width (px 42)
                             ]
                         , onClick (RequestDeleteLabel id)
                         ]
-                        [ Filled.delete 42 Inherit |> Svg.Styled.fromUnstyled ]
+                        [ Filled.delete 36 Inherit |> Svg.Styled.fromUnstyled ]
+                    , div [ css [ displayFlex ] ]
+                        [ button
+                            [ css
+                                [ displayFlex
+                                , justifyContent center
+                                , alignItems center
+                                , textColor black
+                                , border (px 0)
+                                , backgroundColor transparent
+                                , borderLeft3 (px 5) solid black
+                                , cursor pointer
+                                , hover [ backgroundColor black, textColor white ]
+                                ]
+                            , onClick (EditLabel ( id, name ))
+                            ]
+                            [ Filled.edit 42 Inherit |> Svg.Styled.fromUnstyled ]
+                        , button
+                            [ css
+                                [ displayFlex
+                                , justifyContent center
+                                , alignItems center
+                                , textColor black
+                                , border (px 0)
+                                , backgroundColor transparent
+                                , borderLeft3 (px 5) solid black
+                                , cursor pointer
+                                , hover [ backgroundColor black, textColor white ]
+                                ]
+                            , onClick (RemoveLabelFromSelected id)
+                            ]
+                            [ Filled.close 42 Inherit |> Svg.Styled.fromUnstyled ]
+                        ]
                     ]
                 , div [ css [ padX (px 32), paddingTop (px 16), paddingBottom (px 32) ] ]
                     [ p [ css [ delaGothicOne, fontSize (px 38) ] ] [ text name ]
