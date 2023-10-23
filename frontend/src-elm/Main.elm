@@ -5,7 +5,7 @@ import Browser
 import Cmd.Extra exposing (pure)
 import Css exposing (..)
 import Either exposing (Either(..))
-import Html.Styled exposing (Html, br, button, div, form, input, label, li, nav, p, text, textarea, ul)
+import Html.Styled exposing (Html, br, button, div, form, input, label, li, nav, p, span, strong, text, textarea, ul)
 import Html.Styled.Attributes exposing (class, css, for, id, placeholder, style, type_, value)
 import Html.Styled.Events exposing (onClick, onInput, onSubmit)
 import Http
@@ -1762,7 +1762,13 @@ editLabelsView model { selected, searchQuery } =
                     ]
                 ]
                 [ p [ css [ delaGothicOne, fontSize (px 38), marginTop (px 12), marginBottom (px 16), textAlign center ] ] [ text "Really?" ]
-                , p [ css [ publicSans, fontSize (px 18), textAlign center ] ] [ text "Are you sure you want to delete label School?" ]
+                , div [ css [ display inlineBlock, textAlign center ] ]
+                    [ p [ css [ publicSans, fontSize (px 18), display inline ] ] [ text "Are you sure you want to " ]
+                    , p [ css [ publicSans, fontSize (px 18), display inline ] ] [ text "delete" ]
+                    , p [ css [ publicSans, fontSize (px 18), display inline ] ] [ text " label \"" ]
+                    , strong [ css [ fontWeight (int 900), publicSans, fontSize (px 18), display inline ] ] [ text "School" ]
+                    , p [ css [ publicSans, fontSize (px 18), display inline ] ] [ text "\"?" ]
+                    ]
                 , div [ css [ displayFlex, marginTop (px 16), backgroundColor white ] ]
                     [ button [ css [ hover [ textColor white, backgroundColor black ], cursor pointer, fontWeight bold, backgroundColor transparent, border (px 0), publicSans, fontSize (px 22), borderTop3 (px 5) solid black, width (pct 100), padY (px 10), textAlign center ] ] [ text "Cancel" ]
                     , button [ css [ hover [ textColor white, backgroundColor black ], cursor pointer, fontWeight bold, backgroundColor transparent, border (px 0), publicSans, fontSize (px 22), width (pct 100), borderLeft3 (px 5) solid black, borderTop3 (px 5) solid black, padY (px 10), textAlign center ] ] [ text "Confirm" ]
