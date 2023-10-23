@@ -1711,6 +1711,7 @@ editLabelsView model { selected, searchQuery, confirmLabelDeletion, editingLabel
                             , backgroundColor transparent
                             , borderRight3 (px 5) solid black
                             , cursor pointer
+                            , hover [ backgroundColor black, textColor white ]
                             ]
                         , onClick (EditLabel ( id, name ))
                         ]
