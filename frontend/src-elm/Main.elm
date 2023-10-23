@@ -193,7 +193,7 @@ type alias Model =
         }
     , editLabelsScreen :
         Maybe
-            { selected : List Label
+            { selected : List SyncableID
             , searchQuery : String
             }
 
@@ -236,6 +236,8 @@ type LoggedInMsg
     | GoToEditLabelsScreen
       -- Edit Labels view
     | ExitEditingLabelsView
+    | ChangeEditLabelsSearchQuery String
+    | SelectLabel SyncableID
       --
     | NewTitleChange String
     | NewNoteContentChange String
@@ -449,6 +451,33 @@ update msg model =
                         ---------------------
                         ExitEditingLabelsView ->
                             { model | editLabelsScreen = Nothing }
+                                |> pure
+
+                        ChangeEditLabelsSearchQuery newQuery ->
+                            { model
+                                | editLabelsScreen =
+                                    model.editLabelsScreen
+                                        |> Maybe.map
+                                            (\data -> { data | searchQuery = newQuery })
+                            }
+                                |> pure
+
+                        SelectLabel id ->
+                            { model
+                                | editLabelsScreen =
+                                    model.editLabelsScreen
+                                        |> Maybe.map
+                                            (\data ->
+                                                { data
+                                                    | selected =
+                                                        if List.any (sameId id) data.selected then
+                                                            data.selected |> exclude (sameId id)
+
+                                                        else
+                                                            id :: data.selected
+                                                }
+                                            )
+                            }
                                 |> pure
 
                         --
@@ -1403,7 +1432,7 @@ labelsMenuColumn { labels, filters, labelsMenu } =
         ]
 
 
-editLabelsView : Model -> { selected : List Label, searchQuery : String } -> Html LoggedInMsg
+editLabelsView : Model -> { selected : List SyncableID, searchQuery : String } -> Html LoggedInMsg
 editLabelsView model { selected, searchQuery } =
     let
         header =
@@ -1464,12 +1493,52 @@ editLabelsView model { selected, searchQuery } =
                         , fontSize (px 16)
                         ]
                     , placeholder "Search labels..."
+                    , value searchQuery
+                    , onInput ChangeEditLabelsSearchQuery
                     ]
                     []
                 ]
 
         itemsList =
-            ul [ css [ overflow auto, height (pct 100) ] ] (List.map (\e -> li [] [ text e.name ]) model.labels)
+            ul [ css [ overflow auto, height (pct 100) ] ]
+                (List.map
+                    (\label ->
+                        li
+                            []
+                            [ button
+                                [ css
+                                    ([ paddingLeft (px 12)
+                                     , publicSans
+                                     , padY (px 5)
+                                     , width (pct 100)
+                                     , textAlign start
+                                     , backgroundColor transparent
+                                     , border (px 0)
+                                     , cursor pointer
+                                     , fontSize (px 16)
+                                     ]
+                                        ++ (if List.any (\e -> sameId e label.id) selected then
+                                                [ textColor white, backgroundColor black ]
+
+                                            else
+                                                [ hover [ textColor white, backgroundColor black ] ]
+                                           )
+                                    )
+                                , onClick (SelectLabel label.id)
+                                ]
+                                [ p
+                                    [ css
+                                        [ whiteSpace noWrap
+                                        , textOverflow ellipsis
+                                        , overflow hidden
+                                        ]
+                                    ]
+                                    [ text label.name ]
+                                ]
+                            ]
+                    )
+                    model.labels
+                )
     in
     div [ css [ displayFlex, flexDirection column, height (pct 100), padY (px 45) ] ]
         [ div
