@@ -179,6 +179,12 @@ type alias LabelsColumnMenu =
     Maybe String
 
 
+type EditLabelKind
+    = Selected SyncableID
+    | ConfirmDelete SyncableID
+    | Editing SyncableID String
+
+
 type alias Model =
     { seeds : List Random.Seed
     , notes : List Note
@@ -193,10 +199,8 @@ type alias Model =
         }
     , editLabelsScreen :
         Maybe
-            { selected : List SyncableID
+            { selected : List EditLabelKind
             , searchQuery : String
-            , confirmLabelDeletion : List SyncableID
-            , editingLabels : List ( SyncableID, String )
             , confirmDeleteAllSelectedLabels : Bool
             }
 
@@ -433,58 +437,35 @@ update msg model =
                                         SelectLabel id ->
                                             { model
                                                 | editLabelsScreen =
-                                                    model.editLabelsScreen
-                                                        |> Maybe.map
-                                                            (\data ->
-                                                                let
-                                                                    noSelected =
-                                                                        (if List.any (sameId id) data.selected then
-                                                                            data.selected |> exclude (sameId id)
+                                                    let
+                                                        sameIdOnSelected =
+                                                            \e ->
+                                                                case e of
+                                                                    Selected i ->
+                                                                        sameId id i
 
-                                                                         else
-                                                                            id :: data.selected
-                                                                        )
-                                                                            |> List.isEmpty
-                                                                in
-                                                                { data
-                                                                    | selected =
-                                                                        if List.any (sameId id) data.selected then
-                                                                            data.selected |> exclude (sameId id)
+                                                                    ConfirmDelete i ->
+                                                                        sameId id i
 
-                                                                        else
-                                                                            id :: data.selected
-                                                                    , confirmDeleteAllSelectedLabels =
-                                                                        if noSelected then
-                                                                            False
+                                                                    Editing i _ ->
+                                                                        sameId id i
+                                                    in
+                                                    Just
+                                                        { editLabelsScreenData
+                                                            | selected =
+                                                                if List.any sameIdOnSelected editLabelsScreenData.selected then
+                                                                    editLabelsScreenData.selected |> exclude sameIdOnSelected
 
-                                                                        else
-                                                                            data.confirmDeleteAllSelectedLabels
-                                                                    , confirmLabelDeletion =
-                                                                        if noSelected then
-                                                                            []
-
-                                                                        else
-                                                                            data.confirmLabelDeletion
-                                                                    , editingLabels =
-                                                                        if noSelected then
-                                                                            []
-
-                                                                        else
-                                                                            data.editingLabels
-                                                                }
-                                                            )
+                                                                else
+                                                                    Selected id :: editLabelsScreenData.selected
+                                                        }
                                             }
                                                 |> pure
 
                                         ClearEditLabelsSelections ->
                                             { model
                                                 | editLabelsScreen =
-                                                    Just
-                                                        { editLabelsScreenData
-                                                            | selected = []
-                                                            , confirmLabelDeletion = []
-                                                            , editingLabels = []
-                                                        }
+                                                    Just { editLabelsScreenData | selected = [] }
                                             }
                                                 |> pure
 
@@ -493,8 +474,24 @@ update msg model =
                                                 | editLabelsScreen =
                                                     Just
                                                         { editLabelsScreenData
-                                                            | confirmLabelDeletion =
-                                                                id :: editLabelsScreenData.confirmLabelDeletion
+                                                            | selected =
+                                                                editLabelsScreenData.selected
+                                                                    |> List.map
+                                                                        (\e ->
+                                                                            case e of
+                                                                                Selected i ->
+                                                                                    if sameId i id then
+                                                                                        ConfirmDelete i
+
+                                                                                    else
+                                                                                        e
+
+                                                                                ConfirmDelete _ ->
+                                                                                    e
+
+                                                                                Editing _ _ ->
+                                                                                    e
+                                                                        )
                                                         }
                                             }
                                                 |> pure
@@ -505,9 +502,24 @@ update msg model =
                                                 , editLabelsScreen =
                                                     Just
                                                         { editLabelsScreenData
-                                                            | confirmLabelDeletion =
-                                                                editLabelsScreenData.confirmLabelDeletion |> exclude (sameId id)
-                                                            , selected = editLabelsScreenData.selected |> exclude (sameId id)
+                                                            | selected =
+                                                                editLabelsScreenData.selected
+                                                                    |> List.filter
+                                                                        (\e ->
+                                                                            case e of
+                                                                                Selected i ->
+                                                                                    True
+
+                                                                                ConfirmDelete i ->
+                                                                                    if sameId i id then
+                                                                                        False
+
+                                                                                    else
+                                                                                        True
+
+                                                                                Editing _ _ ->
+                                                                                    True
+                                                                        )
                                                         }
                                             }
                                                 |> pure
@@ -518,19 +530,51 @@ update msg model =
                                                 | editLabelsScreen =
                                                     Just
                                                         { editLabelsScreenData
-                                                            | confirmLabelDeletion =
-                                                                editLabelsScreenData.confirmLabelDeletion |> exclude (sameId id)
+                                                            | selected =
+                                                                editLabelsScreenData.selected
+                                                                    |> List.map
+                                                                        (\e ->
+                                                                            case e of
+                                                                                Selected i ->
+                                                                                    e
+
+                                                                                ConfirmDelete i ->
+                                                                                    if sameId i id then
+                                                                                        Selected i
+
+                                                                                    else
+                                                                                        e
+
+                                                                                Editing _ _ ->
+                                                                                    e
+                                                                        )
                                                         }
                                             }
                                                 |> pure
 
-                                        EditLabel label ->
+                                        EditLabel ( id, newName ) ->
                                             { model
                                                 | editLabelsScreen =
                                                     Just
                                                         { editLabelsScreenData
-                                                            | editingLabels =
-                                                                label :: editLabelsScreenData.editingLabels
+                                                            | selected =
+                                                                editLabelsScreenData.selected
+                                                                    |> List.map
+                                                                        (\e ->
+                                                                            case e of
+                                                                                Selected i ->
+                                                                                    if sameId i id then
+                                                                                        Editing id newName
+
+                                                                                    else
+                                                                                        e
+
+                                                                                ConfirmDelete i ->
+                                                                                    e
+
+                                                                                Editing _ _ ->
+                                                                                    e
+                                                                        )
                                                         }
                                             }
                                                 |> pure
@@ -540,15 +584,23 @@ update msg model =
                                                 | editLabelsScreen =
                                                     Just
                                                         { editLabelsScreenData
-                                                            | editingLabels =
-                                                                editLabelsScreenData.editingLabels
+                                                            | selected =
+                                                                editLabelsScreenData.selected
                                                                     |> List.map
-                                                                        (\( lId, lName ) ->
-                                                                            if sameId lId id then
-                                                                                ( id, newName )
+                                                                        (\e ->
+                                                                            case e of
+                                                                                Selected i ->
+                                                                                    e
 
-                                                                            else
-                                                                                ( lId, lName )
+                                                                                ConfirmDelete i ->
+                                                                                    e
+
+                                                                                Editing i _ ->
+                                                                                    if sameId i id then
+                                                                                        Editing id newName
+
+                                                                                    else
+                                                                                        e
                                                                         )
                                                         }
                                             }
@@ -578,8 +630,24 @@ update msg model =
                                                     , editLabelsScreen =
                                                         Just
                                                             { editLabelsScreenData
-                                                                | editingLabels =
-                                                                    editLabelsScreenData.editingLabels |> exclude (Tuple.first >> sameId id)
+                                                                | selected =
+                                                                    editLabelsScreenData.selected
+                                                                        |> List.map
+                                                                            (\e ->
+                                                                                case e of
+                                                                                    Selected i ->
+                                                                                        e
+
+                                                                                    ConfirmDelete i ->
+                                                                                        e
+
+                                                                                    Editing i _ ->
+                                                                                        if sameId i id then
+                                                                                            Selected i
+
+                                                                                        else
+                                                                                            e
+                                                                            )
                                                             }
                                                 }
                                                     |> pure
@@ -590,8 +658,24 @@ update msg model =
                                                 | editLabelsScreen =
                                                     Just
                                                         { editLabelsScreenData
-                                                            | editingLabels =
-                                                                editLabelsScreenData.editingLabels |> exclude (Tuple.first >> sameId id)
+                                                            | selected =
+                                                                editLabelsScreenData.selected
+                                                                    |> List.map
+                                                                        (\e ->
+                                                                            case e of
+                                                                                Selected i ->
+                                                                                    e
+
+                                                                                ConfirmDelete i ->
+                                                                                    e
+
+                                                                                Editing i _ ->
+                                                                                    if sameId i id then
+                                                                                        Selected i
+
+                                                                                    else
+                                                                                        e
+                                                                        )
                                                         }
                                             }
                                                 |> pure
@@ -602,7 +686,19 @@ update msg model =
                                                     Just
                                                         { editLabelsScreenData
                                                             | selected =
-                                                                editLabelsScreenData.selected |> exclude (sameId id)
+                                                                editLabelsScreenData.selected
+                                                                    |> exclude
+                                                                        (\e ->
+                                                                            case e of
+                                                                                Selected i ->
+                                                                                    sameId id i
+
+                                                                                ConfirmDelete i ->
+                                                                                    sameId id i
+
+                                                                                Editing i _ ->
+                                                                                    sameId id i
+                                                                        )
                                                         }
                                             }
                                                 |> pure
@@ -628,21 +724,32 @@ update msg model =
                                                 |> pure
 
                                         ConfirmDeleteMultipleLabels ->
+                                            let
+                                                deletedIds : List SyncableID
+                                                deletedIds =
+                                                    editLabelsScreenData.selected
+                                                        |> List.map
+                                                            (\e ->
+                                                                case e of
+                                                                    Selected i ->
+                                                                        i
+
+                                                                    ConfirmDelete i ->
+                                                                        i
+
+                                                                    Editing i _ ->
+                                                                        i
+                                                            )
+                                            in
                                             { model
                                                 | labels =
                                                     model.labels
-                                                        |> exclude (\l -> List.any (sameId l.id) editLabelsScreenData.selected)
+                                                        |> exclude (\l -> List.any (sameId l.id) deletedIds)
                                                 , editLabelsScreen =
-                                                    Just
-                                                        { editLabelsScreenData
-                                                            | selected = []
-                                                            , confirmLabelDeletion = []
-                                                            , editingLabels = []
-                                                            , confirmDeleteAllSelectedLabels = False
-                                                        }
+                                                    Just { editLabelsScreenData | selected = [] }
                                             }
                                                 |> pure
-                                                |> addToQueue (qDeleteLabels editLabelsScreenData.selected)
+                                                |> addToQueue (qDeleteLabels deletedIds)
 
                         -- Labels column menu
                         OpenLabelsMenu ->
@@ -686,8 +793,6 @@ update msg model =
                                     Just
                                         { selected = []
                                         , searchQuery = ""
-                                        , confirmLabelDeletion = []
-                                        , editingLabels = []
                                         , confirmDeleteAllSelectedLabels = False
                                         }
                                 , labelsMenu = Nothing
@@ -1650,14 +1755,12 @@ labelsMenuColumn { labels, filters, labelsMenu } =
 editLabelsView :
     Model
     ->
-        { selected : List SyncableID
+        { selected : List EditLabelKind
         , searchQuery : String
-        , confirmLabelDeletion : List SyncableID
-        , editingLabels : List ( SyncableID, String )
         , confirmDeleteAllSelectedLabels : Bool
         }
     -> Html EditLabelsViewMsg
-editLabelsView model { selected, searchQuery, confirmLabelDeletion, editingLabels, confirmDeleteAllSelectedLabels } =
+editLabelsView model { selected, searchQuery, confirmDeleteAllSelectedLabels } =
     let
         header =
             div
@@ -1742,7 +1845,21 @@ editLabelsView model { selected, searchQuery, confirmLabelDeletion, editingLabel
                                      , fontSize (px 16)
                                      , fontWeight (int 600)
                                      ]
-                                        ++ (if List.any (\e -> sameId e label.id) selected then
+                                        ++ (if
+                                                List.any
+                                                    (\e ->
+                                                        case e of
+                                                            Selected i ->
+                                                                sameId label.id i
+
+                                                            ConfirmDelete i ->
+                                                                sameId label.id i
+
+                                                            Editing i _ ->
+                                                                sameId label.id i
+                                                    )
+                                                    selected
+                                            then
                                                 [ textColor white, backgroundColor black ]
 
                                             else
@@ -2065,26 +2182,54 @@ editLabelsView model { selected, searchQuery, confirmLabelDeletion, editingLabel
                 text ""
             , ul []
                 (List.indexedMap
-                    (\i label ->
-                        let
-                            isContemplatingDeletion =
-                                List.any (\e -> sameId e label.id) confirmLabelDeletion
+                    (\i ( label, labelKind ) ->
+                        case labelKind of
+                            Selected _ ->
+                                labelCard { name = label.name, id = label.id } (i == 0)
 
-                            isBeingEdited =
-                                editingLabels |> listFirst (\e -> sameId (Tuple.first e) label.id)
-                        in
-                        if isContemplatingDeletion then
-                            confirmDeleteCard { name = label.name, id = label.id } (i == 0)
+                            ConfirmDelete _ ->
+                                confirmDeleteCard { name = label.name, id = label.id } (i == 0)
 
-                        else
-                            case isBeingEdited of
-                                Just ( _, newName ) ->
-                                    editLabelCard { name = label.name, id = label.id } (i == 0) newName
-
-                                Nothing ->
-                                    labelCard { name = label.name, id = label.id } (i == 0)
+                            Editing _ newName ->
+                                editLabelCard { name = label.name, id = label.id } (i == 0) newName
                     )
-                    (model.labels |> List.filter (\e -> List.any (\r -> sameId e.id r) selected))
+                    (let
+                        labelKinds : List Label -> List EditLabelKind -> List ( Label, Maybe EditLabelKind ) -> List ( Label, Maybe EditLabelKind )
+                        labelKinds labels selection current =
+                            case labels of
+                                [] ->
+                                    current
+
+                                x :: xs ->
+                                    let
+                                        ( foundKind, restKind ) =
+                                            selection
+                                                |> partitionFirst
+                                                    (\r ->
+                                                        case r of
+                                                            Selected i ->
+                                                                sameId x.id i
+
+                                                            ConfirmDelete i ->
+                                                                sameId x.id i
+
+                                                            Editing i _ ->
+                                                                sameId x.id i
+                                                    )
+                                    in
+                                    labelKinds xs restKind (( x, foundKind ) :: current)
+                     in
+                     labelKinds model.labels selected []
+                        |> List.filterMap
+                            (\( id, kind ) ->
+                                case kind of
+                                    Nothing ->
+                                        Nothing
+
+                                    Just k ->
+                                        Just ( id, k )
+                            )
+                    )
                 )
             ]
         ]
@@ -2553,12 +2698,6 @@ alphaNumericGenerator strLength =
 
 
 -- Helpers
--- It's just `filterNot` https://package.elm-lang.org/packages/elm-community/list-extra/8.7.0/List-Extra#filterNot
-
-
-exclude : (a -> Bool) -> List a -> List a
-exclude pred list =
-    List.filter (not << pred) list
 
 
 partitionFirstHelper : List a -> (a -> Bool) -> ( Maybe a, List a ) -> ( Maybe a, List a )
@@ -2603,6 +2742,17 @@ or default new =
 
         Nothing ->
             default
+
+
+
+{-
+   It's just `filterNot` https://package.elm-lang.org/packages/elm-community/list-extra/8.7.0/List-Extra#filterNot
+-}
+
+
+exclude : (a -> Bool) -> List a -> List a
+exclude pred list =
+    List.filter (not << pred) list
 
 
 listFirst : (a -> Bool) -> List a -> Maybe a
