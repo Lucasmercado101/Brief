@@ -229,31 +229,21 @@ type LoggedOutMsg
     | LoginRes (Result Http.Error ())
 
 
+type Msg
+    = LoggedOutView LoggedOutMsg
+    | LoggedInView LoggedInMsg
+    | FullSyncResp (Result Http.Error Api.FullSyncResponse)
+
+
 type LoggedInMsg
     = ChangeNotePinned ( SyncableID, Bool )
+    | EditLabelsView EditLabelsViewMsg
       -- Labels menu
     | SelectLabelToFilterBy SyncableID
     | OpenLabelsMenu
     | CloseLabelsMenu
     | ChangeLabelsSearchQuery String
     | GoToEditLabelsScreen
-      -- Edit Labels view
-    | ExitEditingLabelsView
-    | ChangeEditLabelsSearchQuery String
-    | SelectLabel SyncableID
-    | ClearEditLabelsSelections
-    | RequestDeleteLabel SyncableID
-    | ConfirmDeleteLabel SyncableID
-    | CancelDeleteLabel SyncableID
-    | EditLabel ( SyncableID, String )
-    | ChangeEditingLabelName ( SyncableID, String )
-    | ConfirmEditingLabelName ( SyncableID, String )
-    | CancelEditingLabelName SyncableID
-    | RemoveLabelFromSelected SyncableID
-    | RequestConfirmDeleteMultipleLabels
-    | ConfirmDeleteMultipleLabels
-    | CancelDeleteMultipleLabels
-      --
     | NewTitleChange String
     | NewNoteContentChange String
     | RequestTimeForNewLabelCreation
@@ -279,10 +269,22 @@ type LoggedInMsg
     | ReceivedChangesResp (Result Http.Error Api.ChangesResponse)
 
 
-type Msg
-    = LoggedOutView LoggedOutMsg
-    | LoggedInView LoggedInMsg
-    | FullSyncResp (Result Http.Error Api.FullSyncResponse)
+type EditLabelsViewMsg
+    = ExitEditingLabelsView
+    | ChangeEditLabelsSearchQuery String
+    | SelectLabel SyncableID
+    | ClearEditLabelsSelections
+    | RequestDeleteLabel SyncableID
+    | ConfirmDeleteLabel SyncableID
+    | CancelDeleteLabel SyncableID
+    | EditLabel ( SyncableID, String )
+    | ChangeEditingLabelName ( SyncableID, String )
+    | ConfirmEditingLabelName ( SyncableID, String )
+    | CancelEditingLabelName SyncableID
+    | RemoveLabelFromSelected SyncableID
+    | RequestConfirmDeleteMultipleLabels
+    | ConfirmDeleteMultipleLabels
+    | CancelDeleteMultipleLabels
 
 
 
@@ -413,6 +415,235 @@ update msg model =
             case msg of
                 LoggedInView loggedInMsg ->
                     case loggedInMsg of
+                        EditLabelsView editLabelsViewMsg ->
+                            case model.editLabelsScreen of
+                                Nothing ->
+                                    model |> pure
+
+                                Just editLabelsScreenData ->
+                                    case editLabelsViewMsg of
+                                        ExitEditingLabelsView ->
+                                            { model | editLabelsScreen = Nothing }
+                                                |> pure
+
+                                        ChangeEditLabelsSearchQuery newQuery ->
+                                            { model | editLabelsScreen = Just { editLabelsScreenData | searchQuery = newQuery } }
+                                                |> pure
+
+                                        SelectLabel id ->
+                                            { model
+                                                | editLabelsScreen =
+                                                    model.editLabelsScreen
+                                                        |> Maybe.map
+                                                            (\data ->
+                                                                let
+                                                                    noSelected =
+                                                                        (if List.any (sameId id) data.selected then
+                                                                            data.selected |> exclude (sameId id)
+
+                                                                         else
+                                                                            id :: data.selected
+                                                                        )
+                                                                            |> List.isEmpty
+                                                                in
+                                                                { data
+                                                                    | selected =
+                                                                        if List.any (sameId id) data.selected then
+                                                                            data.selected |> exclude (sameId id)
+
+                                                                        else
+                                                                            id :: data.selected
+                                                                    , confirmDeleteAllSelectedLabels =
+                                                                        if noSelected then
+                                                                            False
+
+                                                                        else
+                                                                            data.confirmDeleteAllSelectedLabels
+                                                                    , confirmLabelDeletion =
+                                                                        if noSelected then
+                                                                            []
+
+                                                                        else
+                                                                            data.confirmLabelDeletion
+                                                                    , editingLabels =
+                                                                        if noSelected then
+                                                                            []
+
+                                                                        else
+                                                                            data.editingLabels
+                                                                }
+                                                            )
+                                            }
+                                                |> pure
+
+                                        ClearEditLabelsSelections ->
+                                            { model
+                                                | editLabelsScreen =
+                                                    Just
+                                                        { editLabelsScreenData
+                                                            | selected = []
+                                                            , confirmLabelDeletion = []
+                                                            , editingLabels = []
+                                                        }
+                                            }
+                                                |> pure
+
+                                        RequestDeleteLabel id ->
+                                            { model
+                                                | editLabelsScreen =
+                                                    Just
+                                                        { editLabelsScreenData
+                                                            | confirmLabelDeletion =
+                                                                id :: editLabelsScreenData.confirmLabelDeletion
+                                                        }
+                                            }
+                                                |> pure
+
+                                        ConfirmDeleteLabel id ->
+                                            { model
+                                                | labels = model.labels |> exclude (.id >> sameId id)
+                                                , editLabelsScreen =
+                                                    Just
+                                                        { editLabelsScreenData
+                                                            | confirmLabelDeletion =
+                                                                editLabelsScreenData.confirmLabelDeletion |> exclude (sameId id)
+                                                            , selected = editLabelsScreenData.selected |> exclude (sameId id)
+                                                        }
+                                            }
+                                                |> pure
+                                                |> addToQueue (qDeleteLabel id)
+
+                                        CancelDeleteLabel id ->
+                                            { model
+                                                | editLabelsScreen =
+                                                    Just
+                                                        { editLabelsScreenData
+                                                            | confirmLabelDeletion =
+                                                                editLabelsScreenData.confirmLabelDeletion |> exclude (sameId id)
+                                                        }
+                                            }
+                                                |> pure
+
+                                        EditLabel label ->
+                                            { model
+                                                | editLabelsScreen =
+                                                    Just
+                                                        { editLabelsScreenData
+                                                            | editingLabels =
+                                                                label :: editLabelsScreenData.editingLabels
+                                                        }
+                                            }
+                                                |> pure
+
+                                        ChangeEditingLabelName ( id, newName ) ->
+                                            { model
+                                                | editLabelsScreen =
+                                                    Just
+                                                        { editLabelsScreenData
+                                                            | editingLabels =
+                                                                editLabelsScreenData.editingLabels
+                                                                    |> List.map
+                                                                        (\( lId, lName ) ->
+                                                                            if sameId lId id then
+                                                                                ( id, newName )
+
+                                                                            else
+                                                                                ( lId, lName )
+                                                                        )
+                                                        }
+                                            }
+                                                |> pure
+
+                                        ConfirmEditingLabelName ( id, newName ) ->
+                                            if newName == "" then
+                                                model |> pure
+
+                                            else if List.any (\l -> (l.name |> String.toLower) == (newName |> String.toLower)) model.labels then
+                                                -- TODO: show message to the user "This label already exists"
+                                                -- and disable create button
+                                                model |> pure
+
+                                            else
+                                                { model
+                                                    | labels =
+                                                        model.labels
+                                                            |> List.map
+                                                                (\l ->
+                                                                    if sameId l.id id then
+                                                                        { l | name = newName }
+
+                                                                    else
+                                                                        l
+                                                                )
+                                                    , editLabelsScreen =
+                                                        Just
+                                                            { editLabelsScreenData
+                                                                | editingLabels =
+                                                                    editLabelsScreenData.editingLabels |> exclude (Tuple.first >> sameId id)
+                                                            }
+                                                }
+                                                    |> pure
+                                                    |> addToQueue (qEditLabelName { name = newName, id = id })
+
+                                        CancelEditingLabelName id ->
+                                            { model
+                                                | editLabelsScreen =
+                                                    Just
+                                                        { editLabelsScreenData
+                                                            | editingLabels =
+                                                                editLabelsScreenData.editingLabels |> exclude (Tuple.first >> sameId id)
+                                                        }
+                                            }
+                                                |> pure
+
+                                        RemoveLabelFromSelected id ->
+                                            { model
+                                                | editLabelsScreen =
+                                                    Just
+                                                        { editLabelsScreenData
+                                                            | selected =
+                                                                editLabelsScreenData.selected |> exclude (sameId id)
+                                                        }
+                                            }
+                                                |> pure
+
+                                        RequestConfirmDeleteMultipleLabels ->
+                                            { model
+                                                | editLabelsScreen =
+                                                    Just
+                                                        { editLabelsScreenData
+                                                            | confirmDeleteAllSelectedLabels = True
+                                                        }
+                                            }
+                                                |> pure
+
+                                        CancelDeleteMultipleLabels ->
+                                            { model
+                                                | editLabelsScreen =
+                                                    Just
+                                                        { editLabelsScreenData
+                                                            | confirmDeleteAllSelectedLabels = False
+                                                        }
+                                            }
+                                                |> pure
+
+                                        ConfirmDeleteMultipleLabels ->
+                                            { model
+                                                | labels =
+                                                    model.labels
+                                                        |> exclude (\l -> List.any (sameId l.id) editLabelsScreenData.selected)
+                                                , editLabelsScreen =
+                                                    Just
+                                                        { editLabelsScreenData
+                                                            | selected = []
+                                                            , confirmLabelDeletion = []
+                                                            , editingLabels = []
+                                                            , confirmDeleteAllSelectedLabels = False
+                                                        }
+                                            }
+                                                |> pure
+                                                |> addToQueue (qDeleteLabels editLabelsScreenData.selected)
+
                         -- Labels column menu
                         OpenLabelsMenu ->
                             { model | labelsMenu = Just "" }
@@ -463,275 +694,6 @@ update msg model =
                             }
                                 |> pure
 
-                        ---------------------
-                        -- Edit Labels view --
-                        ---------------------
-                        ExitEditingLabelsView ->
-                            { model | editLabelsScreen = Nothing }
-                                |> pure
-
-                        ChangeEditLabelsSearchQuery newQuery ->
-                            { model
-                                | editLabelsScreen =
-                                    model.editLabelsScreen
-                                        |> Maybe.map
-                                            (\data -> { data | searchQuery = newQuery })
-                            }
-                                |> pure
-
-                        SelectLabel id ->
-                            { model
-                                | editLabelsScreen =
-                                    model.editLabelsScreen
-                                        |> Maybe.map
-                                            (\data ->
-                                                let
-                                                    noSelected =
-                                                        (if List.any (sameId id) data.selected then
-                                                            data.selected |> exclude (sameId id)
-
-                                                         else
-                                                            id :: data.selected
-                                                        )
-                                                            |> List.isEmpty
-                                                in
-                                                { data
-                                                    | selected =
-                                                        if List.any (sameId id) data.selected then
-                                                            data.selected |> exclude (sameId id)
-
-                                                        else
-                                                            id :: data.selected
-                                                    , confirmDeleteAllSelectedLabels =
-                                                        if noSelected then
-                                                            False
-
-                                                        else
-                                                            data.confirmDeleteAllSelectedLabels
-                                                    , confirmLabelDeletion =
-                                                        if noSelected then
-                                                            []
-
-                                                        else
-                                                            data.confirmLabelDeletion
-                                                    , editingLabels =
-                                                        if noSelected then
-                                                            []
-
-                                                        else
-                                                            data.editingLabels
-                                                }
-                                            )
-                            }
-                                |> pure
-
-                        ClearEditLabelsSelections ->
-                            { model
-                                | editLabelsScreen =
-                                    model.editLabelsScreen
-                                        |> Maybe.map
-                                            (\data ->
-                                                { data
-                                                    | selected = []
-                                                    , confirmLabelDeletion = []
-                                                    , editingLabels = []
-                                                }
-                                            )
-                            }
-                                |> pure
-
-                        RequestDeleteLabel id ->
-                            { model
-                                | editLabelsScreen =
-                                    model.editLabelsScreen
-                                        |> Maybe.map
-                                            (\data ->
-                                                { data
-                                                    | confirmLabelDeletion =
-                                                        id :: data.confirmLabelDeletion
-                                                }
-                                            )
-                            }
-                                |> pure
-
-                        ConfirmDeleteLabel id ->
-                            { model
-                                | labels = model.labels |> exclude (.id >> sameId id)
-                                , editLabelsScreen =
-                                    model.editLabelsScreen
-                                        |> Maybe.map
-                                            (\data ->
-                                                { data
-                                                    | confirmLabelDeletion =
-                                                        data.confirmLabelDeletion |> exclude (sameId id)
-                                                    , selected = data.selected |> exclude (sameId id)
-                                                }
-                                            )
-                            }
-                                |> pure
-                                |> addToQueue (qDeleteLabel id)
-
-                        CancelDeleteLabel id ->
-                            { model
-                                | editLabelsScreen =
-                                    model.editLabelsScreen
-                                        |> Maybe.map
-                                            (\data ->
-                                                { data
-                                                    | confirmLabelDeletion =
-                                                        data.confirmLabelDeletion |> exclude (sameId id)
-                                                }
-                                            )
-                            }
-                                |> pure
-
-                        EditLabel label ->
-                            { model
-                                | editLabelsScreen =
-                                    model.editLabelsScreen
-                                        |> Maybe.map
-                                            (\data ->
-                                                { data
-                                                    | editingLabels =
-                                                        label :: data.editingLabels
-                                                }
-                                            )
-                            }
-                                |> pure
-
-                        ChangeEditingLabelName ( id, newName ) ->
-                            { model
-                                | editLabelsScreen =
-                                    model.editLabelsScreen
-                                        |> Maybe.map
-                                            (\data ->
-                                                { data
-                                                    | editingLabels =
-                                                        data.editingLabels
-                                                            |> List.map
-                                                                (\( lId, lName ) ->
-                                                                    if sameId lId id then
-                                                                        ( id, newName )
-
-                                                                    else
-                                                                        ( lId, lName )
-                                                                )
-                                                }
-                                            )
-                            }
-                                |> pure
-
-                        ConfirmEditingLabelName ( id, newName ) ->
-                            if newName == "" then
-                                model |> pure
-
-                            else if List.any (\l -> (l.name |> String.toLower) == (newName |> String.toLower)) model.labels then
-                                -- TODO: show message to the user "This label already exists"
-                                -- and disable create button
-                                model |> pure
-
-                            else
-                                { model
-                                    | labels =
-                                        model.labels
-                                            |> List.map
-                                                (\l ->
-                                                    if sameId l.id id then
-                                                        { l | name = newName }
-
-                                                    else
-                                                        l
-                                                )
-                                    , editLabelsScreen =
-                                        model.editLabelsScreen
-                                            |> Maybe.map
-                                                (\data ->
-                                                    { data
-                                                        | editingLabels =
-                                                            data.editingLabels |> exclude (Tuple.first >> sameId id)
-                                                    }
-                                                )
-                                }
-                                    |> pure
-                                    |> addToQueue (qEditLabelName { name = newName, id = id })
-
-                        CancelEditingLabelName id ->
-                            { model
-                                | editLabelsScreen =
-                                    model.editLabelsScreen
-                                        |> Maybe.map
-                                            (\data ->
-                                                { data
-                                                    | editingLabels =
-                                                        data.editingLabels |> exclude (Tuple.first >> sameId id)
-                                                }
-                                            )
-                            }
-                                |> pure
-
-                        RemoveLabelFromSelected id ->
-                            { model
-                                | editLabelsScreen =
-                                    model.editLabelsScreen
-                                        |> Maybe.map
-                                            (\data ->
-                                                { data
-                                                    | selected =
-                                                        data.selected |> exclude (sameId id)
-                                                }
-                                            )
-                            }
-                                |> pure
-
-                        RequestConfirmDeleteMultipleLabels ->
-                            { model
-                                | editLabelsScreen =
-                                    model.editLabelsScreen
-                                        |> Maybe.map
-                                            (\data ->
-                                                { data
-                                                    | confirmDeleteAllSelectedLabels = True
-                                                }
-                                            )
-                            }
-                                |> pure
-
-                        CancelDeleteMultipleLabels ->
-                            { model
-                                | editLabelsScreen =
-                                    model.editLabelsScreen
-                                        |> Maybe.map
-                                            (\data ->
-                                                { data
-                                                    | confirmDeleteAllSelectedLabels = False
-                                                }
-                                            )
-                            }
-                                |> pure
-
-                        ConfirmDeleteMultipleLabels ->
-                            case model.editLabelsScreen of
-                                Just val ->
-                                    { model
-                                        | labels =
-                                            model.labels
-                                                |> exclude (\l -> List.any (sameId l.id) val.selected)
-                                        , editLabelsScreen =
-                                            Just
-                                                { val
-                                                    | selected = []
-                                                    , confirmLabelDeletion = []
-                                                    , editingLabels = []
-                                                    , confirmDeleteAllSelectedLabels = False
-                                                }
-                                    }
-                                        |> pure
-                                        |> addToQueue (qDeleteLabels val.selected)
-
-                                Nothing ->
-                                    model |> pure
-
-                        --------------------------------
                         ChangeNotePinned ( uid, newPinnedVal ) ->
                             { model
                                 | notes =
@@ -1694,7 +1656,7 @@ editLabelsView :
         , editingLabels : List ( SyncableID, String )
         , confirmDeleteAllSelectedLabels : Bool
         }
-    -> Html LoggedInMsg
+    -> Html EditLabelsViewMsg
 editLabelsView model { selected, searchQuery, confirmLabelDeletion, editingLabels, confirmDeleteAllSelectedLabels } =
     let
         header =
@@ -2183,7 +2145,7 @@ mainView model =
                     mainViewNotesList model
 
                 Just val ->
-                    editLabelsView model val
+                    editLabelsView model val |> Html.Styled.map EditLabelsView
             ]
         ]
 
