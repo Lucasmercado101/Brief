@@ -6,7 +6,7 @@ import Cmd.Extra exposing (pure)
 import Css exposing (..)
 import Either exposing (Either(..))
 import Html.Styled exposing (Html, br, button, div, form, input, label, li, nav, p, span, strong, text, textarea, ul)
-import Html.Styled.Attributes exposing (class, css, for, id, placeholder, style, type_, value)
+import Html.Styled.Attributes exposing (class, css, for, id, placeholder, style, title, type_, value)
 import Html.Styled.Events exposing (onClick, onInput, onSubmit)
 import Http
 import Material.Icons as Filled
@@ -197,6 +197,7 @@ type alias Model =
             , searchQuery : String
             , confirmLabelDeletion : List SyncableID
             , editingLabels : List ( SyncableID, String )
+            , confirmDeleteAllSelectedLabels : Bool
             }
 
     -- sync stuff
@@ -249,6 +250,9 @@ type LoggedInMsg
     | ConfirmEditingLabelName ( SyncableID, String )
     | CancelEditingLabelName SyncableID
     | RemoveLabelFromSelected SyncableID
+    | RequestConfirmDeleteMultipleLabels
+    | ConfirmDeleteMultipleLabels
+    | CancelDeleteMultipleLabels
       --
     | NewTitleChange String
     | NewNoteContentChange String
@@ -453,6 +457,7 @@ update msg model =
                                         , searchQuery = ""
                                         , confirmLabelDeletion = []
                                         , editingLabels = []
+                                        , confirmDeleteAllSelectedLabels = False
                                         }
                                 , labelsMenu = Nothing
                             }
@@ -480,6 +485,16 @@ update msg model =
                                     model.editLabelsScreen
                                         |> Maybe.map
                                             (\data ->
+                                                let
+                                                    noSelected =
+                                                        (if List.any (sameId id) data.selected then
+                                                            data.selected |> exclude (sameId id)
+
+                                                         else
+                                                            id :: data.selected
+                                                        )
+                                                            |> List.isEmpty
+                                                in
                                                 { data
                                                     | selected =
                                                         if List.any (sameId id) data.selected then
@@ -487,6 +502,24 @@ update msg model =
 
                                                         else
                                                             id :: data.selected
+                                                    , confirmDeleteAllSelectedLabels =
+                                                        if noSelected then
+                                                            False
+
+                                                        else
+                                                            data.confirmDeleteAllSelectedLabels
+                                                    , confirmLabelDeletion =
+                                                        if noSelected then
+                                                            []
+
+                                                        else
+                                                            data.confirmLabelDeletion
+                                                    , editingLabels =
+                                                        if noSelected then
+                                                            []
+
+                                                        else
+                                                            data.editingLabels
                                                 }
                                             )
                             }
@@ -649,6 +682,54 @@ update msg model =
                                             )
                             }
                                 |> pure
+
+                        RequestConfirmDeleteMultipleLabels ->
+                            { model
+                                | editLabelsScreen =
+                                    model.editLabelsScreen
+                                        |> Maybe.map
+                                            (\data ->
+                                                { data
+                                                    | confirmDeleteAllSelectedLabels = True
+                                                }
+                                            )
+                            }
+                                |> pure
+
+                        CancelDeleteMultipleLabels ->
+                            { model
+                                | editLabelsScreen =
+                                    model.editLabelsScreen
+                                        |> Maybe.map
+                                            (\data ->
+                                                { data
+                                                    | confirmDeleteAllSelectedLabels = False
+                                                }
+                                            )
+                            }
+                                |> pure
+
+                        ConfirmDeleteMultipleLabels ->
+                            case model.editLabelsScreen of
+                                Just val ->
+                                    { model
+                                        | labels =
+                                            model.labels
+                                                |> exclude (\l -> List.any (sameId l.id) val.selected)
+                                        , editLabelsScreen =
+                                            Just
+                                                { val
+                                                    | selected = []
+                                                    , confirmLabelDeletion = []
+                                                    , editingLabels = []
+                                                    , confirmDeleteAllSelectedLabels = False
+                                                }
+                                    }
+                                        |> pure
+                                        |> addToQueue (qDeleteLabels val.selected)
+
+                                Nothing ->
+                                    model |> pure
 
                         --------------------------------
                         ChangeNotePinned ( uid, newPinnedVal ) ->
@@ -1161,6 +1242,11 @@ qDeleteLabel labelId queue =
             }
 
 
+qDeleteLabels : List OQDeleteLabel -> OfflineQueueOps -> OfflineQueueOps
+qDeleteLabels labels queue =
+    List.foldl (\l q -> qDeleteLabel l q) queue labels
+
+
 qCreateNewNote : OQCreateNote -> OfflineQueueOps -> OfflineQueueOps
 qCreateNewNote data queue =
     { queue | createNotes = data :: queue.createNotes }
@@ -1606,9 +1692,10 @@ editLabelsView :
         , searchQuery : String
         , confirmLabelDeletion : List SyncableID
         , editingLabels : List ( SyncableID, String )
+        , confirmDeleteAllSelectedLabels : Bool
         }
     -> Html LoggedInMsg
-editLabelsView model { selected, searchQuery, confirmLabelDeletion, editingLabels } =
+editLabelsView model { selected, searchQuery, confirmLabelDeletion, editingLabels, confirmDeleteAllSelectedLabels } =
     let
         header =
             div
@@ -1891,30 +1978,98 @@ editLabelsView model { selected, searchQuery, confirmLabelDeletion, editingLabel
                 ]
 
         someLabelSelected =
-            List.length selected /= 0 || List.length confirmLabelDeletion /= 0 || List.length editingLabels /= 0
+            List.length selected /= 0
 
         selectedActions amount =
-            div [ css [ displayFlex, marginBottom (px 32), textAlign center, textColor white, border3 (px 3) solid white ] ]
-                [ div [ css [ width (pct 100), padY (px 16) ] ]
-                    [ p [ css [ publicSans, fontSize (px 42) ] ] [ text amount ]
-                    , p [ css [ publicSans, fontSize (px 42) ] ] [ text "Selected" ]
-                    ]
-                , button
-                    [ css
-                        [ width (px 64)
-                        , border (px 0)
-                        , textColor inherit
-                        , borderLeft3 (px 3) solid white
-                        , displayFlex
-                        , justifyContent center
-                        , alignItems center
-                        , backgroundColor transparent
-                        , hover [ backgroundColor black, textColor white ]
+            let
+                selectedAmountActions =
+                    [ button
+                        [ css
+                            [ width (px 64)
+                            , border (px 0)
+                            , textColor inherit
+                            , borderRight3 (px 3) solid white
+                            , displayFlex
+                            , justifyContent center
+                            , alignItems center
+                            , backgroundColor transparent
+                            , hover [ backgroundColor black, textColor white ]
+                            , cursor pointer
+                            ]
+                        , title "Delete selected labels"
+                        , onClick RequestConfirmDeleteMultipleLabels
                         ]
-                    , onClick ClearEditLabelsSelections
+                        [ Filled.delete 32 Inherit |> Svg.Styled.fromUnstyled ]
+                    , div [ css [ width (pct 100), padY (px 16) ] ]
+                        [ p [ css [ publicSans, fontSize (px 42), fontWeight bold ] ] [ text amount ]
+                        , p [ css [ publicSans, fontSize (px 42) ] ] [ text "Selected" ]
+                        ]
+                    , button
+                        [ css
+                            [ width (px 64)
+                            , border (px 0)
+                            , textColor inherit
+                            , borderLeft3 (px 3) solid white
+                            , displayFlex
+                            , justifyContent center
+                            , alignItems center
+                            , backgroundColor transparent
+                            , hover [ backgroundColor error, textColor white ]
+                            , cursor pointer
+                            ]
+                        , title "Clear selected labels"
+                        , onClick ClearEditLabelsSelections
+                        ]
+                        [ Filled.close 32 Inherit |> Svg.Styled.fromUnstyled ]
                     ]
-                    [ Filled.close 32 Inherit |> Svg.Styled.fromUnstyled ]
-                ]
+
+                confirmDeleteMultiple =
+                    [ button
+                        [ css
+                            [ width (px 64)
+                            , border (px 0)
+                            , textColor inherit
+                            , borderRight3 (px 3) solid white
+                            , displayFlex
+                            , justifyContent center
+                            , alignItems center
+                            , backgroundColor transparent
+                            , hover [ backgroundColor black, textColor white ]
+                            , cursor pointer
+                            ]
+                        , onClick CancelDeleteMultipleLabels
+                        ]
+                        [ Filled.close 32 Inherit |> Svg.Styled.fromUnstyled ]
+                    , div [ css [ width (pct 100), padY (px 16) ] ]
+                        [ p [ css [ publicSans, fontSize (px 42) ] ] [ text "Delete" ]
+                        , strong [ css [ publicSans, fontSize (px 42), display inline ] ] [ text amount ]
+                        , p [ css [ display inline, publicSans, fontSize (px 42) ] ] [ text " labels?" ]
+                        ]
+                    , button
+                        [ css
+                            [ width (px 64)
+                            , border (px 0)
+                            , textColor inherit
+                            , borderLeft3 (px 3) solid white
+                            , displayFlex
+                            , justifyContent center
+                            , alignItems center
+                            , backgroundColor transparent
+                            , hover [ backgroundColor error, textColor white ]
+                            , cursor pointer
+                            ]
+                        , onClick ConfirmDeleteMultipleLabels
+                        ]
+                        [ Filled.check 32 Inherit |> Svg.Styled.fromUnstyled ]
+                    ]
+            in
+            div [ css [ displayFlex, marginBottom (px 32), textAlign center, textColor white, border3 (px 3) solid white ] ]
+                (if confirmDeleteAllSelectedLabels then
+                    confirmDeleteMultiple
+
+                 else
+                    selectedAmountActions
+                )
     in
     div [ css [ displayFlex, flexDirection row, height (pct 100) ] ]
         [ div [ css [ displayFlex, padY (px 45), height (pct 100) ] ]
