@@ -1327,9 +1327,12 @@ view model =
     div
         [ id "full-container"
         , css
-            [ backgroundColor (rgb 24 129 106)
-            , fullWidth
+            [ fullWidth
             , height (pct 100)
+            , backgroundColor (rgb 18 104 85)
+            , backgroundImage (url "./media/bgr.png ")
+            , backgroundSize contain
+            , backgroundRepeat repeat
             ]
         ]
         [ case model.user of
@@ -1337,7 +1340,6 @@ view model =
                 Html.Styled.map LoggedOutView (logInView m)
 
             CheckingSessionValidity ->
-                -- TODO:
                 div [] [ text "TODO" ]
 
             LoggedIn ->
