@@ -1849,13 +1849,13 @@ editLabelsView model { selected, searchQuery, confirmLabelDeletion, editingLabel
                     ]
                 ]
 
-        nothingSelected =
+        someLabelSelected =
             List.length selected /= 0 || List.length confirmLabelDeletion /= 0 || List.length editingLabels /= 0
 
-        selectedActions =
+        selectedActions amount =
             div [ css [ displayFlex, marginBottom (px 32), textAlign center, textColor white, border3 (px 3) solid white ] ]
                 [ div [ css [ width (pct 100), padY (px 16) ] ]
-                    [ p [ css [ publicSans, fontSize (px 42) ] ] [ text "8" ]
+                    [ p [ css [ publicSans, fontSize (px 42) ] ] [ text amount ]
                     , p [ css [ publicSans, fontSize (px 42) ] ] [ text "Selected" ]
                     ]
                 , button
@@ -1899,8 +1899,8 @@ editLabelsView model { selected, searchQuery, confirmLabelDeletion, editingLabel
                 ]
             ]
         , div [ css [ overflowY auto, height (pct 100), padY (px 45), padX (px 32) ] ]
-            [ if nothingSelected then
-                selectedActions
+            [ if someLabelSelected then
+                selectedActions (selected |> List.length |> String.fromInt)
 
               else
                 text ""
