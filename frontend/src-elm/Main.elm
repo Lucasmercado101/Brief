@@ -1405,23 +1405,14 @@ labelsMenuColumn { labels, filters, labelsMenu } =
 
 editLabelsView : Model -> { selected : List Label, searchQuery : String } -> Html LoggedInMsg
 editLabelsView model { selected, searchQuery } =
-    div []
-        [ div
-            [ css
-                [ backgroundColor secondary
-                , border3 (px 3) solid black
-                , displayFlex
-                , flexDirection column
-                , maxWidth (px 345)
-                , minWidth (px 345)
-                , width (px 345)
-                ]
-            ]
-            [ div
+    let
+        header =
+            div
                 [ css
                     [ displayFlex
                     , justifyContent spaceBetween
                     , alignItems flexStart
+                    , marginBottom (px 18)
                     ]
                 ]
                 [ div
@@ -1449,6 +1440,53 @@ editLabelsView model { selected, searchQuery } =
                         |> Svg.Styled.fromUnstyled
                     ]
                 ]
+
+        searchBar =
+            div
+                [ css
+                    [ displayFlex
+                    , backgroundColor white
+                    , alignItems center
+                    , borderBottom3 (px 3) solid black
+                    , borderTop3 (px 3) solid black
+                    ]
+                ]
+                [ label [ for "labels-edit-searchBar", css [ displayFlex, justifyContent center, alignItems center, paddingLeft (px 12), paddingRight (px 6) ] ] [ Outlined.search 18 Inherit |> Svg.Styled.fromUnstyled ]
+                , input
+                    [ id "labels-edit-searchBar"
+                    , css
+                        [ border (px 0)
+                        , fontWeight (int 600)
+                        , width (pct 100)
+                        , height (pct 100)
+                        , padY (px 7)
+                        , publicSans
+                        , fontSize (px 16)
+                        ]
+                    , placeholder "Search labels..."
+                    ]
+                    []
+                ]
+
+        itemsList =
+            ul [ css [ overflow auto, height (pct 100) ] ] (List.map (\e -> li [] [ text e.name ]) model.labels)
+    in
+    div [ css [ displayFlex, flexDirection column, height (pct 100), padY (px 45) ] ]
+        [ div
+            [ css
+                [ backgroundColor secondary
+                , border3 (px 3) solid black
+                , displayFlex
+                , flexDirection column
+                , maxWidth (px 345)
+                , minWidth (px 345)
+                , width (px 345)
+                , overflow hidden
+                ]
+            ]
+            [ header
+            , searchBar
+            , itemsList
             ]
         ]
 

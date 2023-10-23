@@ -17,3 +17,8 @@
   /* TODO: a better color? */
   color: #414141;
 }
+
+#labels-edit-searchBar::placeholder {
+  /* TODO: a better color? */
+  color: #414141;
+}
