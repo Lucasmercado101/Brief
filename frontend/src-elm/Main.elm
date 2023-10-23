@@ -240,6 +240,7 @@ type LoggedInMsg
     | ExitEditingLabelsView
     | ChangeEditLabelsSearchQuery String
     | SelectLabel SyncableID
+    | ClearEditLabelsSelections
     | RequestDeleteLabel SyncableID
     | ConfirmDeleteLabel SyncableID
     | CancelDeleteLabel SyncableID
@@ -485,6 +486,21 @@ update msg model =
 
                                                         else
                                                             id :: data.selected
+                                                }
+                                            )
+                            }
+                                |> pure
+
+                        ClearEditLabelsSelections ->
+                            { model
+                                | editLabelsScreen =
+                                    model.editLabelsScreen
+                                        |> Maybe.map
+                                            (\data ->
+                                                { data
+                                                    | selected = []
+                                                    , confirmLabelDeletion = []
+                                                    , editingLabels = []
                                                 }
                                             )
                             }
@@ -1808,10 +1824,10 @@ editLabelsView model { selected, searchQuery, confirmLabelDeletion, editingLabel
                     ]
                 ]
                 [ p [ css [ delaGothicOne, fontSize (px 38), marginTop (px 12), marginBottom (px 16), textAlign center ] ] [ text name ]
-                , label [ css [ publicSans, fontSize (px 18), padX (px 16) ] ]
-                    [ text "New Name:"
+                , label [ css [ publicSans, fontSize (px 18), padX (px 16), displayFlex, alignItems center ] ]
+                    [ text "Name:"
                     , input
-                        [ css [ padY (px 12), marginLeft (px 12), border3 (px 3) solid black, publicSans, fontSize (px 18) ]
+                        [ css [ padY (px 12), marginLeft (px 12), border3 (px 3) solid black, publicSans, fontSize (px 18), width (pct 100) ]
                         , class "label-edit-input"
                         , placeholder name
                         , value newName
@@ -1831,6 +1847,32 @@ editLabelsView model { selected, searchQuery, confirmLabelDeletion, editingLabel
                         ]
                         [ text "Confirm" ]
                     ]
+                ]
+
+        nothingSelected =
+            List.length selected /= 0 || List.length confirmLabelDeletion /= 0 || List.length editingLabels /= 0
+
+        selectedActions =
+            div [ css [ displayFlex, marginBottom (px 32), textAlign center, textColor white, border3 (px 3) solid white ] ]
+                [ div [ css [ width (pct 100), padY (px 16) ] ]
+                    [ p [ css [ publicSans, fontSize (px 42) ] ] [ text "8" ]
+                    , p [ css [ publicSans, fontSize (px 42) ] ] [ text "Selected" ]
+                    ]
+                , button
+                    [ css
+                        [ width (px 64)
+                        , border (px 0)
+                        , textColor inherit
+                        , borderLeft3 (px 3) solid white
+                        , displayFlex
+                        , justifyContent center
+                        , alignItems center
+                        , backgroundColor transparent
+                        , hover [ backgroundColor black, textColor white ]
+                        ]
+                    , onClick ClearEditLabelsSelections
+                    ]
+                    [ Filled.close 32 Inherit |> Svg.Styled.fromUnstyled ]
                 ]
     in
     div [ css [ displayFlex, flexDirection row, height (pct 100) ] ]
@@ -1856,29 +1898,36 @@ editLabelsView model { selected, searchQuery, confirmLabelDeletion, editingLabel
                 , itemsList
                 ]
             ]
-        , ul [ css [ overflowY auto, height (pct 100), padY (px 45) ] ]
-            (List.indexedMap
-                (\i label ->
-                    let
-                        isContemplatingDeletion =
-                            List.any (\e -> sameId e label.id) confirmLabelDeletion
+        , div [ css [ overflowY auto, height (pct 100), padY (px 45), padX (px 32) ] ]
+            [ if nothingSelected then
+                selectedActions
 
-                        isBeingEdited =
-                            editingLabels |> listFirst (\e -> sameId (Tuple.first e) label.id)
-                    in
-                    if isContemplatingDeletion then
-                        confirmDeleteCard { name = label.name, id = label.id } (i == 0)
+              else
+                text ""
+            , ul []
+                (List.indexedMap
+                    (\i label ->
+                        let
+                            isContemplatingDeletion =
+                                List.any (\e -> sameId e label.id) confirmLabelDeletion
 
-                    else
-                        case isBeingEdited of
-                            Just ( _, newName ) ->
-                                editLabelCard { name = label.name, id = label.id } (i == 0) newName
+                            isBeingEdited =
+                                editingLabels |> listFirst (\e -> sameId (Tuple.first e) label.id)
+                        in
+                        if isContemplatingDeletion then
+                            confirmDeleteCard { name = label.name, id = label.id } (i == 0)
 
-                            Nothing ->
-                                labelCard { name = label.name, id = label.id } (i == 0)
+                        else
+                            case isBeingEdited of
+                                Just ( _, newName ) ->
+                                    editLabelCard { name = label.name, id = label.id } (i == 0) newName
+
+                                Nothing ->
+                                    labelCard { name = label.name, id = label.id } (i == 0)
+                    )
+                    (model.labels |> List.filter (\e -> List.any (\r -> sameId e.id r) selected))
                 )
-                (model.labels |> List.filter (\e -> List.any (\r -> sameId e.id r) selected))
-            )
+            ]
         ]
 
 
