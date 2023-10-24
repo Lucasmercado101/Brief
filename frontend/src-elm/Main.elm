@@ -2496,31 +2496,35 @@ mainViewNotesList model =
                         ]
                     ]
             )
+        , case model.notes of
+            [] ->
+                -- TODO: add no notes empty state design
+                div [] []
 
-        -- TODO: add no notes empty state design
-        , div
-            [ -- TODO: give the tiled effect of google keep
-              -- using translate and transitions
-              css
-                [ displayFlex
-                , flexDirection row
-                , flexWrap wrap
-                , marginTop (px 30)
-                ]
-            ]
-            (List.map (note model)
-                (model.notes
-                    |> prioritizePinned
-                    |> (\e ->
-                            case model.filters.label of
-                                Just label ->
-                                    e |> List.filter (\l -> List.any (\j -> j == label) l.labels)
+            _ ->
+                div
+                    [ -- TODO: give the tiled effect of google keep
+                      -- using translate and transitions
+                      css
+                        [ displayFlex
+                        , flexDirection row
+                        , flexWrap wrap
+                        , marginTop (px 30)
+                        ]
+                    ]
+                    (List.map (note model)
+                        (model.notes
+                            |> prioritizePinned
+                            |> (\e ->
+                                    case model.filters.label of
+                                        Just label ->
+                                            e |> List.filter (\l -> List.any (\j -> j == label) l.labels)
 
-                                Nothing ->
-                                    e
-                       )
-                )
-            )
+                                        Nothing ->
+                                            e
+                               )
+                        )
+                    )
         ]
 
 
