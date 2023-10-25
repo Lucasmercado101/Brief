@@ -2640,55 +2640,10 @@ note model data =
             , hover
                 [ boxShadow4 (px 6) (px 6) (px 0) (rgb 0 0 0) ]
             ]
-        , class "note"
         ]
-        [ div
-            [ css
-                [ backgroundColor (rgb 117 93 39)
-                , color (hex "fff")
-                , height (px 36)
-                , justifyContent spaceBetween
-                , borderBottom3 (px 3) solid (rgb 0 0 0)
-                ]
-            , class "note-top-actions"
-            ]
-            [ button
-                [ css
-                    [ border (px 0)
-                    , borderRight3 (px 3) solid (rgb 11 14 17)
-                    , backgroundColor
-                        (if data.pinned == True then
-                            hex "000"
-
-                         else
-                            rgb 117 93 39
-                        )
-                    , color (hex "fff")
-                    , hover [ backgroundColor (hex "000"), cursor pointer ]
-                    , paddingRight (px 4)
-                    , paddingLeft (px 4)
-                    , paddingTop (px 3)
-                    ]
-                , onClick (ChangeNotePinned ( data.id, not data.pinned ))
-                ]
-                [ Filled.push_pin 28 Inherit |> Svg.Styled.fromUnstyled ]
-            , button
-                [ css
-                    [ border (px 0)
-                    , borderLeft3 (px 3) solid (rgb 11 14 17)
-                    , hover [ backgroundColor (hex "ff0000"), cursor pointer ]
-                    , backgroundColor inherit
-                    , color (hex "fff")
-                    ]
-                , onClick (DeleteNote data.id)
-                ]
-                [ Filled.close 32 Inherit |> Svg.Styled.fromUnstyled ]
-            ]
-        , div []
-            [ noteTitle
-            , content
-            , labelsFooter
-            ]
+        [ noteTitle
+        , content
+        , labelsFooter
         ]
 
 
