@@ -19,6 +19,7 @@ import Random
 import Random.Char
 import Random.Extra
 import Random.String
+import Route
 import Svg.Styled
 import Task
 import Time exposing (Posix)
@@ -322,6 +323,9 @@ init flags url navKey =
     let
         seeds =
             List.map Random.initialSeed flags.seeds
+
+        currUrl =
+            Route.fromUrl url
     in
     ( { seeds = seeds
       , notes = []
