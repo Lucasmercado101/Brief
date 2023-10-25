@@ -5,6 +5,7 @@ import Browser exposing (Document, UrlRequest)
 import Browser.Navigation as Nav
 import Cmd.Extra exposing (pure)
 import Css exposing (..)
+import CssHelpers exposing (publicSans)
 import Dog exposing (dogSvg)
 import Either exposing (Either(..))
 import Html
@@ -15,6 +16,7 @@ import Http
 import Material.Icons as Filled
 import Material.Icons.Outlined as Outlined
 import Material.Icons.Types exposing (Coloring(..))
+import Page.LogIn as LogIn
 import Random
 import Random.Char
 import Random.Extra
@@ -231,15 +233,8 @@ type alias NewNoteData =
 -- MESSAGE
 
 
-type LoggedOutMsg
-    = UsernameChange String
-    | PasswordChange String
-    | Login
-    | LoginRes (Result Http.Error ())
-
-
 type Msg
-    = LoggedOutView LoggedOutMsg
+    = LoggedOutView LogIn.Msg
     | LoggedInView LoggedInMsg
     | FullSyncResp (Result Http.Error Api.FullSyncResponse)
     | ClickedLink UrlRequest
@@ -408,43 +403,40 @@ update msg model =
                 LoggedOut { username, password } ->
                     case msg of
                         LoggedOutView loggedOutMsg ->
-                            case loggedOutMsg of
-                                UsernameChange newUsername ->
-                                    { model
-                                        | user =
-                                            LoggedOut
-                                                { username = newUsername
-                                                , password = password
-                                                }
-                                    }
-                                        |> pure
+                            LogIn.update loggedOutMsg { username = username, password = password }
+                                |> (\( m, c ) -> ( { model | user = LoggedOut m }, Cmd.none ))
 
-                                PasswordChange newPassword ->
-                                    { model
-                                        | user =
-                                            LoggedOut
-                                                { username = username
-                                                , password = newPassword
-                                                }
-                                    }
-                                        |> pure
-
-                                Login ->
-                                    if username == "" || password == "" then
-                                        model |> pure
-
-                                    else
-                                        ( model, Api.logIn username password LoginRes |> Cmd.map LoggedOutView )
-
-                                LoginRes res ->
-                                    case res of
-                                        Ok v ->
-                                            ( { model | user = LoggedIn }, Api.fullSync FullSyncResp )
-
-                                        Err v ->
-                                            -- TODO: err handling
-                                            model |> pure
-
+                        -- case loggedOutMsg of
+                        -- UsernameChange newUsername ->
+                        --     { model
+                        --         | user =
+                        --             LoggedOut
+                        --                 { username = newUsername
+                        --                 , password = password
+                        --                 }
+                        --     }
+                        --         |> pure
+                        -- PasswordChange newPassword ->
+                        --     { model
+                        --         | user =
+                        --             LoggedOut
+                        --                 { username = username
+                        --                 , password = newPassword
+                        --                 }
+                        --     }
+                        --         |> pure
+                        -- Login ->
+                        --     if username == "" || password == "" then
+                        --         model |> pure
+                        --     else
+                        --         ( model, Api.logIn username password LoginRes |> Cmd.map LoggedOutView )
+                        -- LoginRes res ->
+                        --     case res of
+                        --         Ok v ->
+                        --             ( { model | user = LoggedIn }, Api.fullSync FullSyncResp )
+                        --         Err v ->
+                        --             -- TODO: err handling
+                        --             model |> pure
                         _ ->
                             model |> pure
 
@@ -1557,7 +1549,7 @@ view model =
         ]
         [ case model.user of
             LoggedOut m ->
-                Html.Styled.map LoggedOutView (logInView m)
+                Html.Styled.map LoggedOutView (LogIn.logInView { username = m.username, password = m.password })
 
             CheckingSessionValidity ->
                 div [] [ text "TODO" ]
@@ -1569,18 +1561,6 @@ view model =
 
 
 -- }
-
-
-logInView : LoggedOutModel -> Html LoggedOutMsg
-logInView { username, password } =
-    -- TODO: no styling, add styling
-    div [ css [ width (pct 100), height (pct 100), displayFlex ] ]
-        [ form [ css [ margin auto, displayFlex, flexDirection column, publicSans ], onSubmit Login ]
-            [ label [] [ text "Email: ", input [ placeholder "johnDoe@gmail.com", onInput UsernameChange, value username ] [] ]
-            , label [] [ text "Password: ", input [ placeholder "password1234", onInput PasswordChange, value password ] [] ]
-            , button [ type_ "submit" ] [ text "submit" ]
-            ]
-        ]
 
 
 labelsMenuWidth : Float
@@ -2692,11 +2672,6 @@ note model data =
         , content
         , labelsFooter
         ]
-
-
-publicSans : Style
-publicSans =
-    fontFamilies [ "Public Sans", .value sansSerif ]
 
 
 delaGothicOne : Style
