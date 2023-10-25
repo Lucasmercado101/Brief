@@ -2510,6 +2510,7 @@ mainViewNotesList model =
                         , flexDirection row
                         , flexWrap wrap
                         , marginTop (px 30)
+                        , alignItems flexStart
                         ]
                     ]
                     (List.map (note model)
@@ -2583,8 +2584,7 @@ note model data =
                 labels ->
                     div
                         [ css
-                            [ borderTop3 (px 1) solid (rgb 0 0 0)
-                            , padding (px 10)
+                            [ padding (px 10)
                             , displayFlex
                             , flexWrap wrap
                             , gap 5
