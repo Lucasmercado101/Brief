@@ -524,6 +524,7 @@ updateEditLabelsWithSignal toPageModel toPageMsg topModel ( m, c, maybeSignal ) 
                     labelIds
 
 
+addToQueue : (OfflineQueueOps -> OfflineQueueOps) -> List Api.DbID -> List Api.DbID -> ( Model, Cmd Msg ) -> ( Model, Cmd Msg )
 addToQueue operation notesIds labelsIds ( model, cmds ) =
     let
         currentOperations =
