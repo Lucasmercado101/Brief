@@ -1,5 +1,6 @@
 module Route exposing (..)
 
+import Browser.Navigation as Nav
 import Url exposing (Url)
 import Url.Parser exposing (Parser, map, oneOf, parse, s, top)
 
@@ -9,8 +10,8 @@ type Route
     | LogIn
 
 
-route : Parser (Route -> a) a
-route =
+parser : Parser (Route -> a) a
+parser =
     oneOf
         [ map Home top
         , map LogIn (s "log-in")
@@ -19,7 +20,7 @@ route =
 
 fromUrl : Url -> Route
 fromUrl url =
-    parse route url |> Maybe.withDefault LogIn
+    parse parser url |> Maybe.withDefault LogIn
 
 
 toRoute : String -> Route
@@ -29,4 +30,21 @@ toRoute string =
             LogIn
 
         Just url ->
-            Maybe.withDefault LogIn (parse route url)
+            Maybe.withDefault LogIn (parse parser url)
+
+
+replaceUrl : Nav.Key -> Route -> Cmd msg
+replaceUrl key route =
+    Nav.replaceUrl key (routeToString route)
+
+
+routeToString : Route -> String
+routeToString route =
+    "/"
+        ++ (case route of
+                Home ->
+                    ""
+
+                LogIn ->
+                    "log-in"
+           )

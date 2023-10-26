@@ -124,14 +124,8 @@ type alias Label =
     }
 
 
-type alias LoggedOutModel =
-    { username : String
-    , password : String
-    }
-
-
 type User
-    = LoggedOut LoggedOutModel
+    = LoggedOut LogIn.Model
     | CheckingSessionValidity
     | LoggedIn
 
@@ -193,7 +187,8 @@ type EditLabelKind
 
 
 type alias Model =
-    { seeds : List Random.Seed
+    { key : Nav.Key
+    , seeds : List Random.Seed
     , notes : List Note
     , labels : List Label
     , isWritingANewNote : Maybe NewNoteData
@@ -318,11 +313,9 @@ init flags url navKey =
     let
         seeds =
             List.map Random.initialSeed flags.seeds
-
-        currUrl =
-            Route.fromUrl url
     in
-    ( { seeds = seeds
+    ( { key = navKey
+      , seeds = seeds
       , notes = []
       , isWritingANewNote = Nothing
       , newLabelName = ""
@@ -338,10 +331,7 @@ init flags url navKey =
                 LoggedIn
 
             else
-                LoggedOut
-                    { username = ""
-                    , password = ""
-                    }
+                LoggedOut (LogIn.init navKey)
 
       -- sync stuff
       , offlineQueue = emptyOfflineQueue
@@ -393,9 +383,24 @@ update msg model =
             -- TODO:
             model |> pure
 
-        ChangedUrl _ ->
+        ChangedUrl newUrl ->
             -- TODO:
-            model |> pure
+            ( { model
+                | user =
+                    case Route.fromUrl newUrl of
+                        Route.Home ->
+                            LoggedIn
+
+                        Route.LogIn ->
+                            LoggedOut (LogIn.init model.key)
+              }
+            , case Route.fromUrl newUrl of
+                Route.Home ->
+                    Api.fullSync FullSyncResp
+
+                Route.LogIn ->
+                    Cmd.none
+            )
 
         _ ->
             -- TODO: sync with indexedDB
@@ -403,40 +408,9 @@ update msg model =
                 LoggedOut { username, password } ->
                     case msg of
                         LoggedOutView loggedOutMsg ->
-                            LogIn.update loggedOutMsg { username = username, password = password }
-                                |> (\( m, c ) -> ( { model | user = LoggedOut m }, Cmd.none ))
+                            LogIn.update loggedOutMsg { username = username, password = password, key = model.key }
+                                |> (\( m, c ) -> ( { model | user = LoggedOut m }, c |> Cmd.map LoggedOutView ))
 
-                        -- case loggedOutMsg of
-                        -- UsernameChange newUsername ->
-                        --     { model
-                        --         | user =
-                        --             LoggedOut
-                        --                 { username = newUsername
-                        --                 , password = password
-                        --                 }
-                        --     }
-                        --         |> pure
-                        -- PasswordChange newPassword ->
-                        --     { model
-                        --         | user =
-                        --             LoggedOut
-                        --                 { username = username
-                        --                 , password = newPassword
-                        --                 }
-                        --     }
-                        --         |> pure
-                        -- Login ->
-                        --     if username == "" || password == "" then
-                        --         model |> pure
-                        --     else
-                        --         ( model, Api.logIn username password LoginRes |> Cmd.map LoggedOutView )
-                        -- LoginRes res ->
-                        --     case res of
-                        --         Ok v ->
-                        --             ( { model | user = LoggedIn }, Api.fullSync FullSyncResp )
-                        --         Err v ->
-                        --             -- TODO: err handling
-                        --             model |> pure
                         _ ->
                             model |> pure
 
@@ -1549,7 +1523,7 @@ view model =
         ]
         [ case model.user of
             LoggedOut m ->
-                Html.Styled.map LoggedOutView (LogIn.logInView { username = m.username, password = m.password })
+                Html.Styled.map LoggedOutView (LogIn.logInView { username = m.username, password = m.password, key = m.key })
 
             CheckingSessionValidity ->
                 div [] [ text "TODO" ]
