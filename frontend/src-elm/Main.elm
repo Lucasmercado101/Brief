@@ -5,9 +5,10 @@ import Browser exposing (Document, UrlRequest)
 import Browser.Navigation as Nav
 import Cmd.Extra exposing (pure)
 import Css exposing (backgroundColor, backgroundImage, backgroundRepeat, backgroundSize, contain, fullWidth, height, pct, repeat, rgb, url, width)
+import DataTypes exposing (Label, Note)
 import Dog exposing (dogSvg)
 import Either exposing (Either(..))
-import Helpers exposing (maybeToBool)
+import Helpers exposing (exclude, labelIDsSplitter, listFirst, maybeToBool, sameId)
 import Html
 import Html.Styled exposing (Html, br, button, div, form, img, input, label, li, nav, p, span, strong, text, textarea, ul)
 import Html.Styled.Attributes exposing (class, css, for, id, placeholder, src, style, title, type_, value)
@@ -16,11 +17,11 @@ import Http
 import Material.Icons as Filled
 import Material.Icons.Outlined as Outlined
 import Material.Icons.Types exposing (Coloring(..))
-import OfflineQueue exposing (OfflineQueueOps, emptyOfflineQueue)
+import OfflineQueue exposing (OfflineQueueOps, emptyOfflineQueue, offlineQueueIsEmpty, queueToOperations)
 import Page.EditLabels as EditLabels
 import Page.Home as Home
 import Page.LogIn as LogIn
-import Ports exposing (requestRandomValues)
+import Ports exposing (requestRandomValues, updateLastSyncedAt)
 import Random
 import Random.Char
 import Random.Extra
@@ -90,6 +91,7 @@ type Msg
     | ChangedUrl Url
     | GotPageMsg PageMsg
     | FullSyncResp (Result Http.Error Api.FullSyncResponse)
+    | ReceivedChangesResp (Result Http.Error Api.ChangesResponse)
 
 
 
@@ -282,6 +284,169 @@ update topMsg topModel =
 
                 Err v ->
                     -- TODO: handle 403
+                    topModel |> pure
+
+        ReceivedChangesResp resp ->
+            case resp of
+                Ok { deleted, failedToCreate, failedToEdit, justSyncedAt, downSyncedData, justCreatedData } ->
+                    let
+                        updatePageModel m =
+                            { m
+                                | notes =
+                                    let
+                                        ( _, notOutdatedNotes ) =
+                                            List.partition
+                                                (\e -> List.any (\l -> sameId (DatabaseID l.id) e.id) downSyncedData.notes)
+                                                m.notes
+
+                                        updatedNotes : List Note
+                                        updatedNotes =
+                                            downSyncedData.notes
+                                                |> List.map
+                                                    (\e ->
+                                                        { id = DatabaseID e.id
+                                                        , title = e.title
+                                                        , content = e.content
+                                                        , pinned = e.pinned
+                                                        , createdAt = e.createdAt
+                                                        , updatedAt = e.updatedAt
+                                                        , labels = e.labels |> List.map DatabaseID
+                                                        }
+                                                    )
+                                    in
+                                    notOutdatedNotes
+                                        -- remove the ones that were failed to create
+                                        |> exclude (\l -> List.any (\e -> sameId l.id (OfflineID e)) failedToCreate)
+                                        -- remove the ones that don't exist in DB
+                                        |> exclude (\l -> List.any (\e -> sameId l.id (DatabaseID e)) deleted.notes)
+                                        -- update just created
+                                        |> List.map
+                                            (\l ->
+                                                case listFirst (\( _, offlineId ) -> sameId l.id (OfflineID offlineId)) justCreatedData.notes of
+                                                    Just ( v, _ ) ->
+                                                        { id = DatabaseID v.id
+                                                        , title = v.title
+                                                        , content = v.content
+                                                        , pinned = v.pinned
+                                                        , createdAt = v.createdAt
+                                                        , updatedAt = v.updatedAt
+                                                        , labels = v.labels |> List.map DatabaseID
+                                                        }
+
+                                                    Nothing ->
+                                                        l
+                                            )
+                                        |> (++) updatedNotes
+                                , labels =
+                                    let
+                                        ( _, notOutdatedLabels ) =
+                                            List.partition
+                                                (\e -> List.any (\l -> sameId (DatabaseID l.id) e.id) downSyncedData.labels)
+                                                m.labels
+
+                                        updatedLabels : List Label
+                                        updatedLabels =
+                                            downSyncedData.labels
+                                                |> List.map
+                                                    (\e ->
+                                                        { id = DatabaseID e.id
+                                                        , name = e.name
+                                                        , createdAt = e.createdAt
+                                                        , updatedAt = e.updatedAt
+                                                        }
+                                                    )
+                                    in
+                                    notOutdatedLabels
+                                        -- remove the ones that were failed to create
+                                        |> exclude (\l -> List.any (\e -> sameId l.id (OfflineID e)) failedToCreate)
+                                        -- remove the ones that don't exist in DB
+                                        |> exclude (\l -> List.any (\e -> sameId l.id (DatabaseID e)) deleted.labels)
+                                        -- update just created
+                                        |> List.map
+                                            (\l ->
+                                                case listFirst (\( _, offlineId ) -> sameId l.id (OfflineID offlineId)) justCreatedData.labels of
+                                                    Just ( v, _ ) ->
+                                                        { id = DatabaseID v.id
+                                                        , name = v.name
+                                                        , createdAt = v.createdAt
+                                                        , updatedAt = v.updatedAt
+                                                        }
+
+                                                    Nothing ->
+                                                        l
+                                            )
+                                        |> (++) updatedLabels
+                            }
+
+                        updatedPageModel =
+                            case topModel.page of
+                                Home homeModel ->
+                                    Home (updatePageModel homeModel)
+
+                                EditLabels editLabelsModel ->
+                                    EditLabels (updatePageModel editLabelsModel)
+
+                                LogIn logInModel ->
+                                    -- TODO: separate page
+                                    LogIn logInModel
+
+                        labels : List Label
+                        labels =
+                            case updatedPageModel of
+                                Home homeModel ->
+                                    homeModel.labels
+
+                                EditLabels editLabelsModel ->
+                                    editLabelsModel.labels
+
+                                LogIn logInModel ->
+                                    -- TODO: separate page
+                                    []
+
+                        notes : List Note
+                        notes =
+                            case updatedPageModel of
+                                Home homeModel ->
+                                    homeModel.notes
+
+                                EditLabels editLabelsModel ->
+                                    editLabelsModel.notes
+
+                                LogIn logInModel ->
+                                    -- TODO: separate page
+                                    []
+                    in
+                    ( { topModel
+                        | page = updatedPageModel
+                        , offlineQueue = emptyOfflineQueue
+                        , runningQueueOn =
+                            if offlineQueueIsEmpty topModel.offlineQueue then
+                                Nothing
+
+                            else
+                                Just topModel.offlineQueue
+                        , lastSyncedAt = justSyncedAt
+                      }
+                    , Cmd.batch
+                        [ updateLastSyncedAt (Time.posixToMillis justSyncedAt)
+                        , if offlineQueueIsEmpty topModel.offlineQueue then
+                            Cmd.none
+
+                          else
+                            Api.sendChanges
+                                { operations = queueToOperations topModel.offlineQueue
+                                , lastSyncedAt = justSyncedAt
+                                , currentData =
+                                    { notes = notes |> List.map .id |> labelIDsSplitter |> Tuple.second
+                                    , labels = labels |> List.map .id |> labelIDsSplitter |> Tuple.second
+                                    }
+                                }
+                                ReceivedChangesResp
+                        ]
+                    )
+
+                Err _ ->
+                    -- TODO: error handling here
                     topModel |> pure
 
 
