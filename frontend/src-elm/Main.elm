@@ -124,12 +124,6 @@ type alias Label =
     }
 
 
-type User
-    = LoggedOut LogIn.Model
-    | CheckingSessionValidity
-    | LoggedIn
-
-
 type alias OQCreateLabel =
     { offlineId : String, name : String }
 
@@ -186,14 +180,20 @@ type EditLabelKind
     | Editing SyncableID String
 
 
-type alias Model =
+type Model
+    = LogIn (List Random.Seed) LogIn.Model
+      -- TODO: check if session is valid on entering website,
+      -- then go to either logIn or Home
+    | Home HomeModel
+
+
+type alias HomeModel =
     { key : Nav.Key
     , seeds : List Random.Seed
     , notes : List Note
     , labels : List Label
     , isWritingANewNote : Maybe NewNoteData
     , newLabelName : String
-    , user : User
     , labelsMenu : LabelsColumnMenu
     , filters :
         { label : Maybe SyncableID
@@ -229,7 +229,7 @@ type alias NewNoteData =
 
 
 type Msg
-    = LoggedOutView LogIn.Msg
+    = GotLogInMsg LogIn.Msg
     | LoggedInView LoggedInMsg
     | FullSyncResp (Result Http.Error Api.FullSyncResponse)
     | ClickedLink UrlRequest
@@ -314,37 +314,36 @@ init flags url navKey =
         seeds =
             List.map Random.initialSeed flags.seeds
     in
-    ( { key = navKey
-      , seeds = seeds
-      , notes = []
-      , isWritingANewNote = Nothing
-      , newLabelName = ""
-      , labels = []
-      , labelsMenu = Nothing
-      , editLabelsScreen = Nothing
-      , filters =
-            { label = Nothing
-            , content = Nothing
+    if flags.hasSessionCookie then
+        ( Home
+            { key = navKey
+            , seeds = seeds
+            , notes = []
+            , isWritingANewNote = Nothing
+            , newLabelName = ""
+            , labels = []
+            , labelsMenu = Nothing
+            , editLabelsScreen = Nothing
+            , filters =
+                { label = Nothing
+                , content = Nothing
+                }
+
+            -- sync stuff
+            , offlineQueue = emptyOfflineQueue
+            , runningQueueOn = Nothing
+            , lastSyncedAt = Time.millisToPosix flags.lastSyncedAt
             }
-      , user =
-            if flags.hasSessionCookie then
-                LoggedIn
+          -- TODO: full-sync with regards to indexedDb
+        , if flags.hasSessionCookie then
+            Api.fullSync FullSyncResp
 
-            else
-                LoggedOut (LogIn.init navKey)
+          else
+            Cmd.none
+        )
 
-      -- sync stuff
-      , offlineQueue = emptyOfflineQueue
-      , runningQueueOn = Nothing
-      , lastSyncedAt = Time.millisToPosix flags.lastSyncedAt
-      }
-      -- TODO: full-sync with regards to indexedDb
-    , if flags.hasSessionCookie then
-        Api.fullSync FullSyncResp
-
-      else
-        Cmd.none
-    )
+    else
+        ( LogIn seeds (LogIn.init navKey), Cmd.none )
 
 
 main : Program Flags Model Msg
@@ -376,889 +375,908 @@ main =
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
-update msg model =
-    case msg of
+update topMsg topModel =
+    case ( topMsg, topModel ) of
         -- TODO: fix this
-        ClickedLink _ ->
+        ( ClickedLink _, _ ) ->
             -- TODO:
-            model |> pure
+            topModel |> pure
 
-        ChangedUrl newUrl ->
+        ( ChangedUrl newUrl, _ ) ->
             -- TODO:
-            ( { model
-                | user =
-                    case Route.fromUrl newUrl of
-                        Route.Home ->
-                            LoggedIn
-
-                        Route.LogIn ->
-                            LoggedOut (LogIn.init model.key)
-              }
-            , case Route.fromUrl newUrl of
+            (-- TODO: double check or change Route model
+             case Route.fromUrl newUrl of
                 Route.Home ->
-                    Api.fullSync FullSyncResp
+                    case topModel of
+                        Home _ ->
+                            -- TODO: better
+                            topModel |> pure
+
+                        LogIn seeds { key } ->
+                            ( Home
+                                { -- TODO: better way
+                                  key = key
+                                , seeds = seeds
+                                , notes = []
+                                , isWritingANewNote = Nothing
+                                , newLabelName = ""
+                                , labels = []
+                                , labelsMenu = Nothing
+                                , editLabelsScreen = Nothing
+                                , filters =
+                                    { label = Nothing
+                                    , content = Nothing
+                                    }
+
+                                -- sync stuff
+                                , offlineQueue = emptyOfflineQueue
+                                , runningQueueOn = Nothing
+
+                                -- TODO:
+                                , lastSyncedAt = Time.millisToPosix 1
+                                }
+                            , Cmd.batch [ Api.fullSync FullSyncResp, requestRandomValues () ]
+                            )
 
                 Route.LogIn ->
-                    Cmd.none
+                    ( topModel, Cmd.none )
             )
 
-        _ ->
-            -- TODO: sync with indexedDB
-            case model.user of
-                LoggedOut { username, password } ->
-                    case msg of
-                        LoggedOutView loggedOutMsg ->
-                            LogIn.update loggedOutMsg { username = username, password = password, key = model.key }
-                                |> (\( m, c ) -> ( { model | user = LoggedOut m }, c |> Cmd.map LoggedOutView ))
+        ( GotLogInMsg loginMsg, LogIn randSeeds logInModel ) ->
+            LogIn.update loginMsg logInModel
+                |> (\( m, c ) -> ( LogIn randSeeds m, Cmd.map GotLogInMsg c ))
 
-                        _ ->
-                            model |> pure
+        ( LoggedInView msg, Home homeModel ) ->
+            (case topMsg of
+                -- TODO: TEMP
+                GotLogInMsg _ ->
+                    homeModel |> pure
 
-                CheckingSessionValidity ->
+                -- TODO: fix this
+                ClickedLink _ ->
                     -- TODO:
-                    model |> pure
-
-                LoggedIn ->
-                    case msg of
-                        -- TODO: fix this
-                        ClickedLink _ ->
-                            -- TODO:
-                            model |> pure
-
-                        ChangedUrl _ ->
-                            -- TODO:
-                            model |> pure
-
-                        LoggedInView loggedInMsg ->
-                            case loggedInMsg of
-                                EditLabelsView editLabelsViewMsg ->
-                                    case model.editLabelsScreen of
-                                        Nothing ->
-                                            model |> pure
-
-                                        Just editLabelsScreenData ->
-                                            case editLabelsViewMsg of
-                                                ExitEditingLabelsView ->
-                                                    { model | editLabelsScreen = Nothing }
-                                                        |> pure
-
-                                                ChangeEditLabelsSearchQuery newQuery ->
-                                                    { model | editLabelsScreen = Just { editLabelsScreenData | searchQuery = newQuery } }
-                                                        |> pure
-
-                                                CreateNewLabelEditLabelsView ->
-                                                    if String.length editLabelsScreenData.searchQuery == 0 then
-                                                        model |> pure
-
-                                                    else if List.any (\l -> l.name == editLabelsScreenData.searchQuery) model.labels then
-                                                        -- TODO: make this visual to the user in the form of an error
-                                                        model |> pure
-
-                                                    else
-                                                        let
-                                                            newLabelOfflineId : String
-                                                            newLabelOfflineId =
-                                                                generateUID model.seeds |> Tuple.first
-
-                                                            newLabel =
-                                                                { id = newLabelOfflineId
-                                                                , name = editLabelsScreenData.searchQuery
-                                                                }
-                                                        in
-                                                        ( { model | editLabelsScreen = Just { editLabelsScreenData | searchQuery = "" } }, Cmd.batch [ requestRandomValues (), getNewTimeAndCreateLabel newLabel ] )
-
-                                                SelectLabel id ->
-                                                    { model
-                                                        | editLabelsScreen =
-                                                            let
-                                                                sameIdOnSelected =
-                                                                    \e ->
-                                                                        case e of
-                                                                            Selected i ->
-                                                                                sameId id i
-
-                                                                            ConfirmDelete i ->
-                                                                                sameId id i
-
-                                                                            Editing i _ ->
-                                                                                sameId id i
-                                                            in
-                                                            Just
-                                                                { editLabelsScreenData
-                                                                    | selected =
-                                                                        if List.any sameIdOnSelected editLabelsScreenData.selected then
-                                                                            editLabelsScreenData.selected |> exclude sameIdOnSelected
-
-                                                                        else
-                                                                            Selected id :: editLabelsScreenData.selected
-                                                                }
-                                                    }
-                                                        |> pure
-
-                                                ClearEditLabelsSelections ->
-                                                    { model
-                                                        | editLabelsScreen =
-                                                            Just { editLabelsScreenData | selected = [] }
-                                                    }
-                                                        |> pure
-
-                                                RequestDeleteLabel id ->
-                                                    { model
-                                                        | editLabelsScreen =
-                                                            Just
-                                                                { editLabelsScreenData
-                                                                    | selected =
-                                                                        editLabelsScreenData.selected
-                                                                            |> List.map
-                                                                                (\e ->
-                                                                                    case e of
-                                                                                        Selected i ->
-                                                                                            if sameId i id then
-                                                                                                ConfirmDelete i
-
-                                                                                            else
-                                                                                                e
-
-                                                                                        ConfirmDelete _ ->
-                                                                                            e
-
-                                                                                        Editing _ _ ->
-                                                                                            e
-                                                                                )
-                                                                }
-                                                    }
-                                                        |> pure
-
-                                                ConfirmDeleteLabel id ->
-                                                    { model
-                                                        | labels = model.labels |> exclude (.id >> sameId id)
-                                                        , editLabelsScreen =
-                                                            Just
-                                                                { editLabelsScreenData
-                                                                    | selected =
-                                                                        editLabelsScreenData.selected
-                                                                            |> List.filter
-                                                                                (\e ->
-                                                                                    case e of
-                                                                                        Selected i ->
-                                                                                            True
-
-                                                                                        ConfirmDelete i ->
-                                                                                            if sameId i id then
-                                                                                                False
-
-                                                                                            else
-                                                                                                True
-
-                                                                                        Editing _ _ ->
-                                                                                            True
-                                                                                )
-                                                                }
-                                                    }
-                                                        |> pure
-                                                        |> addToQueue (qDeleteLabel id)
-
-                                                CancelDeleteLabel id ->
-                                                    { model
-                                                        | editLabelsScreen =
-                                                            Just
-                                                                { editLabelsScreenData
-                                                                    | selected =
-                                                                        editLabelsScreenData.selected
-                                                                            |> List.map
-                                                                                (\e ->
-                                                                                    case e of
-                                                                                        Selected i ->
-                                                                                            e
-
-                                                                                        ConfirmDelete i ->
-                                                                                            if sameId i id then
-                                                                                                Selected i
-
-                                                                                            else
-                                                                                                e
-
-                                                                                        Editing _ _ ->
-                                                                                            e
-                                                                                )
-                                                                }
-                                                    }
-                                                        |> pure
-
-                                                EditLabel ( id, newName ) ->
-                                                    { model
-                                                        | editLabelsScreen =
-                                                            Just
-                                                                { editLabelsScreenData
-                                                                    | selected =
-                                                                        editLabelsScreenData.selected
-                                                                            |> List.map
-                                                                                (\e ->
-                                                                                    case e of
-                                                                                        Selected i ->
-                                                                                            if sameId i id then
-                                                                                                Editing id newName
-
-                                                                                            else
-                                                                                                e
-
-                                                                                        ConfirmDelete i ->
-                                                                                            e
-
-                                                                                        Editing _ _ ->
-                                                                                            e
-                                                                                )
-                                                                }
-                                                    }
-                                                        |> pure
-
-                                                ChangeEditingLabelName ( id, newName ) ->
-                                                    { model
-                                                        | editLabelsScreen =
-                                                            Just
-                                                                { editLabelsScreenData
-                                                                    | selected =
-                                                                        editLabelsScreenData.selected
-                                                                            |> List.map
-                                                                                (\e ->
-                                                                                    case e of
-                                                                                        Selected i ->
-                                                                                            e
-
-                                                                                        ConfirmDelete i ->
-                                                                                            e
-
-                                                                                        Editing i _ ->
-                                                                                            if sameId i id then
-                                                                                                Editing id newName
-
-                                                                                            else
-                                                                                                e
-                                                                                )
-                                                                }
-                                                    }
-                                                        |> pure
-
-                                                ConfirmEditingLabelName ( id, newName ) ->
-                                                    if newName == "" then
-                                                        model |> pure
-
-                                                    else if List.any (\l -> (l.name |> String.toLower) == (newName |> String.toLower)) model.labels then
-                                                        -- TODO: show message to the user "This label already exists"
-                                                        -- and disable create button
-                                                        model |> pure
-
-                                                    else
-                                                        { model
-                                                            | labels =
-                                                                model.labels
-                                                                    |> List.map
-                                                                        (\l ->
-                                                                            if sameId l.id id then
-                                                                                { l | name = newName }
-
-                                                                            else
-                                                                                l
-                                                                        )
-                                                            , editLabelsScreen =
-                                                                Just
-                                                                    { editLabelsScreenData
-                                                                        | selected =
-                                                                            editLabelsScreenData.selected
-                                                                                |> List.map
-                                                                                    (\e ->
-                                                                                        case e of
-                                                                                            Selected i ->
-                                                                                                e
-
-                                                                                            ConfirmDelete i ->
-                                                                                                e
-
-                                                                                            Editing i _ ->
-                                                                                                if sameId i id then
-                                                                                                    Selected i
-
-                                                                                                else
-                                                                                                    e
-                                                                                    )
-                                                                    }
-                                                        }
-                                                            |> pure
-                                                            |> addToQueue (qEditLabelName { name = newName, id = id })
-
-                                                CancelEditingLabelName id ->
-                                                    { model
-                                                        | editLabelsScreen =
-                                                            Just
-                                                                { editLabelsScreenData
-                                                                    | selected =
-                                                                        editLabelsScreenData.selected
-                                                                            |> List.map
-                                                                                (\e ->
-                                                                                    case e of
-                                                                                        Selected i ->
-                                                                                            e
-
-                                                                                        ConfirmDelete i ->
-                                                                                            e
-
-                                                                                        Editing i _ ->
-                                                                                            if sameId i id then
-                                                                                                Selected i
-
-                                                                                            else
-                                                                                                e
-                                                                                )
-                                                                }
-                                                    }
-                                                        |> pure
-
-                                                RemoveLabelFromSelected id ->
-                                                    { model
-                                                        | editLabelsScreen =
-                                                            Just
-                                                                { editLabelsScreenData
-                                                                    | selected =
-                                                                        editLabelsScreenData.selected
-                                                                            |> exclude
-                                                                                (\e ->
-                                                                                    case e of
-                                                                                        Selected i ->
-                                                                                            sameId id i
-
-                                                                                        ConfirmDelete i ->
-                                                                                            sameId id i
-
-                                                                                        Editing i _ ->
-                                                                                            sameId id i
-                                                                                )
-                                                                }
-                                                    }
-                                                        |> pure
-
-                                                RequestConfirmDeleteMultipleLabels ->
-                                                    { model
-                                                        | editLabelsScreen =
-                                                            Just
-                                                                { editLabelsScreenData
-                                                                    | confirmDeleteAllSelectedLabels = True
-                                                                }
-                                                    }
-                                                        |> pure
-
-                                                CancelDeleteMultipleLabels ->
-                                                    { model
-                                                        | editLabelsScreen =
-                                                            Just
-                                                                { editLabelsScreenData
-                                                                    | confirmDeleteAllSelectedLabels = False
-                                                                }
-                                                    }
-                                                        |> pure
-
-                                                ConfirmDeleteMultipleLabels ->
-                                                    let
-                                                        deletedIds : List SyncableID
-                                                        deletedIds =
-                                                            editLabelsScreenData.selected
-                                                                |> List.map
-                                                                    (\e ->
-                                                                        case e of
-                                                                            Selected i ->
-                                                                                i
-
-                                                                            ConfirmDelete i ->
-                                                                                i
-
-                                                                            Editing i _ ->
-                                                                                i
-                                                                    )
-                                                    in
-                                                    { model
-                                                        | labels =
-                                                            model.labels
-                                                                |> exclude (\l -> List.any (sameId l.id) deletedIds)
-                                                        , editLabelsScreen =
-                                                            Just { editLabelsScreenData | selected = [], confirmDeleteAllSelectedLabels = False }
-                                                    }
-                                                        |> pure
-                                                        |> addToQueue (qDeleteLabels deletedIds)
-
-                                -- Labels column menu
-                                OpenLabelsMenu ->
-                                    { model | labelsMenu = Just "" }
-                                        |> pure
-
-                                CloseLabelsMenu ->
-                                    { model | labelsMenu = Nothing }
-                                        |> pure
-
-                                ChangeLabelsSearchQuery s ->
-                                    { model | labelsMenu = Maybe.map (\_ -> s) model.labelsMenu }
-                                        |> pure
-
-                                SelectLabelToFilterBy id ->
-                                    let
-                                        newFilter : Maybe SyncableID
-                                        newFilter =
-                                            case model.filters.label of
-                                                Nothing ->
-                                                    Just id
-
-                                                Just oldId ->
-                                                    if sameId oldId id then
-                                                        Nothing
-
-                                                    else
-                                                        Just id
-                                    in
-                                    { model
-                                        | filters =
-                                            { label = newFilter
-                                            , content = model.filters.content
-                                            }
-                                    }
-                                        |> pure
-
-                                GoToEditLabelsScreen ->
-                                    { model
-                                        | editLabelsScreen =
-                                            Just
-                                                { selected = []
-                                                , searchQuery = ""
-                                                , confirmDeleteAllSelectedLabels = False
-                                                }
-                                        , labelsMenu = Nothing
-                                    }
-                                        |> pure
-
-                                ChangeNotePinned ( uid, newPinnedVal ) ->
-                                    { model
-                                        | notes =
-                                            List.map
-                                                (\n ->
-                                                    if n.id == uid then
-                                                        { n | pinned = newPinnedVal }
-
-                                                    else
-                                                        n
-                                                )
-                                                model.notes
-                                    }
-                                        |> pure
-                                        |> addToQueue (qToggleNotePin uid (Just newPinnedVal))
-
-                                RemoveLabelFromNote { noteID, labelID } ->
-                                    let
-                                        ( noteExists, restNotes ) =
-                                            partitionFirst (\n -> sameId n.id noteID) model.notes
-                                    in
-                                    case noteExists of
-                                        Nothing ->
-                                            model |> pure
-
-                                        Just noteData ->
-                                            let
-                                                newNotes =
-                                                    noteData.labels |> exclude (sameId labelID)
-                                            in
-                                            { model | notes = { noteData | labels = newNotes } :: restNotes }
+                    homeModel |> pure
+
+                ChangedUrl _ ->
+                    -- TODO:
+                    homeModel |> pure
+
+                LoggedInView loggedInMsg ->
+                    case loggedInMsg of
+                        EditLabelsView editLabelsViewMsg ->
+                            case homeModel.editLabelsScreen of
+                                Nothing ->
+                                    homeModel |> pure
+
+                                Just editLabelsScreenData ->
+                                    case editLabelsViewMsg of
+                                        ExitEditingLabelsView ->
+                                            { homeModel | editLabelsScreen = Nothing }
                                                 |> pure
-                                                |> addToQueue (qEditNoteLabels noteID (Just newNotes))
 
-                                DeleteNote toDeleteNoteID ->
-                                    { model | notes = model.notes |> exclude (.id >> sameId toDeleteNoteID) }
-                                        |> pure
-                                        |> addToQueue (qDeleteNote toDeleteNoteID)
+                                        ChangeEditLabelsSearchQuery newQuery ->
+                                            { homeModel | editLabelsScreen = Just { editLabelsScreenData | searchQuery = newQuery } }
+                                                |> pure
 
-                                ChangeNewLabelName newName ->
-                                    { model | newLabelName = newName }
-                                        |> pure
+                                        CreateNewLabelEditLabelsView ->
+                                            if String.length editLabelsScreenData.searchQuery == 0 then
+                                                homeModel |> pure
 
-                                RequestTimeForNewLabelCreation ->
-                                    if String.length model.newLabelName == 0 then
-                                        model |> pure
-
-                                    else if List.any (\l -> l.name == model.newLabelName) model.labels then
-                                        -- TODO: make this visual to the user in the form of an error
-                                        model |> pure
-
-                                    else
-                                        let
-                                            newLabelOfflineId : String
-                                            newLabelOfflineId =
-                                                generateUID model.seeds |> Tuple.first
-
-                                            newLabel =
-                                                { id = newLabelOfflineId
-                                                , name = model.newLabelName
-                                                }
-                                        in
-                                        ( model, Cmd.batch [ requestRandomValues (), getNewTimeAndCreateLabel newLabel ] )
-
-                                CreateNewLabel data time ->
-                                    { model
-                                        | newLabelName = ""
-                                        , labels =
-                                            { id = OfflineID data.id
-                                            , name = data.name
-                                            , updatedAt = time
-                                            , createdAt = time
-                                            }
-                                                :: model.labels
-                                    }
-                                        |> pure
-                                        |> addToQueue (qNewLabel { offlineId = data.id, name = data.name })
-
-                                ReceivedRandomValues values ->
-                                    { model | seeds = List.map Random.initialSeed values }
-                                        |> pure
-
-                                BeginWritingNewNote ->
-                                    { model
-                                        | isWritingANewNote =
-                                            Just
-                                                { title = ""
-                                                , content = ""
-                                                , labels = Nothing
-                                                }
-                                    }
-                                        |> pure
-
-                                NewTitleChange s ->
-                                    { model
-                                        | isWritingANewNote =
-                                            Maybe.map
-                                                (\data ->
-                                                    { data
-                                                        | title = s
-                                                    }
-                                                )
-                                                model.isWritingANewNote
-                                    }
-                                        |> pure
-
-                                NewNoteContentChange s ->
-                                    { model
-                                        | isWritingANewNote =
-                                            Maybe.map
-                                                (\data ->
-                                                    { data | content = s }
-                                                )
-                                                model.isWritingANewNote
-                                    }
-                                        |> pure
-
-                                SearchLabelsQueryChange s ->
-                                    { model
-                                        | isWritingANewNote =
-                                            Maybe.map
-                                                (\data ->
-                                                    { data
-                                                        | labels =
-                                                            Maybe.map
-                                                                (\{ labels } ->
-                                                                    { labels = labels
-                                                                    , labelsSearchQuery = s
-                                                                    }
-                                                                )
-                                                                data.labels
-                                                    }
-                                                )
-                                                model.isWritingANewNote
-                                    }
-                                        |> pure
-
-                                AddLabelToNewNote newLabel ->
-                                    { model
-                                        | isWritingANewNote =
-                                            Maybe.map
-                                                (\data ->
-                                                    { data
-                                                        | labels =
-                                                            Maybe.map
-                                                                (\{ labelsSearchQuery, labels } ->
-                                                                    { labels = newLabel :: labels
-                                                                    , labelsSearchQuery = labelsSearchQuery
-                                                                    }
-                                                                )
-                                                                data.labels
-                                                    }
-                                                )
-                                                model.isWritingANewNote
-                                    }
-                                        |> pure
-
-                                RemoveLabelFromNewNote labelID ->
-                                    { model
-                                        | isWritingANewNote =
-                                            model.isWritingANewNote
-                                                |> Maybe.map
-                                                    (\data ->
-                                                        { data
-                                                            | labels =
-                                                                data.labels
-                                                                    |> Maybe.map
-                                                                        (\{ labelsSearchQuery, labels } ->
-                                                                            { labels = labels |> exclude (sameId labelID)
-                                                                            , labelsSearchQuery = labelsSearchQuery
-                                                                            }
-                                                                        )
-                                                        }
-                                                    )
-                                    }
-                                        |> pure
-
-                                RequestTimeForCreateNewNote ->
-                                    case model.isWritingANewNote of
-                                        Nothing ->
-                                            model |> pure
-
-                                        Just newNoteData ->
-                                            if String.length newNoteData.content == 0 then
-                                                model |> pure
+                                            else if List.any (\l -> l.name == editLabelsScreenData.searchQuery) homeModel.labels then
+                                                -- TODO: make this visual to the user in the form of an error
+                                                homeModel |> pure
 
                                             else
                                                 let
-                                                    newNoteOfflineId =
-                                                        generateUID model.seeds |> Tuple.first
+                                                    newLabelOfflineId : String
+                                                    newLabelOfflineId =
+                                                        generateUID homeModel.seeds |> Tuple.first
 
-                                                    newNote =
-                                                        { id = newNoteOfflineId
-                                                        , title = newNoteData.title
-                                                        , content = newNoteData.content
-                                                        , pinned = False
-                                                        , labels =
-                                                            case newNoteData.labels of
-                                                                Just { labels } ->
-                                                                    labels
-
-                                                                Nothing ->
-                                                                    []
+                                                    newLabel =
+                                                        { id = newLabelOfflineId
+                                                        , name = editLabelsScreenData.searchQuery
                                                         }
                                                 in
-                                                ( model
-                                                , Cmd.batch [ requestRandomValues (), getNewTimeForCreateNewNote newNote ]
-                                                )
+                                                ( { homeModel | editLabelsScreen = Just { editLabelsScreenData | searchQuery = "" } }, Cmd.batch [ requestRandomValues (), getNewTimeAndCreateLabel newLabel ] )
 
-                                GotCurrentTimeForNewNote noteData time ->
-                                    let
-                                        newNote : Note
-                                        newNote =
-                                            { id = OfflineID noteData.id
-                                            , title =
-                                                if String.length noteData.title == 0 then
-                                                    Nothing
+                                        SelectLabel id ->
+                                            { homeModel
+                                                | editLabelsScreen =
+                                                    let
+                                                        sameIdOnSelected =
+                                                            \e ->
+                                                                case e of
+                                                                    Selected i ->
+                                                                        sameId id i
 
-                                                else
-                                                    Just noteData.title
-                                            , content = noteData.content
-                                            , pinned = noteData.pinned
-                                            , labels = noteData.labels
-                                            , createdAt = time
-                                            , updatedAt = time
+                                                                    ConfirmDelete i ->
+                                                                        sameId id i
+
+                                                                    Editing i _ ->
+                                                                        sameId id i
+                                                    in
+                                                    Just
+                                                        { editLabelsScreenData
+                                                            | selected =
+                                                                if List.any sameIdOnSelected editLabelsScreenData.selected then
+                                                                    editLabelsScreenData.selected |> exclude sameIdOnSelected
+
+                                                                else
+                                                                    Selected id :: editLabelsScreenData.selected
+                                                        }
                                             }
-                                    in
-                                    { model
-                                        | isWritingANewNote = Nothing
-                                        , notes = newNote :: model.notes
+                                                |> pure
+
+                                        ClearEditLabelsSelections ->
+                                            { homeModel
+                                                | editLabelsScreen =
+                                                    Just { editLabelsScreenData | selected = [] }
+                                            }
+                                                |> pure
+
+                                        RequestDeleteLabel id ->
+                                            { homeModel
+                                                | editLabelsScreen =
+                                                    Just
+                                                        { editLabelsScreenData
+                                                            | selected =
+                                                                editLabelsScreenData.selected
+                                                                    |> List.map
+                                                                        (\e ->
+                                                                            case e of
+                                                                                Selected i ->
+                                                                                    if sameId i id then
+                                                                                        ConfirmDelete i
+
+                                                                                    else
+                                                                                        e
+
+                                                                                ConfirmDelete _ ->
+                                                                                    e
+
+                                                                                Editing _ _ ->
+                                                                                    e
+                                                                        )
+                                                        }
+                                            }
+                                                |> pure
+
+                                        ConfirmDeleteLabel id ->
+                                            { homeModel
+                                                | labels = homeModel.labels |> exclude (.id >> sameId id)
+                                                , editLabelsScreen =
+                                                    Just
+                                                        { editLabelsScreenData
+                                                            | selected =
+                                                                editLabelsScreenData.selected
+                                                                    |> List.filter
+                                                                        (\e ->
+                                                                            case e of
+                                                                                Selected i ->
+                                                                                    True
+
+                                                                                ConfirmDelete i ->
+                                                                                    if sameId i id then
+                                                                                        False
+
+                                                                                    else
+                                                                                        True
+
+                                                                                Editing _ _ ->
+                                                                                    True
+                                                                        )
+                                                        }
+                                            }
+                                                |> pure
+                                                |> addToQueue (qDeleteLabel id)
+
+                                        CancelDeleteLabel id ->
+                                            { homeModel
+                                                | editLabelsScreen =
+                                                    Just
+                                                        { editLabelsScreenData
+                                                            | selected =
+                                                                editLabelsScreenData.selected
+                                                                    |> List.map
+                                                                        (\e ->
+                                                                            case e of
+                                                                                Selected i ->
+                                                                                    e
+
+                                                                                ConfirmDelete i ->
+                                                                                    if sameId i id then
+                                                                                        Selected i
+
+                                                                                    else
+                                                                                        e
+
+                                                                                Editing _ _ ->
+                                                                                    e
+                                                                        )
+                                                        }
+                                            }
+                                                |> pure
+
+                                        EditLabel ( id, newName ) ->
+                                            { homeModel
+                                                | editLabelsScreen =
+                                                    Just
+                                                        { editLabelsScreenData
+                                                            | selected =
+                                                                editLabelsScreenData.selected
+                                                                    |> List.map
+                                                                        (\e ->
+                                                                            case e of
+                                                                                Selected i ->
+                                                                                    if sameId i id then
+                                                                                        Editing id newName
+
+                                                                                    else
+                                                                                        e
+
+                                                                                ConfirmDelete i ->
+                                                                                    e
+
+                                                                                Editing _ _ ->
+                                                                                    e
+                                                                        )
+                                                        }
+                                            }
+                                                |> pure
+
+                                        ChangeEditingLabelName ( id, newName ) ->
+                                            { homeModel
+                                                | editLabelsScreen =
+                                                    Just
+                                                        { editLabelsScreenData
+                                                            | selected =
+                                                                editLabelsScreenData.selected
+                                                                    |> List.map
+                                                                        (\e ->
+                                                                            case e of
+                                                                                Selected i ->
+                                                                                    e
+
+                                                                                ConfirmDelete i ->
+                                                                                    e
+
+                                                                                Editing i _ ->
+                                                                                    if sameId i id then
+                                                                                        Editing id newName
+
+                                                                                    else
+                                                                                        e
+                                                                        )
+                                                        }
+                                            }
+                                                |> pure
+
+                                        ConfirmEditingLabelName ( id, newName ) ->
+                                            if newName == "" then
+                                                homeModel |> pure
+
+                                            else if List.any (\l -> (l.name |> String.toLower) == (newName |> String.toLower)) homeModel.labels then
+                                                -- TODO: show message to the user "This label already exists"
+                                                -- and disable create button
+                                                homeModel |> pure
+
+                                            else
+                                                { homeModel
+                                                    | labels =
+                                                        homeModel.labels
+                                                            |> List.map
+                                                                (\l ->
+                                                                    if sameId l.id id then
+                                                                        { l | name = newName }
+
+                                                                    else
+                                                                        l
+                                                                )
+                                                    , editLabelsScreen =
+                                                        Just
+                                                            { editLabelsScreenData
+                                                                | selected =
+                                                                    editLabelsScreenData.selected
+                                                                        |> List.map
+                                                                            (\e ->
+                                                                                case e of
+                                                                                    Selected i ->
+                                                                                        e
+
+                                                                                    ConfirmDelete i ->
+                                                                                        e
+
+                                                                                    Editing i _ ->
+                                                                                        if sameId i id then
+                                                                                            Selected i
+
+                                                                                        else
+                                                                                            e
+                                                                            )
+                                                            }
+                                                }
+                                                    |> pure
+                                                    |> addToQueue (qEditLabelName { name = newName, id = id })
+
+                                        CancelEditingLabelName id ->
+                                            { homeModel
+                                                | editLabelsScreen =
+                                                    Just
+                                                        { editLabelsScreenData
+                                                            | selected =
+                                                                editLabelsScreenData.selected
+                                                                    |> List.map
+                                                                        (\e ->
+                                                                            case e of
+                                                                                Selected i ->
+                                                                                    e
+
+                                                                                ConfirmDelete i ->
+                                                                                    e
+
+                                                                                Editing i _ ->
+                                                                                    if sameId i id then
+                                                                                        Selected i
+
+                                                                                    else
+                                                                                        e
+                                                                        )
+                                                        }
+                                            }
+                                                |> pure
+
+                                        RemoveLabelFromSelected id ->
+                                            { homeModel
+                                                | editLabelsScreen =
+                                                    Just
+                                                        { editLabelsScreenData
+                                                            | selected =
+                                                                editLabelsScreenData.selected
+                                                                    |> exclude
+                                                                        (\e ->
+                                                                            case e of
+                                                                                Selected i ->
+                                                                                    sameId id i
+
+                                                                                ConfirmDelete i ->
+                                                                                    sameId id i
+
+                                                                                Editing i _ ->
+                                                                                    sameId id i
+                                                                        )
+                                                        }
+                                            }
+                                                |> pure
+
+                                        RequestConfirmDeleteMultipleLabels ->
+                                            { homeModel
+                                                | editLabelsScreen =
+                                                    Just
+                                                        { editLabelsScreenData
+                                                            | confirmDeleteAllSelectedLabels = True
+                                                        }
+                                            }
+                                                |> pure
+
+                                        CancelDeleteMultipleLabels ->
+                                            { homeModel
+                                                | editLabelsScreen =
+                                                    Just
+                                                        { editLabelsScreenData
+                                                            | confirmDeleteAllSelectedLabels = False
+                                                        }
+                                            }
+                                                |> pure
+
+                                        ConfirmDeleteMultipleLabels ->
+                                            let
+                                                deletedIds : List SyncableID
+                                                deletedIds =
+                                                    editLabelsScreenData.selected
+                                                        |> List.map
+                                                            (\e ->
+                                                                case e of
+                                                                    Selected i ->
+                                                                        i
+
+                                                                    ConfirmDelete i ->
+                                                                        i
+
+                                                                    Editing i _ ->
+                                                                        i
+                                                            )
+                                            in
+                                            { homeModel
+                                                | labels =
+                                                    homeModel.labels
+                                                        |> exclude (\l -> List.any (sameId l.id) deletedIds)
+                                                , editLabelsScreen =
+                                                    Just { editLabelsScreenData | selected = [], confirmDeleteAllSelectedLabels = False }
+                                            }
+                                                |> pure
+                                                |> addToQueue (qDeleteLabels deletedIds)
+
+                        -- Labels column menu
+                        OpenLabelsMenu ->
+                            { homeModel | labelsMenu = Just "" }
+                                |> pure
+
+                        CloseLabelsMenu ->
+                            { homeModel | labelsMenu = Nothing }
+                                |> pure
+
+                        ChangeLabelsSearchQuery s ->
+                            { homeModel | labelsMenu = Maybe.map (\_ -> s) homeModel.labelsMenu }
+                                |> pure
+
+                        SelectLabelToFilterBy id ->
+                            let
+                                newFilter : Maybe SyncableID
+                                newFilter =
+                                    case homeModel.filters.label of
+                                        Nothing ->
+                                            Just id
+
+                                        Just oldId ->
+                                            if sameId oldId id then
+                                                Nothing
+
+                                            else
+                                                Just id
+                            in
+                            { homeModel
+                                | filters =
+                                    { label = newFilter
+                                    , content = homeModel.filters.content
                                     }
+                            }
+                                |> pure
+
+                        GoToEditLabelsScreen ->
+                            { homeModel
+                                | editLabelsScreen =
+                                    Just
+                                        { selected = []
+                                        , searchQuery = ""
+                                        , confirmDeleteAllSelectedLabels = False
+                                        }
+                                , labelsMenu = Nothing
+                            }
+                                |> pure
+
+                        ChangeNotePinned ( uid, newPinnedVal ) ->
+                            { homeModel
+                                | notes =
+                                    List.map
+                                        (\n ->
+                                            if n.id == uid then
+                                                { n | pinned = newPinnedVal }
+
+                                            else
+                                                n
+                                        )
+                                        homeModel.notes
+                            }
+                                |> pure
+                                |> addToQueue (qToggleNotePin uid (Just newPinnedVal))
+
+                        RemoveLabelFromNote { noteID, labelID } ->
+                            let
+                                ( noteExists, restNotes ) =
+                                    partitionFirst (\n -> sameId n.id noteID) homeModel.notes
+                            in
+                            case noteExists of
+                                Nothing ->
+                                    homeModel |> pure
+
+                                Just noteData ->
+                                    let
+                                        newNotes =
+                                            noteData.labels |> exclude (sameId labelID)
+                                    in
+                                    { homeModel | notes = { noteData | labels = newNotes } :: restNotes }
                                         |> pure
-                                        |> addToQueue
-                                            (qCreateNewNote
-                                                { offlineId = noteData.id
-                                                , title = newNote.title
-                                                , content = newNote.content
-                                                , pinned = newNote.pinned
-                                                , labels = newNote.labels
+                                        |> addToQueue (qEditNoteLabels noteID (Just newNotes))
+
+                        DeleteNote toDeleteNoteID ->
+                            { homeModel | notes = homeModel.notes |> exclude (.id >> sameId toDeleteNoteID) }
+                                |> pure
+                                |> addToQueue (qDeleteNote toDeleteNoteID)
+
+                        ChangeNewLabelName newName ->
+                            { homeModel | newLabelName = newName }
+                                |> pure
+
+                        RequestTimeForNewLabelCreation ->
+                            if String.length homeModel.newLabelName == 0 then
+                                homeModel |> pure
+
+                            else if List.any (\l -> l.name == homeModel.newLabelName) homeModel.labels then
+                                -- TODO: make this visual to the user in the form of an error
+                                homeModel |> pure
+
+                            else
+                                let
+                                    newLabelOfflineId : String
+                                    newLabelOfflineId =
+                                        generateUID homeModel.seeds |> Tuple.first
+
+                                    newLabel =
+                                        { id = newLabelOfflineId
+                                        , name = homeModel.newLabelName
+                                        }
+                                in
+                                ( homeModel, Cmd.batch [ requestRandomValues (), getNewTimeAndCreateLabel newLabel ] )
+
+                        CreateNewLabel data time ->
+                            { homeModel
+                                | newLabelName = ""
+                                , labels =
+                                    { id = OfflineID data.id
+                                    , name = data.name
+                                    , updatedAt = time
+                                    , createdAt = time
+                                    }
+                                        :: homeModel.labels
+                            }
+                                |> pure
+                                |> addToQueue (qNewLabel { offlineId = data.id, name = data.name })
+
+                        ReceivedRandomValues values ->
+                            { homeModel | seeds = List.map Random.initialSeed values }
+                                |> pure
+
+                        BeginWritingNewNote ->
+                            { homeModel
+                                | isWritingANewNote =
+                                    Just
+                                        { title = ""
+                                        , content = ""
+                                        , labels = Nothing
+                                        }
+                            }
+                                |> pure
+
+                        NewTitleChange s ->
+                            { homeModel
+                                | isWritingANewNote =
+                                    Maybe.map
+                                        (\data ->
+                                            { data
+                                                | title = s
+                                            }
+                                        )
+                                        homeModel.isWritingANewNote
+                            }
+                                |> pure
+
+                        NewNoteContentChange s ->
+                            { homeModel
+                                | isWritingANewNote =
+                                    Maybe.map
+                                        (\data ->
+                                            { data | content = s }
+                                        )
+                                        homeModel.isWritingANewNote
+                            }
+                                |> pure
+
+                        SearchLabelsQueryChange s ->
+                            { homeModel
+                                | isWritingANewNote =
+                                    Maybe.map
+                                        (\data ->
+                                            { data
+                                                | labels =
+                                                    Maybe.map
+                                                        (\{ labels } ->
+                                                            { labels = labels
+                                                            , labelsSearchQuery = s
+                                                            }
+                                                        )
+                                                        data.labels
+                                            }
+                                        )
+                                        homeModel.isWritingANewNote
+                            }
+                                |> pure
+
+                        AddLabelToNewNote newLabel ->
+                            { homeModel
+                                | isWritingANewNote =
+                                    Maybe.map
+                                        (\data ->
+                                            { data
+                                                | labels =
+                                                    Maybe.map
+                                                        (\{ labelsSearchQuery, labels } ->
+                                                            { labels = newLabel :: labels
+                                                            , labelsSearchQuery = labelsSearchQuery
+                                                            }
+                                                        )
+                                                        data.labels
+                                            }
+                                        )
+                                        homeModel.isWritingANewNote
+                            }
+                                |> pure
+
+                        RemoveLabelFromNewNote labelID ->
+                            { homeModel
+                                | isWritingANewNote =
+                                    homeModel.isWritingANewNote
+                                        |> Maybe.map
+                                            (\data ->
+                                                { data
+                                                    | labels =
+                                                        data.labels
+                                                            |> Maybe.map
+                                                                (\{ labelsSearchQuery, labels } ->
+                                                                    { labels = labels |> exclude (sameId labelID)
+                                                                    , labelsSearchQuery = labelsSearchQuery
+                                                                    }
+                                                                )
                                                 }
                                             )
+                            }
+                                |> pure
 
-                                BeginAddingNewNoteLabels ->
-                                    case model.isWritingANewNote of
-                                        Just data ->
-                                            { model
-                                                | isWritingANewNote =
-                                                    Just
-                                                        { data
-                                                            | labels =
-                                                                Just
-                                                                    { labels = []
-                                                                    , labelsSearchQuery = ""
-                                                                    }
-                                                        }
-                                            }
-                                                |> pure
+                        RequestTimeForCreateNewNote ->
+                            case homeModel.isWritingANewNote of
+                                Nothing ->
+                                    homeModel |> pure
 
-                                        Nothing ->
-                                            model
-                                                |> pure
+                                Just newNoteData ->
+                                    if String.length newNoteData.content == 0 then
+                                        homeModel |> pure
 
-                                ReceivedChangesResp resp ->
-                                    case resp of
-                                        Ok { deleted, failedToCreate, failedToEdit, justSyncedAt, downSyncedData, justCreatedData } ->
-                                            ( { model
-                                                | notes =
-                                                    let
-                                                        ( _, notOutdatedNotes ) =
-                                                            List.partition
-                                                                (\e -> List.any (\l -> sameId (DatabaseID l.id) e.id) downSyncedData.notes)
-                                                                model.notes
+                                    else
+                                        let
+                                            newNoteOfflineId =
+                                                generateUID homeModel.seeds |> Tuple.first
 
-                                                        updatedNotes : List Note
-                                                        updatedNotes =
-                                                            downSyncedData.notes
-                                                                |> List.map
-                                                                    (\e ->
-                                                                        { id = DatabaseID e.id
-                                                                        , title = e.title
-                                                                        , content = e.content
-                                                                        , pinned = e.pinned
-                                                                        , createdAt = e.createdAt
-                                                                        , updatedAt = e.updatedAt
-                                                                        , labels = e.labels |> List.map DatabaseID
-                                                                        }
-                                                                    )
-                                                    in
-                                                    notOutdatedNotes
-                                                        -- remove the ones that were failed to create
-                                                        |> exclude (\l -> List.any (\e -> sameId l.id (OfflineID e)) failedToCreate)
-                                                        -- remove the ones that don't exist in DB
-                                                        |> exclude (\l -> List.any (\e -> sameId l.id (DatabaseID e)) deleted.notes)
-                                                        -- update just created
-                                                        |> List.map
-                                                            (\l ->
-                                                                case listFirst (\( _, offlineId ) -> sameId l.id (OfflineID offlineId)) justCreatedData.notes of
-                                                                    Just ( v, _ ) ->
-                                                                        { id = DatabaseID v.id
-                                                                        , title = v.title
-                                                                        , content = v.content
-                                                                        , pinned = v.pinned
-                                                                        , createdAt = v.createdAt
-                                                                        , updatedAt = v.updatedAt
-                                                                        , labels = v.labels |> List.map DatabaseID
-                                                                        }
-
-                                                                    Nothing ->
-                                                                        l
-                                                            )
-                                                        |> (++) updatedNotes
+                                            newNote =
+                                                { id = newNoteOfflineId
+                                                , title = newNoteData.title
+                                                , content = newNoteData.content
+                                                , pinned = False
                                                 , labels =
-                                                    let
-                                                        ( _, notOutdatedLabels ) =
-                                                            List.partition
-                                                                (\e -> List.any (\l -> sameId (DatabaseID l.id) e.id) downSyncedData.labels)
-                                                                model.labels
+                                                    case newNoteData.labels of
+                                                        Just { labels } ->
+                                                            labels
 
-                                                        updatedLabels : List Label
-                                                        updatedLabels =
-                                                            downSyncedData.labels
-                                                                |> List.map
-                                                                    (\e ->
-                                                                        { id = DatabaseID e.id
-                                                                        , name = e.name
-                                                                        , createdAt = e.createdAt
-                                                                        , updatedAt = e.updatedAt
-                                                                        }
-                                                                    )
-                                                    in
-                                                    notOutdatedLabels
-                                                        -- remove the ones that were failed to create
-                                                        |> exclude (\l -> List.any (\e -> sameId l.id (OfflineID e)) failedToCreate)
-                                                        -- remove the ones that don't exist in DB
-                                                        |> exclude (\l -> List.any (\e -> sameId l.id (DatabaseID e)) deleted.labels)
-                                                        -- update just created
-                                                        |> List.map
-                                                            (\l ->
-                                                                case listFirst (\( _, offlineId ) -> sameId l.id (OfflineID offlineId)) justCreatedData.labels of
-                                                                    Just ( v, _ ) ->
-                                                                        { id = DatabaseID v.id
-                                                                        , name = v.name
-                                                                        , createdAt = v.createdAt
-                                                                        , updatedAt = v.updatedAt
-                                                                        }
+                                                        Nothing ->
+                                                            []
+                                                }
+                                        in
+                                        ( homeModel
+                                        , Cmd.batch [ requestRandomValues (), getNewTimeForCreateNewNote newNote ]
+                                        )
 
-                                                                    Nothing ->
-                                                                        l
-                                                            )
-                                                        |> (++) updatedLabels
-                                                , offlineQueue = emptyOfflineQueue
-                                                , runningQueueOn =
-                                                    if offlineQueueIsEmpty model.offlineQueue then
-                                                        Nothing
+                        GotCurrentTimeForNewNote noteData time ->
+                            let
+                                newNote : Note
+                                newNote =
+                                    { id = OfflineID noteData.id
+                                    , title =
+                                        if String.length noteData.title == 0 then
+                                            Nothing
 
-                                                    else
-                                                        Just model.offlineQueue
-                                                , lastSyncedAt = justSyncedAt
-                                              }
-                                            , Cmd.batch
-                                                [ updateLastSyncedAt (Time.posixToMillis justSyncedAt)
-                                                , if offlineQueueIsEmpty model.offlineQueue then
-                                                    Cmd.none
+                                        else
+                                            Just noteData.title
+                                    , content = noteData.content
+                                    , pinned = noteData.pinned
+                                    , labels = noteData.labels
+                                    , createdAt = time
+                                    , updatedAt = time
+                                    }
+                            in
+                            { homeModel
+                                | isWritingANewNote = Nothing
+                                , notes = newNote :: homeModel.notes
+                            }
+                                |> pure
+                                |> addToQueue
+                                    (qCreateNewNote
+                                        { offlineId = noteData.id
+                                        , title = newNote.title
+                                        , content = newNote.content
+                                        , pinned = newNote.pinned
+                                        , labels = newNote.labels
+                                        }
+                                    )
 
-                                                  else
-                                                    Api.sendChanges
-                                                        { operations = queueToOperations model.offlineQueue
-                                                        , lastSyncedAt = justSyncedAt
-                                                        , currentData =
-                                                            { notes = model.notes |> List.map .id |> labelIDsSplitter |> Tuple.second
-                                                            , labels = model.labels |> List.map .id |> labelIDsSplitter |> Tuple.second
+                        BeginAddingNewNoteLabels ->
+                            case homeModel.isWritingANewNote of
+                                Just data ->
+                                    { homeModel
+                                        | isWritingANewNote =
+                                            Just
+                                                { data
+                                                    | labels =
+                                                        Just
+                                                            { labels = []
+                                                            , labelsSearchQuery = ""
                                                             }
-                                                        }
-                                                        ReceivedChangesResp
-                                                        |> Cmd.map LoggedInView
-                                                ]
-                                            )
-
-                                        -- TODO: error handling here
-                                        Err _ ->
-                                            model |> pure
-
-                        -- TODO: Change later
-                        LoggedOutView _ ->
-                            ( model, Cmd.none )
-
-                        FullSyncResp res ->
-                            case res of
-                                -- TODO:
-                                Ok ( notes, labels ) ->
-                                    { model
-                                        | labels =
-                                            List.map
-                                                (\l ->
-                                                    { name = l.name
-                                                    , id = DatabaseID l.id
-                                                    , createdAt = l.createdAt
-                                                    , updatedAt = l.updatedAt
-                                                    }
-                                                )
-                                                labels
-                                        , notes =
-                                            List.map
-                                                (\l ->
-                                                    { id = DatabaseID l.id
-                                                    , title = l.title
-                                                    , content = l.content
-                                                    , pinned = l.pinned
-                                                    , labels = List.map DatabaseID l.labels
-                                                    , createdAt = l.createdAt
-                                                    , updatedAt = l.updatedAt
-                                                    }
-                                                )
-                                                notes
+                                                }
                                     }
                                         |> pure
 
-                                Err v ->
-                                    -- TODO: handle 403
-                                    model |> pure
+                                Nothing ->
+                                    homeModel
+                                        |> pure
+
+                        ReceivedChangesResp resp ->
+                            case resp of
+                                Ok { deleted, failedToCreate, failedToEdit, justSyncedAt, downSyncedData, justCreatedData } ->
+                                    ( { homeModel
+                                        | notes =
+                                            let
+                                                ( _, notOutdatedNotes ) =
+                                                    List.partition
+                                                        (\e -> List.any (\l -> sameId (DatabaseID l.id) e.id) downSyncedData.notes)
+                                                        homeModel.notes
+
+                                                updatedNotes : List Note
+                                                updatedNotes =
+                                                    downSyncedData.notes
+                                                        |> List.map
+                                                            (\e ->
+                                                                { id = DatabaseID e.id
+                                                                , title = e.title
+                                                                , content = e.content
+                                                                , pinned = e.pinned
+                                                                , createdAt = e.createdAt
+                                                                , updatedAt = e.updatedAt
+                                                                , labels = e.labels |> List.map DatabaseID
+                                                                }
+                                                            )
+                                            in
+                                            notOutdatedNotes
+                                                -- remove the ones that were failed to create
+                                                |> exclude (\l -> List.any (\e -> sameId l.id (OfflineID e)) failedToCreate)
+                                                -- remove the ones that don't exist in DB
+                                                |> exclude (\l -> List.any (\e -> sameId l.id (DatabaseID e)) deleted.notes)
+                                                -- update just created
+                                                |> List.map
+                                                    (\l ->
+                                                        case listFirst (\( _, offlineId ) -> sameId l.id (OfflineID offlineId)) justCreatedData.notes of
+                                                            Just ( v, _ ) ->
+                                                                { id = DatabaseID v.id
+                                                                , title = v.title
+                                                                , content = v.content
+                                                                , pinned = v.pinned
+                                                                , createdAt = v.createdAt
+                                                                , updatedAt = v.updatedAt
+                                                                , labels = v.labels |> List.map DatabaseID
+                                                                }
+
+                                                            Nothing ->
+                                                                l
+                                                    )
+                                                |> (++) updatedNotes
+                                        , labels =
+                                            let
+                                                ( _, notOutdatedLabels ) =
+                                                    List.partition
+                                                        (\e -> List.any (\l -> sameId (DatabaseID l.id) e.id) downSyncedData.labels)
+                                                        homeModel.labels
+
+                                                updatedLabels : List Label
+                                                updatedLabels =
+                                                    downSyncedData.labels
+                                                        |> List.map
+                                                            (\e ->
+                                                                { id = DatabaseID e.id
+                                                                , name = e.name
+                                                                , createdAt = e.createdAt
+                                                                , updatedAt = e.updatedAt
+                                                                }
+                                                            )
+                                            in
+                                            notOutdatedLabels
+                                                -- remove the ones that were failed to create
+                                                |> exclude (\l -> List.any (\e -> sameId l.id (OfflineID e)) failedToCreate)
+                                                -- remove the ones that don't exist in DB
+                                                |> exclude (\l -> List.any (\e -> sameId l.id (DatabaseID e)) deleted.labels)
+                                                -- update just created
+                                                |> List.map
+                                                    (\l ->
+                                                        case listFirst (\( _, offlineId ) -> sameId l.id (OfflineID offlineId)) justCreatedData.labels of
+                                                            Just ( v, _ ) ->
+                                                                { id = DatabaseID v.id
+                                                                , name = v.name
+                                                                , createdAt = v.createdAt
+                                                                , updatedAt = v.updatedAt
+                                                                }
+
+                                                            Nothing ->
+                                                                l
+                                                    )
+                                                |> (++) updatedLabels
+                                        , offlineQueue = emptyOfflineQueue
+                                        , runningQueueOn =
+                                            if offlineQueueIsEmpty homeModel.offlineQueue then
+                                                Nothing
+
+                                            else
+                                                Just homeModel.offlineQueue
+                                        , lastSyncedAt = justSyncedAt
+                                      }
+                                    , Cmd.batch
+                                        [ updateLastSyncedAt (Time.posixToMillis justSyncedAt)
+                                        , if offlineQueueIsEmpty homeModel.offlineQueue then
+                                            Cmd.none
+
+                                          else
+                                            Api.sendChanges
+                                                { operations = queueToOperations homeModel.offlineQueue
+                                                , lastSyncedAt = justSyncedAt
+                                                , currentData =
+                                                    { notes = homeModel.notes |> List.map .id |> labelIDsSplitter |> Tuple.second
+                                                    , labels = homeModel.labels |> List.map .id |> labelIDsSplitter |> Tuple.second
+                                                    }
+                                                }
+                                                ReceivedChangesResp
+                                                |> Cmd.map LoggedInView
+                                        ]
+                                    )
+
+                                -- TODO: error handling here
+                                Err _ ->
+                                    homeModel |> pure
+
+                FullSyncResp res ->
+                    case res of
+                        -- TODO:
+                        Ok ( notes, labels ) ->
+                            { homeModel
+                                | labels =
+                                    List.map
+                                        (\l ->
+                                            { name = l.name
+                                            , id = DatabaseID l.id
+                                            , createdAt = l.createdAt
+                                            , updatedAt = l.updatedAt
+                                            }
+                                        )
+                                        labels
+                                , notes =
+                                    List.map
+                                        (\l ->
+                                            { id = DatabaseID l.id
+                                            , title = l.title
+                                            , content = l.content
+                                            , pinned = l.pinned
+                                            , labels = List.map DatabaseID l.labels
+                                            , createdAt = l.createdAt
+                                            , updatedAt = l.updatedAt
+                                            }
+                                        )
+                                        notes
+                            }
+                                |> pure
+
+                        Err v ->
+                            -- TODO: handle 403
+                            homeModel |> pure
+            )
+                |> (\( m, c ) -> ( Home m, c ))
+
+        ( _, _ ) ->
+            -- Disregard messages that arrived for the wrong page.
+            ( topModel, Cmd.none )
+
+
+updateWith toModel toMsg ( m, c ) =
+    ( toModel m, Cmd.map toMsg c )
 
 
 
 -- QUEUE
 
 
-addToQueue : (OfflineQueueOps -> OfflineQueueOps) -> ( Model, Cmd Msg ) -> ( Model, Cmd Msg )
+addToQueue : (OfflineQueueOps -> OfflineQueueOps) -> ( HomeModel, Cmd Msg ) -> ( HomeModel, Cmd Msg )
 addToQueue fn ( model, cmds ) =
     let
         currentOperations =
@@ -1521,15 +1539,12 @@ view model =
             , backgroundRepeat repeat
             ]
         ]
-        [ case model.user of
-            LoggedOut m ->
-                Html.Styled.map LoggedOutView (LogIn.logInView { username = m.username, password = m.password, key = m.key })
+        [ case model of
+            LogIn seeds logInModel ->
+                Html.Styled.map GotLogInMsg (LogIn.logInView { username = logInModel.username, password = logInModel.password, key = logInModel.key })
 
-            CheckingSessionValidity ->
-                div [] [ text "TODO" ]
-
-            LoggedIn ->
-                Html.Styled.map LoggedInView (mainView model)
+            Home homeModel ->
+                Html.Styled.map LoggedInView (mainView homeModel)
         ]
 
 
@@ -1639,7 +1654,7 @@ openLabelsMenuBtn labelsCount =
         ]
 
 
-labelsMenuColumn : Model -> Html LoggedInMsg
+labelsMenuColumn : HomeModel -> Html LoggedInMsg
 labelsMenuColumn { labels, filters, labelsMenu } =
     div
         [ css
@@ -1778,7 +1793,7 @@ labelsMenuColumn { labels, filters, labelsMenu } =
 
 
 editLabelsView :
-    Model
+    HomeModel
     ->
         { selected : List EditLabelKind
         , searchQuery : String
@@ -2273,7 +2288,7 @@ editLabelsView model { selected, searchQuery, confirmDeleteAllSelectedLabels } =
         ]
 
 
-mainView : Model -> Html LoggedInMsg
+mainView : HomeModel -> Html LoggedInMsg
 mainView model =
     div [ css [ displayFlex, flexDirection column, height (pct 100), overflow auto ] ]
         [ nav
@@ -2333,7 +2348,7 @@ mainView model =
         ]
 
 
-mainViewNotesList : Model -> Html LoggedInMsg
+mainViewNotesList : HomeModel -> Html LoggedInMsg
 mainViewNotesList model =
     div [ css [ width (pct 100), overflowY auto ] ]
         [ div []
@@ -2530,7 +2545,7 @@ mainViewNotesList model =
         ]
 
 
-note : Model -> Note -> Html LoggedInMsg
+note : HomeModel -> Note -> Html LoggedInMsg
 note model data =
     let
         noteTitle =
