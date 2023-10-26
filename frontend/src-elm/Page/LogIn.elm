@@ -47,10 +47,10 @@ update msg model =
         LogIn ->
             if model.username == "" || model.password == "" then
                 -- TODO: show user error required fields
-                model |> pure |> Debug.log "a"
+                model |> pure
 
             else
-                ( model, Api.logIn model.username model.password LogInRes ) |> Debug.log "a"
+                ( model, Api.logIn model.username model.password LogInRes )
 
         LogInRes res ->
             case res of
