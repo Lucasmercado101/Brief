@@ -17,6 +17,14 @@ type alias OfflineQueueOps =
     }
 
 
+emptyOfflineQueue :
+    { createLabels : List OQCreateLabel
+    , deleteLabels : List OQDeleteLabel
+    , createNotes : List OQCreateNote
+    , deleteNotes : List OQDeleteNote
+    , editNotes : List OQEditNote
+    , changeLabelNames : List OQChangeLabelName
+    }
 emptyOfflineQueue =
     { createLabels = []
     , deleteLabels = []
