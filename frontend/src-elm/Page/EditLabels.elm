@@ -88,12 +88,12 @@ init { labels, seeds, notes, offlineQueue, runningQueueOn, lastSyncedAt } =
 
 
 type Msg
-    = ExitEditingLabelsView
-    | ChangeEditLabelsSearchQuery String
-    | CreateNewLabelEditLabelsView
+    = GoHome
+    | ChangeSearchQuery String
+    | RequestTimeForCreateNewLabel
     | CreateNewLabel { id : String, name : String } Posix
     | SelectLabel SyncableID
-    | ClearEditLabelsSelections
+    | ClearLabelsSelections
     | RequestDeleteLabel SyncableID
     | ConfirmDeleteLabel SyncableID
     | CancelDeleteLabel SyncableID
@@ -115,17 +115,17 @@ update msg model =
         ReceivedRandomValues values ->
             ( { model | seeds = List.map Random.initialSeed values }, Cmd.none )
 
-        ExitEditingLabelsView ->
+        GoHome ->
             -- TODO:
             model
                 -- { model | editLabelsScreen = Nothing }
                 |> pure
 
-        ChangeEditLabelsSearchQuery newQuery ->
+        ChangeSearchQuery newQuery ->
             { model | searchQuery = newQuery }
                 |> pure
 
-        CreateNewLabelEditLabelsView ->
+        RequestTimeForCreateNewLabel ->
             if String.length model.searchQuery == 0 then
                 model |> pure
 
@@ -185,7 +185,7 @@ update msg model =
             }
                 |> pure
 
-        ClearEditLabelsSelections ->
+        ClearLabelsSelections ->
             { model | selected = [] }
                 |> pure
 
@@ -576,7 +576,7 @@ view ({ selected, searchQuery, confirmDeleteAllSelectedLabels } as model) =
                         , border (px 0)
                         , cursor pointer
                         ]
-                    , onClick ExitEditingLabelsView
+                    , onClick GoHome
                     ]
                     [ Filled.close 32
                         Inherit
@@ -608,7 +608,7 @@ view ({ selected, searchQuery, confirmDeleteAllSelectedLabels } as model) =
                         ]
                     , placeholder "Search labels..."
                     , value searchQuery
-                    , onInput ChangeEditLabelsSearchQuery
+                    , onInput ChangeSearchQuery
                     ]
                     []
                 ]
@@ -674,7 +674,7 @@ view ({ selected, searchQuery, confirmDeleteAllSelectedLabels } as model) =
         newLabelBtn =
             button
                 [ css [ cursor pointer, fontWeight (int 800), publicSans, fontSize (px 16), backgroundColor white, padY (px 12), border (px 0), borderTop3 (px 3) solid black ]
-                , onClick CreateNewLabelEditLabelsView
+                , onClick RequestTimeForCreateNewLabel
                 ]
                 [ text "CREATE NEW LABEL" ]
 
@@ -886,7 +886,7 @@ view ({ selected, searchQuery, confirmDeleteAllSelectedLabels } as model) =
                             , cursor pointer
                             ]
                         , title "Clear selected labels"
-                        , onClick ClearEditLabelsSelections
+                        , onClick ClearLabelsSelections
                         ]
                         [ Filled.close 32 Inherit |> Svg.Styled.fromUnstyled ]
                     ]
