@@ -1,6 +1,6 @@
 module CssHelpers exposing (..)
 
-import Css exposing (Color, ColorValue, Style, color, fontFamilies, property, rgb, rgba, sansSerif)
+import Css exposing (Color, ColorValue, Style, color, fontFamilies, pct, property, rgb, rgba, sansSerif, width)
 
 
 publicSans : Style
@@ -92,3 +92,8 @@ black =
 textColor : ColorValue compatible -> Style
 textColor =
     color
+
+
+fullWidth : Style
+fullWidth =
+    width (pct 100)

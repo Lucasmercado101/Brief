@@ -15,7 +15,7 @@ import Material.Icons as Filled
 import Material.Icons.Outlined as Outlined
 import Material.Icons.Types exposing (Coloring(..))
 import OfflineQueue exposing (OfflineQueueOps, addToQueue, emptyOfflineQueue, offlineQueueIsEmpty, qDeleteLabel, qDeleteLabels, qEditLabelName, qNewLabel, queueToOperations)
-import Ports exposing (requestRandomValues, updateLastSyncedAt)
+import Ports exposing (receiveRandomValues, requestRandomValues, updateLastSyncedAt)
 import Random
 import Svg.Styled
 import Task
@@ -27,10 +27,19 @@ import UID exposing (generateUID)
 -- Subs
 
 
+subscriptions : Model -> Sub Msg
+subscriptions _ =
+    receiveRandomValues ReceivedRandomValues
+
+
 getNewTimeAndCreateLabel : { id : String, name : String } -> Cmd Msg
 getNewTimeAndCreateLabel data =
     Time.now
         |> Task.perform (CreateNewLabel data)
+
+
+
+--
 
 
 type EditLabelKind
@@ -97,11 +106,15 @@ type Msg
     | ConfirmDeleteMultipleLabels
     | CancelDeleteMultipleLabels
     | ReceivedChangesResp (Result Http.Error Api.ChangesResponse)
+    | ReceivedRandomValues (List Int)
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
+        ReceivedRandomValues values ->
+            ( { model | seeds = List.map Random.initialSeed values }, Cmd.none )
+
         ExitEditingLabelsView ->
             -- TODO:
             model
