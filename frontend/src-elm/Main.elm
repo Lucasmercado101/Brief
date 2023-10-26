@@ -17,7 +17,7 @@ import Http
 import Material.Icons as Filled
 import Material.Icons.Outlined as Outlined
 import Material.Icons.Types exposing (Coloring(..))
-import OfflineQueue exposing (OfflineQueueOps, emptyOfflineQueue, offlineQueueIsEmpty, qToggleNotePin, queueToOperations)
+import OfflineQueue exposing (OfflineQueueOps, emptyOfflineQueue, offlineQueueIsEmpty, qCreateNewNote, qDeleteNote, qEditNoteLabels, qNewLabel, qToggleNotePin, queueToOperations)
 import Page.EditLabels as EditLabels
 import Page.Home as Home exposing (Signal(..))
 import Page.LogIn as LogIn
@@ -467,10 +467,25 @@ updateWithSignal toPageModel toPageMsg topModel ( m, c, maybeSignal ) =
                         |> (\( l, n ) -> ( l |> List.map .id |> labelIDsSplitter |> Tuple.second, n |> List.map .id |> labelIDsSplitter |> Tuple.second ))
             in
             ( mappedModel, mappedCmd )
-                |> (case signal of
+                |> addToQueue
+                    (case signal of
                         QToggleNotePin uid newPinnedVal ->
-                            addToQueue (qToggleNotePin uid newPinnedVal) noteIds labelIds
-                   )
+                            qToggleNotePin uid newPinnedVal
+
+                        QEditNoteLabels uid newLabels ->
+                            qEditNoteLabels uid newLabels
+
+                        QDeleteNote uid ->
+                            qDeleteNote uid
+
+                        QNewLabel newLabelData ->
+                            qNewLabel newLabelData
+
+                        QCreateNewNote newNoteData ->
+                            qCreateNewNote newNoteData
+                    )
+                    noteIds
+                    labelIds
 
 
 addToQueue operation notesIds labelsIds ( model, cmds ) =

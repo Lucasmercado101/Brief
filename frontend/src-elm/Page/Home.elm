@@ -14,7 +14,7 @@ import Http
 import Material.Icons as Filled
 import Material.Icons.Outlined as Outlined
 import Material.Icons.Types exposing (Coloring(..))
-import OfflineQueue exposing (OfflineQueueOps, emptyOfflineQueue, offlineQueueIsEmpty, qCreateNewNote, qDeleteNote, qEditNoteLabels, qNewLabel, qToggleNotePin, queueToOperations)
+import OfflineQueue exposing (OQCreateLabel, OQCreateNote, OQDeleteNote, OQEditNote, OfflineQueueOps, emptyOfflineQueue, offlineQueueIsEmpty, qCreateNewNote, qDeleteNote, qEditNoteLabels, qNewLabel, qToggleNotePin, queueToOperations)
 import Ports exposing (receiveRandomValues, requestRandomValues, updateLastSyncedAt)
 import Random
 import Route
@@ -146,6 +146,10 @@ type Msg
 
 type Signal
     = QToggleNotePin SyncableID Bool
+    | QEditNoteLabels SyncableID (Maybe (List SyncableID))
+    | QDeleteNote OQDeleteNote
+    | QNewLabel OQCreateLabel
+    | QCreateNewNote OQCreateNote
 
 
 update : Msg -> Model -> ( Model, Cmd Msg, Maybe Signal )
@@ -205,8 +209,6 @@ update msg model =
             }
                 |> pureWithSignal (QToggleNotePin uid newPinnedVal)
 
-        -- TODO:
-        -- |> addToQueue (qToggleNotePin uid (Just newPinnedVal)) ReceivedChangesResp
         RemoveLabelFromNote { noteID, labelID } ->
             let
                 ( noteExists, restNotes ) =
@@ -222,16 +224,12 @@ update msg model =
                             noteData.labels |> exclude (sameId labelID)
                     in
                     { model | notes = { noteData | labels = newNotes } :: restNotes }
-                        |> pureNoSignal
+                        |> pureWithSignal (QEditNoteLabels noteID (Just newNotes))
 
-        -- TODO:
-        -- |> addToQueue (qEditNoteLabels noteID (Just newNotes)) ReceivedChangesResp
         DeleteNote toDeleteNoteID ->
             { model | notes = model.notes |> exclude (.id >> sameId toDeleteNoteID) }
-                |> pureNoSignal
+                |> pureWithSignal (QDeleteNote toDeleteNoteID)
 
-        -- TODO:
-        -- |> addToQueue (qDeleteNote toDeleteNoteID) ReceivedChangesResp
         ChangeNewLabelName newName ->
             { model | newLabelName = newName }
                 |> pureNoSignal
@@ -268,10 +266,8 @@ update msg model =
                     }
                         :: model.labels
             }
-                |> pureNoSignal
+                |> pureWithSignal (QNewLabel { offlineId = data.id, name = data.name })
 
-        -- TODO:
-        -- |> addToQueue (qNewLabel { offlineId = data.id, name = data.name }) ReceivedChangesResp
         ReceivedRandomValues values ->
             { model | seeds = List.map Random.initialSeed values }
                 |> pureNoSignal
@@ -426,19 +422,16 @@ update msg model =
                 | isWritingANewNote = Nothing
                 , notes = newNote :: model.notes
             }
-                |> pureNoSignal
+                |> pureWithSignal
+                    (QCreateNewNote
+                        { offlineId = noteData.id
+                        , title = newNote.title
+                        , content = newNote.content
+                        , pinned = newNote.pinned
+                        , labels = newNote.labels
+                        }
+                    )
 
-        -- TODO:
-        -- |> addToQueue
-        --     (qCreateNewNote
-        --         { offlineId = noteData.id
-        --         , title = newNote.title
-        --         , content = newNote.content
-        --         , pinned = newNote.pinned
-        --         , labels = newNote.labels
-        --         }
-        --     )
-        --     ReceivedChangesResp
         BeginAddingNewNoteLabels ->
             case model.isWritingANewNote of
                 Just data ->
