@@ -135,6 +135,7 @@ type Msg
     | ReceivedChangesResp (Result Http.Error Api.ChangesResponse)
 
 
+update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
         -- Labels column menu
@@ -190,8 +191,9 @@ update msg model =
                         model.notes
             }
                 |> pure
-                |> addToQueue (qToggleNotePin uid (Just newPinnedVal)) ReceivedChangesResp
 
+        -- TODO:
+        -- |> addToQueue (qToggleNotePin uid (Just newPinnedVal)) ReceivedChangesResp
         RemoveLabelFromNote { noteID, labelID } ->
             let
                 ( noteExists, restNotes ) =
@@ -208,13 +210,15 @@ update msg model =
                     in
                     { model | notes = { noteData | labels = newNotes } :: restNotes }
                         |> pure
-                        |> addToQueue (qEditNoteLabels noteID (Just newNotes)) ReceivedChangesResp
 
+        -- TODO:
+        -- |> addToQueue (qEditNoteLabels noteID (Just newNotes)) ReceivedChangesResp
         DeleteNote toDeleteNoteID ->
             { model | notes = model.notes |> exclude (.id >> sameId toDeleteNoteID) }
                 |> pure
-                |> addToQueue (qDeleteNote toDeleteNoteID) ReceivedChangesResp
 
+        -- TODO:
+        -- |> addToQueue (qDeleteNote toDeleteNoteID) ReceivedChangesResp
         ChangeNewLabelName newName ->
             { model | newLabelName = newName }
                 |> pure
@@ -252,8 +256,9 @@ update msg model =
                         :: model.labels
             }
                 |> pure
-                |> addToQueue (qNewLabel { offlineId = data.id, name = data.name }) ReceivedChangesResp
 
+        -- TODO:
+        -- |> addToQueue (qNewLabel { offlineId = data.id, name = data.name }) ReceivedChangesResp
         ReceivedRandomValues values ->
             { model | seeds = List.map Random.initialSeed values }
                 |> pure
@@ -408,17 +413,18 @@ update msg model =
                 , notes = newNote :: model.notes
             }
                 |> pure
-                |> addToQueue
-                    (qCreateNewNote
-                        { offlineId = noteData.id
-                        , title = newNote.title
-                        , content = newNote.content
-                        , pinned = newNote.pinned
-                        , labels = newNote.labels
-                        }
-                    )
-                    ReceivedChangesResp
 
+        -- TODO:
+        -- |> addToQueue
+        --     (qCreateNewNote
+        --         { offlineId = noteData.id
+        --         , title = newNote.title
+        --         , content = newNote.content
+        --         , pinned = newNote.pinned
+        --         , labels = newNote.labels
+        --         }
+        --     )
+        --     ReceivedChangesResp
         BeginAddingNewNoteLabels ->
             case model.isWritingANewNote of
                 Just data ->
@@ -440,126 +446,121 @@ update msg model =
                         |> pure
 
         ReceivedChangesResp resp ->
-            case resp of
-                Ok { deleted, failedToCreate, failedToEdit, justSyncedAt, downSyncedData, justCreatedData } ->
-                    ( { model
-                        | notes =
-                            let
-                                ( _, notOutdatedNotes ) =
-                                    List.partition
-                                        (\e -> List.any (\l -> sameId (DatabaseID l.id) e.id) downSyncedData.notes)
-                                        model.notes
-
-                                updatedNotes : List Note
-                                updatedNotes =
-                                    downSyncedData.notes
-                                        |> List.map
-                                            (\e ->
-                                                { id = DatabaseID e.id
-                                                , title = e.title
-                                                , content = e.content
-                                                , pinned = e.pinned
-                                                , createdAt = e.createdAt
-                                                , updatedAt = e.updatedAt
-                                                , labels = e.labels |> List.map DatabaseID
-                                                }
-                                            )
-                            in
-                            notOutdatedNotes
-                                -- remove the ones that were failed to create
-                                |> exclude (\l -> List.any (\e -> sameId l.id (OfflineID e)) failedToCreate)
-                                -- remove the ones that don't exist in DB
-                                |> exclude (\l -> List.any (\e -> sameId l.id (DatabaseID e)) deleted.notes)
-                                -- update just created
-                                |> List.map
-                                    (\l ->
-                                        case listFirst (\( _, offlineId ) -> sameId l.id (OfflineID offlineId)) justCreatedData.notes of
-                                            Just ( v, _ ) ->
-                                                { id = DatabaseID v.id
-                                                , title = v.title
-                                                , content = v.content
-                                                , pinned = v.pinned
-                                                , createdAt = v.createdAt
-                                                , updatedAt = v.updatedAt
-                                                , labels = v.labels |> List.map DatabaseID
-                                                }
-
-                                            Nothing ->
-                                                l
-                                    )
-                                |> (++) updatedNotes
-                        , labels =
-                            let
-                                ( _, notOutdatedLabels ) =
-                                    List.partition
-                                        (\e -> List.any (\l -> sameId (DatabaseID l.id) e.id) downSyncedData.labels)
-                                        model.labels
-
-                                updatedLabels : List Label
-                                updatedLabels =
-                                    downSyncedData.labels
-                                        |> List.map
-                                            (\e ->
-                                                { id = DatabaseID e.id
-                                                , name = e.name
-                                                , createdAt = e.createdAt
-                                                , updatedAt = e.updatedAt
-                                                }
-                                            )
-                            in
-                            notOutdatedLabels
-                                -- remove the ones that were failed to create
-                                |> exclude (\l -> List.any (\e -> sameId l.id (OfflineID e)) failedToCreate)
-                                -- remove the ones that don't exist in DB
-                                |> exclude (\l -> List.any (\e -> sameId l.id (DatabaseID e)) deleted.labels)
-                                -- update just created
-                                |> List.map
-                                    (\l ->
-                                        case listFirst (\( _, offlineId ) -> sameId l.id (OfflineID offlineId)) justCreatedData.labels of
-                                            Just ( v, _ ) ->
-                                                { id = DatabaseID v.id
-                                                , name = v.name
-                                                , createdAt = v.createdAt
-                                                , updatedAt = v.updatedAt
-                                                }
-
-                                            Nothing ->
-                                                l
-                                    )
-                                |> (++) updatedLabels
-                        , offlineQueue = emptyOfflineQueue
-                        , runningQueueOn =
-                            if offlineQueueIsEmpty model.offlineQueue then
-                                Nothing
-
-                            else
-                                Just model.offlineQueue
-                        , lastSyncedAt = justSyncedAt
-                      }
-                    , Cmd.batch
-                        [ updateLastSyncedAt (Time.posixToMillis justSyncedAt)
-                        , if offlineQueueIsEmpty model.offlineQueue then
-                            Cmd.none
-
-                          else
-                            Api.sendChanges
-                                { operations = queueToOperations model.offlineQueue
-                                , lastSyncedAt = justSyncedAt
-                                , currentData =
-                                    { notes = model.notes |> List.map .id |> labelIDsSplitter |> Tuple.second
-                                    , labels = model.labels |> List.map .id |> labelIDsSplitter |> Tuple.second
-                                    }
-                                }
-                                ReceivedChangesResp
-                        ]
-                    )
-
-                -- TODO: error handling here
-                Err _ ->
-                    model |> pure
+            model |> pure
 
 
 
+-- TODO:
+-- case resp of
+--     Ok { deleted, failedToCreate, failedToEdit, justSyncedAt, downSyncedData, justCreatedData } ->
+--         ( { model
+--             | notes =
+--                 let
+--                     ( _, notOutdatedNotes ) =
+--                         List.partition
+--                             (\e -> List.any (\l -> sameId (DatabaseID l.id) e.id) downSyncedData.notes)
+--                             model.notes
+--                     updatedNotes : List Note
+--                     updatedNotes =
+--                         downSyncedData.notes
+--                             |> List.map
+--                                 (\e ->
+--                                     { id = DatabaseID e.id
+--                                     , title = e.title
+--                                     , content = e.content
+--                                     , pinned = e.pinned
+--                                     , createdAt = e.createdAt
+--                                     , updatedAt = e.updatedAt
+--                                     , labels = e.labels |> List.map DatabaseID
+--                                     }
+--                                 )
+--                 in
+--                 notOutdatedNotes
+--                     -- remove the ones that were failed to create
+--                     |> exclude (\l -> List.any (\e -> sameId l.id (OfflineID e)) failedToCreate)
+--                     -- remove the ones that don't exist in DB
+--                     |> exclude (\l -> List.any (\e -> sameId l.id (DatabaseID e)) deleted.notes)
+--                     -- update just created
+--                     |> List.map
+--                         (\l ->
+--                             case listFirst (\( _, offlineId ) -> sameId l.id (OfflineID offlineId)) justCreatedData.notes of
+--                                 Just ( v, _ ) ->
+--                                     { id = DatabaseID v.id
+--                                     , title = v.title
+--                                     , content = v.content
+--                                     , pinned = v.pinned
+--                                     , createdAt = v.createdAt
+--                                     , updatedAt = v.updatedAt
+--                                     , labels = v.labels |> List.map DatabaseID
+--                                     }
+--                                 Nothing ->
+--                                     l
+--                         )
+--                     |> (++) updatedNotes
+--             , labels =
+--                 let
+--                     ( _, notOutdatedLabels ) =
+--                         List.partition
+--                             (\e -> List.any (\l -> sameId (DatabaseID l.id) e.id) downSyncedData.labels)
+--                             model.labels
+--                     updatedLabels : List Label
+--                     updatedLabels =
+--                         downSyncedData.labels
+--                             |> List.map
+--                                 (\e ->
+--                                     { id = DatabaseID e.id
+--                                     , name = e.name
+--                                     , createdAt = e.createdAt
+--                                     , updatedAt = e.updatedAt
+--                                     }
+--                                 )
+--                 in
+--                 notOutdatedLabels
+--                     -- remove the ones that were failed to create
+--                     |> exclude (\l -> List.any (\e -> sameId l.id (OfflineID e)) failedToCreate)
+--                     -- remove the ones that don't exist in DB
+--                     |> exclude (\l -> List.any (\e -> sameId l.id (DatabaseID e)) deleted.labels)
+--                     -- update just created
+--                     |> List.map
+--                         (\l ->
+--                             case listFirst (\( _, offlineId ) -> sameId l.id (OfflineID offlineId)) justCreatedData.labels of
+--                                 Just ( v, _ ) ->
+--                                     { id = DatabaseID v.id
+--                                     , name = v.name
+--                                     , createdAt = v.createdAt
+--                                     , updatedAt = v.updatedAt
+--                                     }
+--                                 Nothing ->
+--                                     l
+--                         )
+--                     |> (++) updatedLabels
+--             , offlineQueue = emptyOfflineQueue
+--             , runningQueueOn =
+--                 if offlineQueueIsEmpty model.offlineQueue then
+--                     Nothing
+--                 else
+--                     Just model.offlineQueue
+--             , lastSyncedAt = justSyncedAt
+--           }
+--         , Cmd.batch
+--             [ updateLastSyncedAt (Time.posixToMillis justSyncedAt)
+--             , if offlineQueueIsEmpty model.offlineQueue then
+--                 Cmd.none
+--               else
+--                 Api.sendChanges
+--                     { operations = queueToOperations model.offlineQueue
+--                     , lastSyncedAt = justSyncedAt
+--                     , currentData =
+--                         { notes = model.notes |> List.map .id |> labelIDsSplitter |> Tuple.second
+--                         , labels = model.labels |> List.map .id |> labelIDsSplitter |> Tuple.second
+--                         }
+--                     }
+--                     ReceivedChangesResp
+--             ]
+--         )
+--     -- TODO: error handling here
+--     Err _ ->
+--         model |> pure
 -- FullSyncResp res ->
 --     case res of
 --         -- TODO:

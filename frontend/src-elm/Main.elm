@@ -151,82 +151,80 @@ update topMsg topModel =
             topModel |> pure
 
         ( ChangedUrl newUrl, _ ) ->
-            -- TODO:
-            topModel |> pure
+            (-- TODO: double check or change Route model
+             case Route.fromUrl newUrl of
+                Route.Home ->
+                    case topModel.page of
+                        Home _ ->
+                            -- TODO: better
+                            topModel |> pure
 
-        -- (-- TODO: double check or change Route model
-        --  case Route.fromUrl newUrl of
-        --     Route.Home ->
-        --         case topModel of
-        --             Home _ ->
-        --                 -- TODO: better
-        --                 topModel |> pure
-        --             LogIn { seeds, key } ->
-        --                 ( Home
-        --                     { -- TODO: better way
-        --                       key = key
-        --                     , seeds = seeds
-        --                     , notes = []
-        --                     , isWritingANewNote = Nothing
-        --                     , newLabelName = ""
-        --                     , labels = []
-        --                     , labelsMenu = Nothing
-        --                     , filters =
-        --                         { label = Nothing
-        --                         , content = Nothing
-        --                         }
-        --                     -- sync stuff
-        --                     , offlineQueue = emptyOfflineQueue
-        --                     , runningQueueOn = Nothing
-        --                     -- TODO:
-        --                     , lastSyncedAt = Time.millisToPosix 1
-        --                     }
-        --                 , Cmd.batch [ Api.fullSync FullSyncResp, requestRandomValues () ]
-        --                 )
-        --             EditLabels _ ->
-        --                 case topModel of
-        --                     Home homeModel ->
-        --                         ( EditLabels
-        --                             (EditLabels.init
-        --                                 { seeds = homeModel.seeds
-        --                                 , labels = homeModel.labels
-        --                                 , notes = homeModel.notes
-        --                                 , offlineQueue = homeModel.offlineQueue
-        --                                 , runningQueueOn = homeModel.runningQueueOn
-        --                                 , lastSyncedAt = homeModel.lastSyncedAt
-        --                                 }
-        --                             )
-        --                         , Cmd.none
-        --                         )
-        --                     _ ->
-        --                         -- TODO:
-        --                         topModel |> pure
-        --     Route.LogIn ->
-        --         -- TODO:
-        --         ( topModel, Cmd.none )
-        --     Route.EditLabels ->
-        --         -- TODO:
-        --         ( topModel, Cmd.none )
-        -- )
+                        LogIn { seeds, key } ->
+                            ( { topModel
+                                | page =
+                                    Home
+                                        { -- TODO: do this in a better way
+                                          key = key
+                                        , seeds = seeds
+                                        , notes = []
+                                        , isWritingANewNote = Nothing
+                                        , newLabelName = ""
+                                        , labels = []
+                                        , labelsMenu = Nothing
+                                        , filters =
+                                            { label = Nothing
+                                            , content = Nothing
+                                            }
+                                        }
+                              }
+                            , Cmd.batch [ Api.fullSync FullSyncResp, requestRandomValues () ]
+                            )
+
+                        EditLabels _ ->
+                            topModel |> pure
+
+                -- TODO:
+                -- case topModel of
+                --     Home homeModel ->
+                --         ( EditLabels
+                --             (EditLabels.init
+                --                 { seeds = homeModel.seeds
+                --                 , labels = homeModel.labels
+                --                 , notes = homeModel.notes
+                --                 , offlineQueue = homeModel.offlineQueue
+                --                 , runningQueueOn = homeModel.runningQueueOn
+                --                 , lastSyncedAt = homeModel.lastSyncedAt
+                --                 }
+                --             )
+                --         , Cmd.none
+                --         )
+                --     _ ->
+                --         -- TODO:
+                --         topModel |> pure
+                Route.LogIn ->
+                    -- TODO:
+                    ( topModel, Cmd.none )
+
+                Route.EditLabels ->
+                    -- TODO:
+                    ( topModel, Cmd.none )
+            )
+
         ( GotLogInMsg loginMsg, LogIn logInModel ) ->
             LogIn.update loginMsg logInModel
-                |> (\( m, c ) -> ( { topModel | page = LogIn m }, Cmd.map GotLogInMsg c ))
+                |> updateWith LogIn GotLogInMsg topModel
 
-        -- TODO:
-        --     |> updateWith LogIn GotLogInMsg
         ( GotHomeMsg homeMsg, Home homeModel ) ->
-            topModel |> pure
+            Home.update homeMsg homeModel
+                |> updateWith Home GotHomeMsg topModel
 
-        -- TODO:
-        -- Home.update homeMsg homeModel
-        --     |> updateWith Home GotHomeMsg
         ( _, _ ) ->
             -- Disregard messages that arrived for the wrong page.
             topModel |> pure
 
 
-updateWith toModel toMsg ( m, c ) =
-    ( toModel m, Cmd.map toMsg c )
+updateWith toModel toMsg topModel ( m, c ) =
+    ( { topModel | page = toModel m }, Cmd.map toMsg c )
 
 
 
