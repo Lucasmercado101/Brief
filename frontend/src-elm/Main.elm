@@ -441,41 +441,36 @@ updateWith toModel toMsg topModel ( m, c ) =
 
 
 updateWithSignal : (a -> Page) -> (c -> PageMsg) -> Model -> ( a, Cmd c, Maybe Home.Signal ) -> ( Model, Cmd Msg )
-updateWithSignal toModel toMsg topModel ( m, c, maybeSignal ) =
+updateWithSignal toPageModel toPageMsg topModel ( m, c, maybeSignal ) =
     let
-        mappedCmd =
-            Cmd.map GotPageMsg (Cmd.map toMsg c)
-
-        ( newModel, withSignalCmds ) =
-            case maybeSignal of
-                Nothing ->
-                    ( topModel, Cmd.none )
-
-                Just signal ->
-                    let
-                        ( labelIds, noteIds ) =
-                            (case topModel.page of
-                                Home homeModel ->
-                                    ( homeModel.labels, homeModel.notes )
-
-                                EditLabels editLabelsModel ->
-                                    ( editLabelsModel.labels, editLabelsModel.notes )
-
-                                LogIn logInModel ->
-                                    -- TODO: separate page
-                                    ( [], [] )
-                            )
-                                |> (\( l, n ) -> ( l |> List.map .id |> labelIDsSplitter |> Tuple.second, n |> List.map .id |> labelIDsSplitter |> Tuple.second ))
-                    in
-                    ( topModel, mappedCmd )
-                        |> (case signal of
-                                QToggleNotePin uid newPinnedVal ->
-                                    addToQueue (qToggleNotePin uid newPinnedVal) noteIds labelIds
-                           )
+        ( mappedModel, mappedCmd ) =
+            ( { topModel | page = toPageModel m }, Cmd.map GotPageMsg (Cmd.map toPageMsg c) )
     in
-    ( { newModel | page = toModel m }
-    , Cmd.batch [ mappedCmd, withSignalCmds ]
-    )
+    case maybeSignal of
+        Nothing ->
+            ( mappedModel, mappedCmd )
+
+        Just signal ->
+            let
+                ( labelIds, noteIds ) =
+                    (case topModel.page of
+                        Home homeModel ->
+                            ( homeModel.labels, homeModel.notes )
+
+                        EditLabels editLabelsModel ->
+                            ( editLabelsModel.labels, editLabelsModel.notes )
+
+                        LogIn logInModel ->
+                            -- TODO: separate page
+                            ( [], [] )
+                    )
+                        |> (\( l, n ) -> ( l |> List.map .id |> labelIDsSplitter |> Tuple.second, n |> List.map .id |> labelIDsSplitter |> Tuple.second ))
+            in
+            ( mappedModel, mappedCmd )
+                |> (case signal of
+                        QToggleNotePin uid newPinnedVal ->
+                            addToQueue (qToggleNotePin uid newPinnedVal) noteIds labelIds
+                   )
 
 
 addToQueue operation notesIds labelsIds ( model, cmds ) =
