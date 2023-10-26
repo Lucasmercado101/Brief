@@ -70,6 +70,36 @@ type alias Model =
     }
 
 
+init : { navKey : Nav.Key, seeds : List Random.Seed, lastSyncedAt : Int } -> Model
+init { navKey, seeds, lastSyncedAt } =
+    ({ key = navKey
+     , seeds = seeds
+     , notes = []
+     , isWritingANewNote = Nothing
+     , newLabelName = ""
+     , labels = []
+     , labelsMenu = Nothing
+     , filters =
+        { label = Nothing
+        , content = Nothing
+        }
+
+     -- sync stuff
+     , offlineQueue = emptyOfflineQueue
+     , runningQueueOn = Nothing
+     , lastSyncedAt = Time.millisToPosix lastSyncedAt
+     }
+     -- TODO: full-sync with regards to indexedDb
+     -- , Cmd.none
+     --     -- TODO:
+     -- if hasSessionCookie then
+     --     -- Api.fullSync FullSyncResp
+     --     --
+     --   else
+     --     Cmd.none
+    )
+
+
 type alias NewNoteData =
     { title : String
     , content : String

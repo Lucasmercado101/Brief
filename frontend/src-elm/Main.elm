@@ -98,31 +98,7 @@ init flags url navKey =
             List.map Random.initialSeed flags.seeds
     in
     if flags.hasSessionCookie then
-        ( Home
-            { key = navKey
-            , seeds = seeds
-            , notes = []
-            , isWritingANewNote = Nothing
-            , newLabelName = ""
-            , labels = []
-            , labelsMenu = Nothing
-            , filters =
-                { label = Nothing
-                , content = Nothing
-                }
-
-            -- sync stuff
-            , offlineQueue = emptyOfflineQueue
-            , runningQueueOn = Nothing
-            , lastSyncedAt = Time.millisToPosix flags.lastSyncedAt
-            }
-          -- TODO: full-sync with regards to indexedDb
-        , if flags.hasSessionCookie then
-            Api.fullSync FullSyncResp
-
-          else
-            Cmd.none
-        )
+        ( Home (Home.init { navKey = navKey, seeds = seeds, lastSyncedAt = flags.lastSyncedAt }), Cmd.none )
 
     else
         ( LogIn seeds (LogIn.init navKey), Cmd.none )
