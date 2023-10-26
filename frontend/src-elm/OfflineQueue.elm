@@ -75,6 +75,7 @@ type Action
     | QDeleteLabels (List OQDeleteLabel)
 
 
+actionMapToFn : Action -> OfflineQueueOps -> OfflineQueueOps
 actionMapToFn action =
     case action of
         QToggleNotePin uid newPinnedVal ->
