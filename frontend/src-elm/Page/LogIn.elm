@@ -1,7 +1,7 @@
 module Page.LogIn exposing (..)
 
 import Api
-import Browser.Navigation
+import Browser.Navigation as Nav
 import Cmd.Extra exposing (pure)
 import Css exposing (auto, column, displayFlex, flexDirection, height, margin, pct, width)
 import CssHelpers exposing (publicSans)
@@ -9,19 +9,21 @@ import Html.Styled exposing (Html, button, div, form, input, label, text)
 import Html.Styled.Attributes exposing (css, placeholder, type_, value)
 import Html.Styled.Events exposing (onInput, onSubmit)
 import Http
+import Random
 import Route
 
 
 type alias Model =
-    { username : String
+    { seeds : List Random.Seed
+    , username : String
     , password : String
-    , key : Browser.Navigation.Key
+    , key : Nav.Key
     }
 
 
-init : a -> { username : String, password : String, key : a }
-init key =
-    { username = "", password = "", key = key }
+init : Nav.Key -> List Random.Seed -> Model
+init key seeds =
+    { username = "", password = "", seeds = seeds, key = key }
 
 
 

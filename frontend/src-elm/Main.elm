@@ -34,7 +34,7 @@ import Url exposing (Url)
 subscriptions : Model -> Sub Msg
 subscriptions model =
     case model of
-        LogIn _ logInModel ->
+        LogIn logInModel ->
             -- TODO:
             Sub.none
 
@@ -53,7 +53,7 @@ subscriptions model =
 
 
 type Model
-    = LogIn (List Random.Seed) LogIn.Model
+    = LogIn LogIn.Model
       -- TODO: check if session is valid on entering website,
       -- then go to either logIn or Home
     | Home Home.Model
@@ -101,7 +101,7 @@ init flags url navKey =
         ( Home (Home.init { navKey = navKey, seeds = seeds, lastSyncedAt = flags.lastSyncedAt }), Cmd.none )
 
     else
-        ( LogIn seeds (LogIn.init navKey), Cmd.none )
+        ( LogIn (LogIn.init navKey seeds), Cmd.none )
 
 
 main : Program Flags Model Msg
@@ -150,7 +150,7 @@ update topMsg topModel =
                             -- TODO: better
                             topModel |> pure
 
-                        LogIn seeds { key } ->
+                        LogIn { seeds, key } ->
                             ( Home
                                 { -- TODO: better way
                                   key = key
@@ -204,9 +204,9 @@ update topMsg topModel =
                     ( topModel, Cmd.none )
             )
 
-        ( GotLogInMsg loginMsg, LogIn randSeeds logInModel ) ->
+        ( GotLogInMsg loginMsg, LogIn logInModel ) ->
             LogIn.update loginMsg logInModel
-                |> (\( m, c ) -> ( LogIn randSeeds m, Cmd.map GotLogInMsg c ))
+                |> updateWith LogIn GotLogInMsg
 
         ( GotHomeMsg homeMsg, Home homeModel ) ->
             Home.update homeMsg homeModel
@@ -239,8 +239,8 @@ view model =
             ]
         ]
         [ case model of
-            LogIn seeds logInModel ->
-                Html.Styled.map GotLogInMsg (LogIn.logInView { username = logInModel.username, password = logInModel.password, key = logInModel.key })
+            LogIn logInModel ->
+                Html.Styled.map GotLogInMsg (LogIn.logInView logInModel)
 
             Home homeModel ->
                 Html.Styled.map GotHomeMsg (Home.view homeModel)
