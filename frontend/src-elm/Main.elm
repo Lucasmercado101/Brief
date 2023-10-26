@@ -44,87 +44,12 @@ subscriptions model =
 
         EditLabels editLabelsModel ->
             -- TODO:
+            -- EditLabels.subscriptions editLabelsModel |> Sub.map GotEditLabelsMsg
             Sub.none
 
 
 
--- EditLabels.subscriptions editLabelsModel |> Sub.map GotEditLabelsMsg
 -- MODEL
-
-
-type alias UniqueStr =
-    String
-
-
-type alias Note =
-    { id : SyncableID
-    , title : Maybe String
-    , content : String
-    , pinned : Bool
-    , createdAt : Posix
-    , updatedAt : Posix
-    , labels : List SyncableID
-    }
-
-
-type alias Label =
-    { id : SyncableID
-    , name : UniqueStr
-    , createdAt : Posix
-    , updatedAt : Posix
-    }
-
-
-type alias OQCreateLabel =
-    { offlineId : String, name : String }
-
-
-type alias OQDeleteLabel =
-    Api.SyncableID
-
-
-type alias OQCreateNote =
-    { offlineId : String
-    , title : Maybe String
-    , content : String
-    , pinned : Bool
-    , labels : List SyncableID
-    }
-
-
-type alias OQDeleteNote =
-    SyncableID
-
-
-type alias OQEditNote =
-    { id : SyncableID
-    , title : Maybe String
-    , content : Maybe String
-    , pinned : Maybe Bool
-    , labels : Maybe (List SyncableID)
-    }
-
-
-type alias OQChangeLabelName =
-    { name : String
-    , id : Api.SyncableID
-    }
-
-
-type alias OfflineQueueOps =
-    { createLabels : List OQCreateLabel
-    , deleteLabels : List OQDeleteLabel
-    , createNotes : List OQCreateNote
-    , deleteNotes : List OQDeleteNote
-    , editNotes : List OQEditNote
-    , changeLabelNames : List OQChangeLabelName
-    }
-
-
-type EditLabelKind
-    = Selected SyncableID
-    | ConfirmDelete SyncableID
-    | Editing SyncableID String
 
 
 type Model
@@ -146,25 +71,6 @@ type Msg
     | FullSyncResp (Result Http.Error Api.FullSyncResponse)
     | ClickedLink UrlRequest
     | ChangedUrl Url
-
-
-type EditLabelsViewMsg
-    = ExitEditingLabelsView
-    | ChangeEditLabelsSearchQuery String
-    | CreateNewLabelEditLabelsView
-    | SelectLabel SyncableID
-    | ClearEditLabelsSelections
-    | RequestDeleteLabel SyncableID
-    | ConfirmDeleteLabel SyncableID
-    | CancelDeleteLabel SyncableID
-    | EditLabel ( SyncableID, String )
-    | ChangeEditingLabelName ( SyncableID, String )
-    | ConfirmEditingLabelName ( SyncableID, String )
-    | CancelEditingLabelName SyncableID
-    | RemoveLabelFromSelected SyncableID
-    | RequestConfirmDeleteMultipleLabels
-    | ConfirmDeleteMultipleLabels
-    | CancelDeleteMultipleLabels
 
 
 
