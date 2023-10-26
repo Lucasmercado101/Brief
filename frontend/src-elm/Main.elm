@@ -42,8 +42,10 @@ subscriptions model =
 
         -- LogIn.subscriptions logInModel |> Sub.map GotLogInMsg
         Home homeModel ->
-            Home.subscriptions homeModel |> Sub.map GotHomeMsg
+            Sub.none
 
+        -- TODO:
+        -- Home.subscriptions homeModel |> Sub.map GotHomeMsg
         EditLabels editLabelsModel ->
             -- TODO:
             -- EditLabels.subscriptions editLabelsModel |> Sub.map GotEditLabelsMsg
@@ -76,14 +78,16 @@ type alias Model =
 -- MESSAGE
 
 
+type PageMsg
+    = GotLogInMsg LogIn.Msg
+    | GotHomeMsg Home.Msg
+    | GotEditLabelsMsg EditLabels.Msg
+
+
 type Msg
     = ClickedLink UrlRequest
     | ChangedUrl Url
-      -- Pages Msg
-    | GotLogInMsg LogIn.Msg
-    | GotHomeMsg Home.Msg
-    | GotEditLabelsMsg EditLabels.Msg
-      --
+    | GotPageMsg PageMsg
     | FullSyncResp (Result Http.Error Api.FullSyncResponse)
 
 
@@ -145,13 +149,13 @@ main =
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update topMsg topModel =
-    case ( topMsg, topModel.page ) of
+    case topMsg of
         -- TODO: fix this
-        ( ClickedLink _, _ ) ->
+        ClickedLink _ ->
             -- TODO:
             topModel |> pure
 
-        ( ChangedUrl newUrl, _ ) ->
+        ChangedUrl newUrl ->
             (-- TODO: double check or change Route model
              case Route.fromUrl newUrl of
                 Route.Home ->
@@ -211,21 +215,31 @@ update topMsg topModel =
                     ( topModel, Cmd.none )
             )
 
-        ( GotLogInMsg loginMsg, LogIn logInModel ) ->
-            LogIn.update loginMsg logInModel
-                |> updateWith LogIn GotLogInMsg topModel
-
-        ( GotHomeMsg homeMsg, Home homeModel ) ->
-            Home.update homeMsg homeModel
-                |> updateWith Home GotHomeMsg topModel
-
-        ( _, _ ) ->
-            -- Disregard messages that arrived for the wrong page.
+        FullSyncResp resp ->
+            -- TODO:
             topModel |> pure
+
+        GotPageMsg pageMsg ->
+            case ( pageMsg, topModel.page ) of
+                ( GotLogInMsg loginMsg, LogIn logInModel ) ->
+                    LogIn.update loginMsg logInModel
+                        |> updateWith LogIn GotLogInMsg topModel
+
+                ( GotHomeMsg homeMsg, Home homeModel ) ->
+                    Home.update homeMsg homeModel
+                        |> updateWith Home GotHomeMsg topModel
+
+                ( GotEditLabelsMsg editLabelsMsg, EditLabels editLabelsModel ) ->
+                    EditLabels.update editLabelsMsg editLabelsModel
+                        |> updateWith EditLabels GotEditLabelsMsg topModel
+
+                ( _, _ ) ->
+                    -- Disregard messages that arrived for the wrong page.
+                    topModel |> pure
 
 
 updateWith toModel toMsg topModel ( m, c ) =
-    ( { topModel | page = toModel m }, Cmd.map toMsg c )
+    ( { topModel | page = toModel m }, Cmd.map GotPageMsg (Cmd.map toMsg c) )
 
 
 
@@ -245,7 +259,7 @@ view model =
             , backgroundRepeat repeat
             ]
         ]
-        [ case model.page of
+        [ (case model.page of
             LogIn logInModel ->
                 Html.Styled.map GotLogInMsg (LogIn.logInView logInModel)
 
@@ -255,6 +269,8 @@ view model =
             EditLabels editLabelsModel ->
                 -- TODO: fix this
                 div [] []
+          )
+            |> Html.Styled.map GotPageMsg
 
         -- Html.Styled.map GotEditLabelsMsg (EditLabels.view editLabelsModel)
         ]
