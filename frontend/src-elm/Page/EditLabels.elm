@@ -14,13 +14,23 @@ import Http
 import Material.Icons as Filled
 import Material.Icons.Outlined as Outlined
 import Material.Icons.Types exposing (Coloring(..))
-import OfflineQueue exposing (OfflineQueueOps, emptyOfflineQueue, offlineQueueIsEmpty, qDeleteLabel, qDeleteLabels, qEditLabelName, qNewLabel, queueToOperations)
+import OfflineQueue exposing (Action(..), OfflineQueueOps, emptyOfflineQueue, offlineQueueIsEmpty, qDeleteLabel, qDeleteLabels, qEditLabelName, qNewLabel, queueToOperations)
 import Ports exposing (receiveRandomValues, requestRandomValues, updateLastSyncedAt)
 import Random
 import Svg.Styled
 import Task
 import Time exposing (Posix)
 import UID exposing (generateUID)
+
+
+pureWithSignal : Signal -> Model -> ( Model, Cmd msg, Maybe Signal )
+pureWithSignal s m =
+    ( m, Cmd.none, Just s )
+
+
+pureNoSignal : Model -> ( Model, Cmd msg, Maybe Signal )
+pureNoSignal m =
+    ( m, Cmd.none, Nothing )
 
 
 
@@ -57,11 +67,6 @@ type alias Model =
     -- global data
     , labels : List Label
     , notes : List Note
-
-    -- sync stuff
-    , offlineQueue : OfflineQueueOps
-    , runningQueueOn : Maybe OfflineQueueOps
-    , lastSyncedAt : Posix
     }
 
 
@@ -69,21 +74,15 @@ init :
     { seeds : List Random.Seed
     , labels : List Label
     , notes : List Note
-    , offlineQueue : OfflineQueueOps
-    , runningQueueOn : Maybe OfflineQueueOps
-    , lastSyncedAt : Posix
     }
     -> Model
-init { labels, seeds, notes, offlineQueue, runningQueueOn, lastSyncedAt } =
+init { labels, seeds, notes } =
     { seeds = seeds
     , selected = []
     , searchQuery = ""
     , confirmDeleteAllSelectedLabels = False
     , labels = labels
     , notes = notes
-    , offlineQueue = offlineQueue
-    , runningQueueOn = runningQueueOn
-    , lastSyncedAt = lastSyncedAt
     }
 
 
@@ -105,33 +104,37 @@ type Msg
     | RequestConfirmDeleteMultipleLabels
     | ConfirmDeleteMultipleLabels
     | CancelDeleteMultipleLabels
-    | ReceivedChangesResp (Result Http.Error Api.ChangesResponse)
     | ReceivedRandomValues (List Int)
 
 
-update : Msg -> Model -> ( Model, Cmd Msg )
+type Signal
+    = OfflineQueueAction OfflineQueue.Action
+
+
+update : Msg -> Model -> ( Model, Cmd Msg, Maybe Signal )
 update msg model =
     case msg of
         ReceivedRandomValues values ->
-            ( { model | seeds = List.map Random.initialSeed values }, Cmd.none )
+            { model | seeds = List.map Random.initialSeed values }
+                |> pureNoSignal
 
         GoHome ->
             -- TODO:
             model
                 -- { model | editLabelsScreen = Nothing }
-                |> pure
+                |> pureNoSignal
 
         ChangeSearchQuery newQuery ->
             { model | searchQuery = newQuery }
-                |> pure
+                |> pureNoSignal
 
         RequestTimeForCreateNewLabel ->
             if String.length model.searchQuery == 0 then
-                model |> pure
+                model |> pureNoSignal
 
             else if List.any (\l -> l.name == model.searchQuery) model.labels then
                 -- TODO: make this visual to the user in the form of an error
-                model |> pure
+                model |> pureNoSignal
 
             else
                 let
@@ -146,6 +149,7 @@ update msg model =
                 in
                 ( { model | searchQuery = "" }
                 , Cmd.batch [ requestRandomValues (), getNewTimeAndCreateLabel newLabel ]
+                , Nothing
                 )
 
         CreateNewLabel data time ->
@@ -158,10 +162,8 @@ update msg model =
                     }
                         :: model.labels
             }
-                |> pure
+                |> pureWithSignal (OfflineQueueAction (QNewLabel { offlineId = data.id, name = data.name }))
 
-        -- TODO: Signal
-        -- |> addToQueue (qNewLabel { offlineId = data.id, name = data.name }) ReceivedChangesResp
         SelectLabel id ->
             let
                 sameIdOnSelected =
@@ -184,11 +186,11 @@ update msg model =
                     else
                         Selected id :: model.selected
             }
-                |> pure
+                |> pureNoSignal
 
         ClearLabelsSelections ->
             { model | selected = [] }
-                |> pure
+                |> pureNoSignal
 
         RequestDeleteLabel id ->
             { model
@@ -211,7 +213,7 @@ update msg model =
                                         e
                             )
             }
-                |> pure
+                |> pureNoSignal
 
         ConfirmDeleteLabel id ->
             { model
@@ -234,10 +236,8 @@ update msg model =
                                         True
                             )
             }
-                |> pure
+                |> pureWithSignal (OfflineQueueAction (QDeleteLabel id))
 
-        -- TODO: Signal
-        -- |> addToQueue (qDeleteLabel id) ReceivedChangesResp
         CancelDeleteLabel id ->
             { model
                 | selected =
@@ -259,7 +259,7 @@ update msg model =
                                         e
                             )
             }
-                |> pure
+                |> pureNoSignal
 
         EditLabel ( id, newName ) ->
             { model
@@ -282,7 +282,7 @@ update msg model =
                                         e
                             )
             }
-                |> pure
+                |> pureNoSignal
 
         ChangeEditingLabelName ( id, newName ) ->
             { model
@@ -305,16 +305,16 @@ update msg model =
                                             e
                             )
             }
-                |> pure
+                |> pureNoSignal
 
         ConfirmEditingLabelName ( id, newName ) ->
             if newName == "" then
-                model |> pure
+                model |> pureNoSignal
 
             else if List.any (\l -> (l.name |> String.toLower) == (newName |> String.toLower)) model.labels then
                 -- TODO: show message to the user "This label already exists"
                 -- and disable create button
-                model |> pure
+                model |> pureNoSignal
 
             else
                 { model
@@ -347,10 +347,8 @@ update msg model =
                                                 e
                                 )
                 }
-                    |> pure
+                    |> pureWithSignal (OfflineQueueAction (QEditLabelName { name = newName, id = id }))
 
-        -- TODO: Signal
-        -- |> addToQueue (qEditLabelName { name = newName, id = id }) ReceivedChangesResp
         CancelEditingLabelName id ->
             { model
                 | selected =
@@ -372,7 +370,7 @@ update msg model =
                                             e
                             )
             }
-                |> pure
+                |> pureNoSignal
 
         RemoveLabelFromSelected id ->
             { model
@@ -391,15 +389,15 @@ update msg model =
                                         sameId id i
                             )
             }
-                |> pure
+                |> pureNoSignal
 
         RequestConfirmDeleteMultipleLabels ->
             { model | confirmDeleteAllSelectedLabels = True }
-                |> pure
+                |> pureNoSignal
 
         CancelDeleteMultipleLabels ->
             { model | confirmDeleteAllSelectedLabels = False }
-                |> pure
+                |> pureNoSignal
 
         ConfirmDeleteMultipleLabels ->
             let
@@ -426,128 +424,7 @@ update msg model =
                 , selected = []
                 , confirmDeleteAllSelectedLabels = False
             }
-                |> pure
-
-        -- TODO: Signal
-        -- |> addToQueue (qDeleteLabels deletedIds) ReceivedChangesResp
-        ReceivedChangesResp resp ->
-            case resp of
-                Ok { deleted, failedToCreate, failedToEdit, justSyncedAt, downSyncedData, justCreatedData } ->
-                    ( { model
-                        | notes =
-                            let
-                                ( _, notOutdatedNotes ) =
-                                    List.partition
-                                        (\e -> List.any (\l -> sameId (DatabaseID l.id) e.id) downSyncedData.notes)
-                                        model.notes
-
-                                updatedNotes : List Note
-                                updatedNotes =
-                                    downSyncedData.notes
-                                        |> List.map
-                                            (\e ->
-                                                { id = DatabaseID e.id
-                                                , title = e.title
-                                                , content = e.content
-                                                , pinned = e.pinned
-                                                , createdAt = e.createdAt
-                                                , updatedAt = e.updatedAt
-                                                , labels = e.labels |> List.map DatabaseID
-                                                }
-                                            )
-                            in
-                            notOutdatedNotes
-                                -- remove the ones that were failed to create
-                                |> exclude (\l -> List.any (\e -> sameId l.id (OfflineID e)) failedToCreate)
-                                -- remove the ones that don't exist in DB
-                                |> exclude (\l -> List.any (\e -> sameId l.id (DatabaseID e)) deleted.notes)
-                                -- update just created
-                                |> List.map
-                                    (\l ->
-                                        case listFirst (\( _, offlineId ) -> sameId l.id (OfflineID offlineId)) justCreatedData.notes of
-                                            Just ( v, _ ) ->
-                                                { id = DatabaseID v.id
-                                                , title = v.title
-                                                , content = v.content
-                                                , pinned = v.pinned
-                                                , createdAt = v.createdAt
-                                                , updatedAt = v.updatedAt
-                                                , labels = v.labels |> List.map DatabaseID
-                                                }
-
-                                            Nothing ->
-                                                l
-                                    )
-                                |> (++) updatedNotes
-                        , labels =
-                            let
-                                ( _, notOutdatedLabels ) =
-                                    List.partition
-                                        (\e -> List.any (\l -> sameId (DatabaseID l.id) e.id) downSyncedData.labels)
-                                        model.labels
-
-                                updatedLabels : List Label
-                                updatedLabels =
-                                    downSyncedData.labels
-                                        |> List.map
-                                            (\e ->
-                                                { id = DatabaseID e.id
-                                                , name = e.name
-                                                , createdAt = e.createdAt
-                                                , updatedAt = e.updatedAt
-                                                }
-                                            )
-                            in
-                            notOutdatedLabels
-                                -- remove the ones that were failed to create
-                                |> exclude (\l -> List.any (\e -> sameId l.id (OfflineID e)) failedToCreate)
-                                -- remove the ones that don't exist in DB
-                                |> exclude (\l -> List.any (\e -> sameId l.id (DatabaseID e)) deleted.labels)
-                                -- update just created
-                                |> List.map
-                                    (\l ->
-                                        case listFirst (\( _, offlineId ) -> sameId l.id (OfflineID offlineId)) justCreatedData.labels of
-                                            Just ( v, _ ) ->
-                                                { id = DatabaseID v.id
-                                                , name = v.name
-                                                , createdAt = v.createdAt
-                                                , updatedAt = v.updatedAt
-                                                }
-
-                                            Nothing ->
-                                                l
-                                    )
-                                |> (++) updatedLabels
-                        , offlineQueue = emptyOfflineQueue
-                        , runningQueueOn =
-                            if offlineQueueIsEmpty model.offlineQueue then
-                                Nothing
-
-                            else
-                                Just model.offlineQueue
-                        , lastSyncedAt = justSyncedAt
-                      }
-                    , Cmd.batch
-                        [ updateLastSyncedAt (Time.posixToMillis justSyncedAt)
-                        , if offlineQueueIsEmpty model.offlineQueue then
-                            Cmd.none
-
-                          else
-                            Api.sendChanges
-                                { operations = queueToOperations model.offlineQueue
-                                , lastSyncedAt = justSyncedAt
-                                , currentData =
-                                    { notes = model.notes |> List.map .id |> labelIDsSplitter |> Tuple.second
-                                    , labels = model.labels |> List.map .id |> labelIDsSplitter |> Tuple.second
-                                    }
-                                }
-                                ReceivedChangesResp
-                        ]
-                    )
-
-                -- TODO: error handling here
-                Err _ ->
-                    model |> pure
+                |> pureWithSignal (OfflineQueueAction (QDeleteLabels deletedIds))
 
 
 view : Model -> Html Msg

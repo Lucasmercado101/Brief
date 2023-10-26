@@ -64,6 +64,44 @@ type alias OQChangeLabelName =
     }
 
 
+type Action
+    = QToggleNotePin SyncableID Bool
+    | QEditNoteLabels SyncableID (Maybe (List SyncableID))
+    | QDeleteNote OQDeleteNote
+    | QNewLabel OQCreateLabel
+    | QCreateNewNote OQCreateNote
+    | QDeleteLabel OQDeleteLabel
+    | QEditLabelName OQChangeLabelName
+    | QDeleteLabels (List OQDeleteLabel)
+
+
+actionMapToFn action =
+    case action of
+        QToggleNotePin uid newPinnedVal ->
+            qToggleNotePin uid newPinnedVal
+
+        QEditNoteLabels uid newLabels ->
+            qEditNoteLabels uid newLabels
+
+        QDeleteNote uid ->
+            qDeleteNote uid
+
+        QNewLabel newLabelData ->
+            qNewLabel newLabelData
+
+        QCreateNewNote newNoteData ->
+            qCreateNewNote newNoteData
+
+        QDeleteLabel labelId ->
+            qDeleteLabel labelId
+
+        QEditLabelName editData ->
+            qEditLabelName editData
+
+        QDeleteLabels labels ->
+            qDeleteLabels labels
+
+
 queueToOperations : OfflineQueueOps -> List Operation
 queueToOperations { createLabels, deleteLabels, createNotes, deleteNotes, editNotes, changeLabelNames } =
     let

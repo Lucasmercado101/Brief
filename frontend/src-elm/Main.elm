@@ -17,7 +17,7 @@ import Http
 import Material.Icons as Filled
 import Material.Icons.Outlined as Outlined
 import Material.Icons.Types exposing (Coloring(..))
-import OfflineQueue exposing (OfflineQueueOps, emptyOfflineQueue, offlineQueueIsEmpty, qCreateNewNote, qDeleteNote, qEditNoteLabels, qNewLabel, qToggleNotePin, queueToOperations)
+import OfflineQueue exposing (Action(..), OfflineQueueOps, actionMapToFn, emptyOfflineQueue, offlineQueueIsEmpty, qCreateNewNote, qDeleteNote, qEditNoteLabels, qNewLabel, qToggleNotePin, queueToOperations)
 import Page.EditLabels as EditLabels
 import Page.Home as Home exposing (Signal(..))
 import Page.LogIn as LogIn
@@ -46,12 +46,9 @@ subscriptions model =
             Home.subscriptions homeModel
                 |> Sub.map (\e -> GotPageMsg (GotHomeMsg e))
 
-        -- TODO:
-        -- Home.subscriptions homeModel |> Sub.map GotHomeMsg
         EditLabels editLabelsModel ->
-            -- TODO:
-            -- EditLabels.subscriptions editLabelsModel |> Sub.map GotEditLabelsMsg
-            Sub.none
+            EditLabels.subscriptions editLabelsModel
+                |> Sub.map (\e -> GotPageMsg (GotEditLabelsMsg e))
 
 
 
@@ -215,7 +212,22 @@ update topMsg topModel =
 
                 Route.EditLabels ->
                     -- TODO:
-                    ( topModel, Cmd.none )
+                    case topModel.page of
+                        Home data ->
+                            { topModel
+                                | page =
+                                    EditLabels
+                                        (EditLabels.init
+                                            { seeds = data.seeds
+                                            , labels = data.labels
+                                            , notes = data.notes
+                                            }
+                                        )
+                            }
+                                |> pure
+
+                        _ ->
+                            ( topModel, Cmd.none )
             )
 
         GotPageMsg pageMsg ->
@@ -226,11 +238,11 @@ update topMsg topModel =
 
                 ( GotHomeMsg homeMsg, Home homeModel ) ->
                     Home.update homeMsg homeModel
-                        |> updateWithSignal Home GotHomeMsg topModel
+                        |> updateHomeWithSignal Home GotHomeMsg topModel
 
                 ( GotEditLabelsMsg editLabelsMsg, EditLabels editLabelsModel ) ->
                     EditLabels.update editLabelsMsg editLabelsModel
-                        |> updateWith EditLabels GotEditLabelsMsg topModel
+                        |> updateEditLabelsWithSignal EditLabels GotEditLabelsMsg topModel
 
                 ( _, _ ) ->
                     -- Disregard messages that arrived for the wrong page.
@@ -440,8 +452,8 @@ updateWith toModel toMsg topModel ( m, c ) =
     ( { topModel | page = toModel m }, Cmd.map GotPageMsg (Cmd.map toMsg c) )
 
 
-updateWithSignal : (a -> Page) -> (c -> PageMsg) -> Model -> ( a, Cmd c, Maybe Home.Signal ) -> ( Model, Cmd Msg )
-updateWithSignal toPageModel toPageMsg topModel ( m, c, maybeSignal ) =
+updateHomeWithSignal : (a -> Page) -> (c -> PageMsg) -> Model -> ( a, Cmd c, Maybe Home.Signal ) -> ( Model, Cmd Msg )
+updateHomeWithSignal toPageModel toPageMsg topModel ( m, c, maybeSignal ) =
     let
         ( mappedModel, mappedCmd ) =
             ( { topModel | page = toPageModel m }, Cmd.map GotPageMsg (Cmd.map toPageMsg c) )
@@ -469,20 +481,44 @@ updateWithSignal toPageModel toPageMsg topModel ( m, c, maybeSignal ) =
             ( mappedModel, mappedCmd )
                 |> addToQueue
                     (case signal of
-                        QToggleNotePin uid newPinnedVal ->
-                            qToggleNotePin uid newPinnedVal
+                        Home.OfflineQueueAction action ->
+                            actionMapToFn action
+                    )
+                    noteIds
+                    labelIds
 
-                        QEditNoteLabels uid newLabels ->
-                            qEditNoteLabels uid newLabels
 
-                        QDeleteNote uid ->
-                            qDeleteNote uid
+updateEditLabelsWithSignal : (a -> Page) -> (c -> PageMsg) -> Model -> ( a, Cmd c, Maybe EditLabels.Signal ) -> ( Model, Cmd Msg )
+updateEditLabelsWithSignal toPageModel toPageMsg topModel ( m, c, maybeSignal ) =
+    let
+        ( mappedModel, mappedCmd ) =
+            ( { topModel | page = toPageModel m }, Cmd.map GotPageMsg (Cmd.map toPageMsg c) )
+    in
+    case maybeSignal of
+        Nothing ->
+            ( mappedModel, mappedCmd )
 
-                        QNewLabel newLabelData ->
-                            qNewLabel newLabelData
+        Just signal ->
+            let
+                ( labelIds, noteIds ) =
+                    (case topModel.page of
+                        Home homeModel ->
+                            ( homeModel.labels, homeModel.notes )
 
-                        QCreateNewNote newNoteData ->
-                            qCreateNewNote newNoteData
+                        EditLabels editLabelsModel ->
+                            ( editLabelsModel.labels, editLabelsModel.notes )
+
+                        LogIn logInModel ->
+                            -- TODO: separate page
+                            ( [], [] )
+                    )
+                        |> (\( l, n ) -> ( l |> List.map .id |> labelIDsSplitter |> Tuple.second, n |> List.map .id |> labelIDsSplitter |> Tuple.second ))
+            in
+            ( mappedModel, mappedCmd )
+                |> addToQueue
+                    (case signal of
+                        EditLabels.OfflineQueueAction action ->
+                            actionMapToFn action
                     )
                     noteIds
                     labelIds
@@ -542,10 +578,7 @@ view model =
                 Html.Styled.map GotHomeMsg (Home.view homeModel (maybeToBool model.runningQueueOn))
 
             EditLabels editLabelsModel ->
-                -- TODO: fix this
-                div [] []
+                Html.Styled.map GotEditLabelsMsg (EditLabels.view editLabelsModel)
           )
             |> Html.Styled.map GotPageMsg
-
-        -- Html.Styled.map GotEditLabelsMsg (EditLabels.view editLabelsModel)
         ]
