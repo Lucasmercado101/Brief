@@ -8,6 +8,7 @@ import Url.Parser exposing (Parser, map, oneOf, parse, s, top)
 type Route
     = Home
     | LogIn
+    | EditLabels
 
 
 parser : Parser (Route -> a) a
@@ -15,6 +16,7 @@ parser =
     oneOf
         [ map Home top
         , map LogIn (s "log-in")
+        , map EditLabels (s "edit-labels")
         ]
 
 
@@ -47,4 +49,7 @@ routeToString route =
 
                 LogIn ->
                     "log-in"
+
+                EditLabels ->
+                    "edit-labels"
            )
