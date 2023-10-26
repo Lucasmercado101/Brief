@@ -390,31 +390,17 @@ update topMsg topModel =
                                     -- TODO: separate page
                                     LogIn logInModel
 
-                        labels : List Label
-                        labels =
+                        ( labels, notes ) =
                             case updatedPageModel of
                                 Home homeModel ->
-                                    homeModel.labels
+                                    ( homeModel.labels, homeModel.notes )
 
                                 EditLabels editLabelsModel ->
-                                    editLabelsModel.labels
+                                    ( editLabelsModel.labels, editLabelsModel.notes )
 
                                 LogIn logInModel ->
                                     -- TODO: separate page
-                                    []
-
-                        notes : List Note
-                        notes =
-                            case updatedPageModel of
-                                Home homeModel ->
-                                    homeModel.notes
-
-                                EditLabels editLabelsModel ->
-                                    editLabelsModel.notes
-
-                                LogIn logInModel ->
-                                    -- TODO: separate page
-                                    []
+                                    ( [], [] )
                     in
                     ( { topModel
                         | page = updatedPageModel
