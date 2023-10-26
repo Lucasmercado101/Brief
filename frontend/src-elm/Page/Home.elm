@@ -14,7 +14,7 @@ import Http
 import Material.Icons as Filled
 import Material.Icons.Outlined as Outlined
 import Material.Icons.Types exposing (Coloring(..))
-import OfflineQueue exposing (OfflineQueueOps, addToQueue, emptyOfflineQueue, offlineQueueIsEmpty, qCreateNewNote, qDeleteNote, qEditNoteLabels, qNewLabel, qToggleNotePin, queueToOperations)
+import OfflineQueue exposing (OfflineQueueOps, emptyOfflineQueue, offlineQueueIsEmpty, qCreateNewNote, qDeleteNote, qEditNoteLabels, qNewLabel, qToggleNotePin, queueToOperations)
 import Ports exposing (receiveRandomValues, requestRandomValues, updateLastSyncedAt)
 import Random
 import Route
@@ -22,6 +22,16 @@ import Svg.Styled
 import Task
 import Time exposing (Posix)
 import UID exposing (generateUID)
+
+
+pureNoSignal : Model -> ( Model, Cmd msg, Maybe Signal )
+pureNoSignal m =
+    ( m, Cmd.none, Nothing )
+
+
+pureWithSignal : Signal -> Model -> ( Model, Cmd msg, Maybe Signal )
+pureWithSignal s m =
+    ( m, Cmd.none, Just s )
 
 
 subscriptions : Model -> Sub Msg
@@ -134,21 +144,25 @@ type Msg
     | ChangeNewLabelName String
 
 
-update : Msg -> Model -> ( Model, Cmd Msg )
+type Signal
+    = QToggleNotePin SyncableID Bool
+
+
+update : Msg -> Model -> ( Model, Cmd Msg, Maybe Signal )
 update msg model =
     case msg of
         -- Labels column menu
         OpenLabelsMenu ->
             { model | labelsMenu = Just "" }
-                |> pure
+                |> pureNoSignal
 
         CloseLabelsMenu ->
             { model | labelsMenu = Nothing }
-                |> pure
+                |> pureNoSignal
 
         ChangeLabelsSearchQuery s ->
             { model | labelsMenu = Maybe.map (\_ -> s) model.labelsMenu }
-                |> pure
+                |> pureNoSignal
 
         SelectLabelToFilterBy id ->
             let
@@ -171,10 +185,10 @@ update msg model =
                     , content = model.filters.content
                     }
             }
-                |> pure
+                |> pureNoSignal
 
         GoToEditLabelsScreen ->
-            ( { model | labelsMenu = Nothing }, Route.replaceUrl model.key Route.EditLabels )
+            ( { model | labelsMenu = Nothing }, Route.replaceUrl model.key Route.EditLabels, Nothing )
 
         ChangeNotePinned ( uid, newPinnedVal ) ->
             { model
@@ -189,7 +203,7 @@ update msg model =
                         )
                         model.notes
             }
-                |> pure
+                |> pureWithSignal (QToggleNotePin uid newPinnedVal)
 
         -- TODO:
         -- |> addToQueue (qToggleNotePin uid (Just newPinnedVal)) ReceivedChangesResp
@@ -200,7 +214,7 @@ update msg model =
             in
             case noteExists of
                 Nothing ->
-                    model |> pure
+                    model |> pureNoSignal
 
                 Just noteData ->
                     let
@@ -208,27 +222,27 @@ update msg model =
                             noteData.labels |> exclude (sameId labelID)
                     in
                     { model | notes = { noteData | labels = newNotes } :: restNotes }
-                        |> pure
+                        |> pureNoSignal
 
         -- TODO:
         -- |> addToQueue (qEditNoteLabels noteID (Just newNotes)) ReceivedChangesResp
         DeleteNote toDeleteNoteID ->
             { model | notes = model.notes |> exclude (.id >> sameId toDeleteNoteID) }
-                |> pure
+                |> pureNoSignal
 
         -- TODO:
         -- |> addToQueue (qDeleteNote toDeleteNoteID) ReceivedChangesResp
         ChangeNewLabelName newName ->
             { model | newLabelName = newName }
-                |> pure
+                |> pureNoSignal
 
         RequestTimeForNewLabelCreation ->
             if String.length model.newLabelName == 0 then
-                model |> pure
+                model |> pureNoSignal
 
             else if List.any (\l -> l.name == model.newLabelName) model.labels then
                 -- TODO: make this visual to the user in the form of an error
-                model |> pure
+                model |> pureNoSignal
 
             else
                 let
@@ -241,7 +255,7 @@ update msg model =
                         , name = model.newLabelName
                         }
                 in
-                ( model, Cmd.batch [ requestRandomValues (), getNewTimeAndCreateLabel newLabel ] )
+                ( model, Cmd.batch [ requestRandomValues (), getNewTimeAndCreateLabel newLabel ], Nothing )
 
         CreateNewLabel data time ->
             { model
@@ -254,13 +268,13 @@ update msg model =
                     }
                         :: model.labels
             }
-                |> pure
+                |> pureNoSignal
 
         -- TODO:
         -- |> addToQueue (qNewLabel { offlineId = data.id, name = data.name }) ReceivedChangesResp
         ReceivedRandomValues values ->
             { model | seeds = List.map Random.initialSeed values }
-                |> pure
+                |> pureNoSignal
 
         BeginWritingNewNote ->
             { model
@@ -271,7 +285,7 @@ update msg model =
                         , labels = Nothing
                         }
             }
-                |> pure
+                |> pureNoSignal
 
         NewTitleChange s ->
             { model
@@ -284,7 +298,7 @@ update msg model =
                         )
                         model.isWritingANewNote
             }
-                |> pure
+                |> pureNoSignal
 
         NewNoteContentChange s ->
             { model
@@ -295,7 +309,7 @@ update msg model =
                         )
                         model.isWritingANewNote
             }
-                |> pure
+                |> pureNoSignal
 
         SearchLabelsQueryChange s ->
             { model
@@ -315,7 +329,7 @@ update msg model =
                         )
                         model.isWritingANewNote
             }
-                |> pure
+                |> pureNoSignal
 
         AddLabelToNewNote newLabel ->
             { model
@@ -335,7 +349,7 @@ update msg model =
                         )
                         model.isWritingANewNote
             }
-                |> pure
+                |> pureNoSignal
 
         RemoveLabelFromNewNote labelID ->
             { model
@@ -355,16 +369,16 @@ update msg model =
                                 }
                             )
             }
-                |> pure
+                |> pureNoSignal
 
         RequestTimeForCreateNewNote ->
             case model.isWritingANewNote of
                 Nothing ->
-                    model |> pure
+                    model |> pureNoSignal
 
                 Just newNoteData ->
                     if String.length newNoteData.content == 0 then
-                        model |> pure
+                        model |> pureNoSignal
 
                     else
                         let
@@ -387,6 +401,7 @@ update msg model =
                         in
                         ( model
                         , Cmd.batch [ requestRandomValues (), getNewTimeForCreateNewNote newNote ]
+                        , Nothing
                         )
 
         GotCurrentTimeForNewNote noteData time ->
@@ -411,7 +426,7 @@ update msg model =
                 | isWritingANewNote = Nothing
                 , notes = newNote :: model.notes
             }
-                |> pure
+                |> pureNoSignal
 
         -- TODO:
         -- |> addToQueue
@@ -438,11 +453,11 @@ update msg model =
                                             }
                                 }
                     }
-                        |> pure
+                        |> pureNoSignal
 
                 Nothing ->
                     model
-                        |> pure
+                        |> pureNoSignal
 
 
 view : Model -> Bool -> Html Msg
@@ -1048,7 +1063,16 @@ note model data =
                 [ boxShadow4 (px 6) (px 6) (px 0) (rgb 0 0 0) ]
             ]
         ]
-        [ noteTitle
+        [ div [ onClick (ChangeNotePinned ( data.id, not data.pinned )) ]
+            [ text
+                (if data.pinned then
+                    "pinned"
+
+                 else
+                    "unpin"
+                )
+            ]
+        , noteTitle
         , content
         , labelsFooter
         ]

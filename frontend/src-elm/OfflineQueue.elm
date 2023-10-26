@@ -63,58 +63,6 @@ type alias OQChangeLabelName =
     }
 
 
-addToQueue :
-    (OfflineQueueOps -> OfflineQueueOps)
-    -> (Result Http.Error Api.ChangesResponse -> msg)
-    ->
-        ( { a
-            | offlineQueue : OfflineQueueOps
-            , runningQueueOn : Maybe OfflineQueueOps
-            , lastSyncedAt : Posix
-            , labels : List Label
-            , notes : List Note
-          }
-        , Cmd msg
-        )
-    ->
-        ( { a
-            | offlineQueue : OfflineQueueOps
-            , runningQueueOn : Maybe OfflineQueueOps
-            , lastSyncedAt : Posix
-            , labels : List Label
-            , notes : List Note
-          }
-        , Cmd msg
-        )
-addToQueue fn respMsg ( model, cmds ) =
-    let
-        currentOperations =
-            model.offlineQueue |> fn
-    in
-    case model.runningQueueOn of
-        Nothing ->
-            ( { model
-                | offlineQueue = emptyOfflineQueue
-                , runningQueueOn = Just currentOperations
-              }
-            , Cmd.batch
-                [ Api.sendChanges
-                    { operations = queueToOperations currentOperations
-                    , lastSyncedAt = model.lastSyncedAt
-                    , currentData =
-                        { notes = model.notes |> List.map .id |> labelIDsSplitter |> Tuple.second
-                        , labels = model.labels |> List.map .id |> labelIDsSplitter |> Tuple.second
-                        }
-                    }
-                    respMsg
-                , cmds
-                ]
-            )
-
-        Just _ ->
-            ( { model | offlineQueue = currentOperations }, cmds )
-
-
 queueToOperations : OfflineQueueOps -> List Operation
 queueToOperations { createLabels, deleteLabels, createNotes, deleteNotes, editNotes, changeLabelNames } =
     let
@@ -259,13 +207,13 @@ qEditNoteLabels id labels =
         }
 
 
-qToggleNotePin : SyncableID -> Maybe Bool -> OfflineQueueOps -> OfflineQueueOps
+qToggleNotePin : SyncableID -> Bool -> OfflineQueueOps -> OfflineQueueOps
 qToggleNotePin id newPinnedVal =
     qEditNote
         { id = id
         , title = Nothing
         , content = Nothing
-        , pinned = newPinnedVal
+        , pinned = Just newPinnedVal
         , labels = Nothing
         }
 

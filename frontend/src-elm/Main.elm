@@ -17,9 +17,9 @@ import Http
 import Material.Icons as Filled
 import Material.Icons.Outlined as Outlined
 import Material.Icons.Types exposing (Coloring(..))
-import OfflineQueue exposing (OfflineQueueOps, emptyOfflineQueue, offlineQueueIsEmpty, queueToOperations)
+import OfflineQueue exposing (OfflineQueueOps, emptyOfflineQueue, offlineQueueIsEmpty, qToggleNotePin, queueToOperations)
 import Page.EditLabels as EditLabels
-import Page.Home as Home
+import Page.Home as Home exposing (Signal(..))
 import Page.LogIn as LogIn
 import Ports exposing (requestRandomValues, updateLastSyncedAt)
 import Random
@@ -226,7 +226,7 @@ update topMsg topModel =
 
                 ( GotHomeMsg homeMsg, Home homeModel ) ->
                     Home.update homeMsg homeModel
-                        |> updateWith Home GotHomeMsg topModel
+                        |> updateWithSignal Home GotHomeMsg topModel
 
                 ( GotEditLabelsMsg editLabelsMsg, EditLabels editLabelsModel ) ->
                     EditLabels.update editLabelsMsg editLabelsModel
@@ -438,6 +438,73 @@ update topMsg topModel =
 
 updateWith toModel toMsg topModel ( m, c ) =
     ( { topModel | page = toModel m }, Cmd.map GotPageMsg (Cmd.map toMsg c) )
+
+
+updateWithSignal : (a -> Page) -> (c -> PageMsg) -> Model -> ( a, Cmd c, Maybe Home.Signal ) -> ( Model, Cmd Msg )
+updateWithSignal toModel toMsg topModel ( m, c, maybeSignal ) =
+    let
+        mappedCmd =
+            Cmd.map GotPageMsg (Cmd.map toMsg c)
+
+        ( newModel, withSignalCmds ) =
+            case maybeSignal of
+                Nothing ->
+                    ( topModel, Cmd.none )
+
+                Just signal ->
+                    let
+                        ( labelIds, noteIds ) =
+                            (case topModel.page of
+                                Home homeModel ->
+                                    ( homeModel.labels, homeModel.notes )
+
+                                EditLabels editLabelsModel ->
+                                    ( editLabelsModel.labels, editLabelsModel.notes )
+
+                                LogIn logInModel ->
+                                    -- TODO: separate page
+                                    ( [], [] )
+                            )
+                                |> (\( l, n ) -> ( l |> List.map .id |> labelIDsSplitter |> Tuple.second, n |> List.map .id |> labelIDsSplitter |> Tuple.second ))
+                    in
+                    ( topModel, mappedCmd )
+                        |> (case signal of
+                                QToggleNotePin uid newPinnedVal ->
+                                    addToQueue (qToggleNotePin uid newPinnedVal) noteIds labelIds
+                           )
+    in
+    ( { newModel | page = toModel m }
+    , Cmd.batch [ mappedCmd, withSignalCmds ]
+    )
+
+
+addToQueue operation notesIds labelsIds ( model, cmds ) =
+    let
+        currentOperations =
+            model.offlineQueue |> operation
+    in
+    case model.runningQueueOn of
+        Nothing ->
+            ( { model
+                | offlineQueue = emptyOfflineQueue
+                , runningQueueOn = Just currentOperations
+              }
+            , Cmd.batch
+                [ Api.sendChanges
+                    { operations = queueToOperations currentOperations
+                    , lastSyncedAt = model.lastSyncedAt
+                    , currentData =
+                        { notes = notesIds
+                        , labels = labelsIds
+                        }
+                    }
+                    ReceivedChangesResp
+                , cmds
+                ]
+            )
+
+        Just _ ->
+            ( { model | offlineQueue = currentOperations }, cmds )
 
 
 

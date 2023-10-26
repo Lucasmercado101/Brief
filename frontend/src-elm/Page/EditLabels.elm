@@ -14,7 +14,7 @@ import Http
 import Material.Icons as Filled
 import Material.Icons.Outlined as Outlined
 import Material.Icons.Types exposing (Coloring(..))
-import OfflineQueue exposing (OfflineQueueOps, addToQueue, emptyOfflineQueue, offlineQueueIsEmpty, qDeleteLabel, qDeleteLabels, qEditLabelName, qNewLabel, queueToOperations)
+import OfflineQueue exposing (OfflineQueueOps, emptyOfflineQueue, offlineQueueIsEmpty, qDeleteLabel, qDeleteLabels, qEditLabelName, qNewLabel, queueToOperations)
 import Ports exposing (receiveRandomValues, requestRandomValues, updateLastSyncedAt)
 import Random
 import Svg.Styled
@@ -159,8 +159,9 @@ update msg model =
                         :: model.labels
             }
                 |> pure
-                |> addToQueue (qNewLabel { offlineId = data.id, name = data.name }) ReceivedChangesResp
 
+        -- TODO: Signal
+        -- |> addToQueue (qNewLabel { offlineId = data.id, name = data.name }) ReceivedChangesResp
         SelectLabel id ->
             let
                 sameIdOnSelected =
@@ -234,8 +235,9 @@ update msg model =
                             )
             }
                 |> pure
-                |> addToQueue (qDeleteLabel id) ReceivedChangesResp
 
+        -- TODO: Signal
+        -- |> addToQueue (qDeleteLabel id) ReceivedChangesResp
         CancelDeleteLabel id ->
             { model
                 | selected =
@@ -346,8 +348,9 @@ update msg model =
                                 )
                 }
                     |> pure
-                    |> addToQueue (qEditLabelName { name = newName, id = id }) ReceivedChangesResp
 
+        -- TODO: Signal
+        -- |> addToQueue (qEditLabelName { name = newName, id = id }) ReceivedChangesResp
         CancelEditingLabelName id ->
             { model
                 | selected =
@@ -424,8 +427,9 @@ update msg model =
                 , confirmDeleteAllSelectedLabels = False
             }
                 |> pure
-                |> addToQueue (qDeleteLabels deletedIds) ReceivedChangesResp
 
+        -- TODO: Signal
+        -- |> addToQueue (qDeleteLabels deletedIds) ReceivedChangesResp
         ReceivedChangesResp resp ->
             case resp of
                 Ok { deleted, failedToCreate, failedToEdit, justSyncedAt, downSyncedData, justCreatedData } ->
