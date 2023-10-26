@@ -7,6 +7,7 @@ import Cmd.Extra exposing (pure)
 import Css exposing (backgroundColor, backgroundImage, backgroundRepeat, backgroundSize, contain, fullWidth, height, pct, repeat, rgb, url, width)
 import Dog exposing (dogSvg)
 import Either exposing (Either(..))
+import Helpers exposing (maybeToBool)
 import Html
 import Html.Styled exposing (Html, br, button, div, form, img, input, label, li, nav, p, span, strong, text, textarea, ul)
 import Html.Styled.Attributes exposing (class, css, for, id, placeholder, src, style, title, type_, value)
@@ -249,10 +250,8 @@ view model =
                 Html.Styled.map GotLogInMsg (LogIn.logInView logInModel)
 
             Home homeModel ->
-                -- TODO: fix this
-                div [] []
+                Html.Styled.map GotHomeMsg (Home.view homeModel (maybeToBool model.runningQueueOn))
 
-            -- Html.Styled.map GotHomeMsg (Home.view homeModel)
             EditLabels editLabelsModel ->
                 -- TODO: fix this
                 div [] []

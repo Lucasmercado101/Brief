@@ -596,61 +596,58 @@ update msg model =
 --             homeModel |> pure
 
 
-view : Model -> Html Msg
-view model =
-    div [] []
+view : Model -> Bool -> Html Msg
+view model isSyncing =
+    div [ css [ displayFlex, flexDirection column, height (pct 100), overflow auto ] ]
+        [ nav
+            [ css
+                [ backgroundColor (rgb 140 20 254)
+                , color (rgb 255 255 255)
+                , publicSans
+                , fontWeight bolder
+                , borderBottom3 (px 3) solid (rgb 0 0 0)
+                , position sticky
+                , top (px 0)
+                , displayFlex
+                , justifyContent spaceBetween
+                ]
+            ]
+            [ let
+                labelsCount =
+                    model.labels |> List.length |> String.fromInt
+              in
+              case model.labelsMenu of
+                Just _ ->
+                    openLabelsMenuBtn labelsCount
 
+                Nothing ->
+                    closedLabelsMenuBtn labelsCount
+            , p
+                [ css
+                    [ fontSize (px 25)
+                    ]
+                ]
+                [ text "Notes" ]
+            , (if isSyncing then
+                Outlined.sync
 
+               else
+                Outlined.cloud
+              )
+                28
+                Inherit
+                |> Svg.Styled.fromUnstyled
+            ]
+        , div [ css [ displayFlex, height (pct 100), overflow hidden ] ]
+            [ case model.labelsMenu of
+                Just _ ->
+                    labelsMenuColumn model
 
--- TODO: restore
--- div [ css [ displayFlex, flexDirection column, height (pct 100), overflow auto ] ]
---     [ nav
---         [ css
---             [ backgroundColor (rgb 140 20 254)
---             , color (rgb 255 255 255)
---             , publicSans
---             , fontWeight bolder
---             , borderBottom3 (px 3) solid (rgb 0 0 0)
---             , position sticky
---             , top (px 0)
---             , displayFlex
---             , justifyContent spaceBetween
---             ]
---         ]
---         [ let
---             labelsCount =
---                 model.labels |> List.length |> String.fromInt
---           in
---           case model.labelsMenu of
---             Just _ ->
---                 openLabelsMenuBtn labelsCount
---             Nothing ->
---                 closedLabelsMenuBtn labelsCount
---         , p
---             [ css
---                 [ fontSize (px 25)
---                 ]
---             ]
---             [ text "Notes" ]
---         , (case model.runningQueueOn of
---             Nothing ->
---                 Outlined.cloud
---             Just _ ->
---                 Outlined.sync
---           )
---             28
---             Inherit
---             |> Svg.Styled.fromUnstyled
---         ]
---     , div [ css [ displayFlex, height (pct 100), overflow hidden ] ]
---         [ case model.labelsMenu of
---             Just _ ->
---                 labelsMenuColumn model
---             Nothing ->
---                 text ""
---         , notesGrid model
---         ]
---     ]
+                Nothing ->
+                    text ""
+            , notesGrid model
+            ]
+        ]
 
 
 labelsMenuWidth : Float

@@ -108,3 +108,13 @@ listFirst pred list =
 
             else
                 listFirst pred xs
+
+
+maybeToBool : Maybe a -> Bool
+maybeToBool maybe =
+    case maybe of
+        Just _ ->
+            True
+
+        Nothing ->
+            False
