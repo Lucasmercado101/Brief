@@ -1,4 +1,4 @@
-port module Main exposing (..)
+module Main exposing (..)
 
 import Api exposing (Operation(..), SyncableID(..))
 import Browser exposing (Document, UrlRequest)
@@ -8,6 +8,7 @@ import Css exposing (..)
 import CssHelpers exposing (publicSans)
 import Dog exposing (dogSvg)
 import Either exposing (Either(..))
+import Helpers exposing (exclude, idDiff, labelIDsSplitter, listFirst, or, partitionFirst, sameId)
 import Html
 import Html.Styled exposing (Html, br, button, div, form, img, input, label, li, nav, p, span, strong, text, textarea, ul)
 import Html.Styled.Attributes exposing (class, css, for, id, placeholder, src, style, title, type_, value)
@@ -16,7 +17,9 @@ import Http
 import Material.Icons as Filled
 import Material.Icons.Outlined as Outlined
 import Material.Icons.Types exposing (Coloring(..))
+import Page.EditLabels as EditLabels
 import Page.LogIn as LogIn
+import Ports exposing (..)
 import Random
 import Random.Char
 import Random.Extra
@@ -25,20 +28,8 @@ import Route
 import Svg.Styled
 import Task
 import Time exposing (Posix)
+import UID exposing (generateUID)
 import Url exposing (Url)
-
-
-
--- PORTS
-
-
-port requestRandomValues : () -> Cmd msg
-
-
-port updateLastSyncedAt : Int -> Cmd msg
-
-
-port receiveRandomValues : (List Int -> msg) -> Sub msg
 
 
 
@@ -81,24 +72,6 @@ getNewTimeAndCreateLabel data =
 
 
 -- MODEL
-
-
-idDiff : SyncableID -> SyncableID -> Bool
-idDiff a b =
-    case ( a, b ) of
-        ( OfflineID c, OfflineID d ) ->
-            c /= d
-
-        ( DatabaseID c, DatabaseID d ) ->
-            c /= d
-
-        _ ->
-            True
-
-
-sameId : SyncableID -> SyncableID -> Bool
-sameId a b =
-    not (idDiff a b)
 
 
 type alias UniqueStr =
@@ -1502,26 +1475,6 @@ queueToOperations { createLabels, deleteLabels, createNotes, deleteNotes, editNo
         ++ ifNotEmpty1 changeLabelNames (List.map ChangeLabelName changeLabelNames)
 
 
-labelIDsSplitterHelper : List SyncableID -> List String -> List Int -> ( List String, List Int )
-labelIDsSplitterHelper ids offlineIds dbIds =
-    case ids of
-        [] ->
-            ( offlineIds, dbIds )
-
-        x :: xs ->
-            case x of
-                OfflineID offlineId ->
-                    labelIDsSplitterHelper xs (offlineId :: offlineIds) dbIds
-
-                DatabaseID dbID ->
-                    labelIDsSplitterHelper xs offlineIds (dbID :: dbIds)
-
-
-labelIDsSplitter : List SyncableID -> ( List String, List Int )
-labelIDsSplitter ids =
-    labelIDsSplitterHelper ids [] []
-
-
 
 -- VIEW
 
@@ -2683,100 +2636,6 @@ prioritizePinned notes =
             List.filter (\n -> n.pinned == False) notes
     in
     pinned ++ unpinned
-
-
-
--- UID Lib
--- https://github.com/elm/random/issues/2
-
-
-generateUID : List Random.Seed -> ( String, List Random.Seed )
-generateUID seeds =
-    List.map (Random.step (alphaNumericGenerator 5)) seeds
-        |> List.unzip
-        |> Tuple.mapFirst (String.join "")
-
-
-alphaNumericGenerator : Int -> Random.Generator String
-alphaNumericGenerator strLength =
-    Random.Extra.choices (Random.Char.char 48 57)
-        [ Random.Char.char 97 122
-        , Random.Char.char 65 90
-        ]
-        |> Random.String.string strLength
-
-
-
--- Helpers
-
-
-partitionFirstHelper : List a -> (a -> Bool) -> ( Maybe a, List a ) -> ( Maybe a, List a )
-partitionFirstHelper arr pred ( first, checked ) =
-    case arr of
-        [] ->
-            ( Nothing, checked )
-
-        x :: xs ->
-            if pred x then
-                ( Just x, checked ++ xs )
-
-            else
-                partitionFirstHelper xs pred ( Nothing, checked ++ [ x ] )
-
-
-
-{-
-   Like List.partition but only returns the first element that matches the predicate
-   and the rest of the elements with that first element missing
-
-   or Nothing and the original array if it's not there
--}
-
-
-partitionFirst : (a -> Bool) -> List a -> ( Maybe a, List a )
-partitionFirst pred arr =
-    partitionFirstHelper arr pred ( Nothing, [] )
-
-
-
-{-
-   Returns the first value that is present, like the boolean ||.
--}
-
-
-or : Maybe a -> Maybe a -> Maybe a
-or default new =
-    case new of
-        Just v ->
-            Just v
-
-        Nothing ->
-            default
-
-
-
-{-
-   It's just `filterNot` https://package.elm-lang.org/packages/elm-community/list-extra/8.7.0/List-Extra#filterNot
--}
-
-
-exclude : (a -> Bool) -> List a -> List a
-exclude pred list =
-    List.filter (not << pred) list
-
-
-listFirst : (a -> Bool) -> List a -> Maybe a
-listFirst pred list =
-    case list of
-        [] ->
-            Nothing
-
-        x :: xs ->
-            if pred x then
-                Just x
-
-            else
-                listFirst pred xs
 
 
 
