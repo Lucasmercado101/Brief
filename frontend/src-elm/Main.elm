@@ -42,7 +42,8 @@ subscriptions model =
 
         -- LogIn.subscriptions logInModel |> Sub.map GotLogInMsg
         Home homeModel ->
-            Sub.none
+            Home.subscriptions homeModel
+                |> Sub.map (\e -> GotPageMsg (GotHomeMsg e))
 
         -- TODO:
         -- Home.subscriptions homeModel |> Sub.map GotHomeMsg
@@ -215,10 +216,6 @@ update topMsg topModel =
                     ( topModel, Cmd.none )
             )
 
-        FullSyncResp resp ->
-            -- TODO:
-            topModel |> pure
-
         GotPageMsg pageMsg ->
             case ( pageMsg, topModel.page ) of
                 ( GotLogInMsg loginMsg, LogIn logInModel ) ->
@@ -235,6 +232,56 @@ update topMsg topModel =
 
                 ( _, _ ) ->
                     -- Disregard messages that arrived for the wrong page.
+                    topModel |> pure
+
+        FullSyncResp res ->
+            case res of
+                Ok ( notes, labels ) ->
+                    let
+                        updatedPageModel m =
+                            { m
+                                | labels =
+                                    List.map
+                                        (\l ->
+                                            { name = l.name
+                                            , id = DatabaseID l.id
+                                            , createdAt = l.createdAt
+                                            , updatedAt = l.updatedAt
+                                            }
+                                        )
+                                        labels
+                                , notes =
+                                    List.map
+                                        (\l ->
+                                            { id = DatabaseID l.id
+                                            , title = l.title
+                                            , content = l.content
+                                            , pinned = l.pinned
+                                            , labels = List.map DatabaseID l.labels
+                                            , createdAt = l.createdAt
+                                            , updatedAt = l.updatedAt
+                                            }
+                                        )
+                                        notes
+                            }
+                    in
+                    { topModel
+                        | page =
+                            case topModel.page of
+                                Home homeModel ->
+                                    Home (updatedPageModel homeModel)
+
+                                EditLabels editLabelsModel ->
+                                    EditLabels (updatedPageModel editLabelsModel)
+
+                                LogIn logInModel ->
+                                    -- TODO: separate LogIn from pages msg stuff
+                                    LogIn logInModel
+                    }
+                        |> pure
+
+                Err v ->
+                    -- TODO: handle 403
                     topModel |> pure
 
 
