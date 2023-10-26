@@ -62,16 +62,11 @@ type alias Model =
         { label : Maybe SyncableID
         , content : Maybe String
         }
-
-    -- sync stuff
-    , offlineQueue : OfflineQueueOps
-    , runningQueueOn : Maybe OfflineQueueOps
-    , lastSyncedAt : Posix
     }
 
 
-init : { navKey : Nav.Key, seeds : List Random.Seed, lastSyncedAt : Int } -> Model
-init { navKey, seeds, lastSyncedAt } =
+init : { navKey : Nav.Key, seeds : List Random.Seed } -> Model
+init { navKey, seeds } =
     ({ key = navKey
      , seeds = seeds
      , notes = []
@@ -83,11 +78,6 @@ init { navKey, seeds, lastSyncedAt } =
         { label = Nothing
         , content = Nothing
         }
-
-     -- sync stuff
-     , offlineQueue = emptyOfflineQueue
-     , runningQueueOn = Nothing
-     , lastSyncedAt = Time.millisToPosix lastSyncedAt
      }
      -- TODO: full-sync with regards to indexedDb
      -- , Cmd.none
@@ -607,57 +597,59 @@ update msg model =
 
 view : Model -> Html Msg
 view model =
-    div [ css [ displayFlex, flexDirection column, height (pct 100), overflow auto ] ]
-        [ nav
-            [ css
-                [ backgroundColor (rgb 140 20 254)
-                , color (rgb 255 255 255)
-                , publicSans
-                , fontWeight bolder
-                , borderBottom3 (px 3) solid (rgb 0 0 0)
-                , position sticky
-                , top (px 0)
-                , displayFlex
-                , justifyContent spaceBetween
-                ]
-            ]
-            [ let
-                labelsCount =
-                    model.labels |> List.length |> String.fromInt
-              in
-              case model.labelsMenu of
-                Just _ ->
-                    openLabelsMenuBtn labelsCount
+    div [] []
 
-                Nothing ->
-                    closedLabelsMenuBtn labelsCount
-            , p
-                [ css
-                    [ fontSize (px 25)
-                    ]
-                ]
-                [ text "Notes" ]
-            , (case model.runningQueueOn of
-                Nothing ->
-                    Outlined.cloud
 
-                Just _ ->
-                    Outlined.sync
-              )
-                28
-                Inherit
-                |> Svg.Styled.fromUnstyled
-            ]
-        , div [ css [ displayFlex, height (pct 100), overflow hidden ] ]
-            [ case model.labelsMenu of
-                Just _ ->
-                    labelsMenuColumn model
 
-                Nothing ->
-                    text ""
-            , notesGrid model
-            ]
-        ]
+-- TODO: restore
+-- div [ css [ displayFlex, flexDirection column, height (pct 100), overflow auto ] ]
+--     [ nav
+--         [ css
+--             [ backgroundColor (rgb 140 20 254)
+--             , color (rgb 255 255 255)
+--             , publicSans
+--             , fontWeight bolder
+--             , borderBottom3 (px 3) solid (rgb 0 0 0)
+--             , position sticky
+--             , top (px 0)
+--             , displayFlex
+--             , justifyContent spaceBetween
+--             ]
+--         ]
+--         [ let
+--             labelsCount =
+--                 model.labels |> List.length |> String.fromInt
+--           in
+--           case model.labelsMenu of
+--             Just _ ->
+--                 openLabelsMenuBtn labelsCount
+--             Nothing ->
+--                 closedLabelsMenuBtn labelsCount
+--         , p
+--             [ css
+--                 [ fontSize (px 25)
+--                 ]
+--             ]
+--             [ text "Notes" ]
+--         , (case model.runningQueueOn of
+--             Nothing ->
+--                 Outlined.cloud
+--             Just _ ->
+--                 Outlined.sync
+--           )
+--             28
+--             Inherit
+--             |> Svg.Styled.fromUnstyled
+--         ]
+--     , div [ css [ displayFlex, height (pct 100), overflow hidden ] ]
+--         [ case model.labelsMenu of
+--             Just _ ->
+--                 labelsMenuColumn model
+--             Nothing ->
+--                 text ""
+--         , notesGrid model
+--         ]
+--     ]
 
 
 labelsMenuWidth : Float

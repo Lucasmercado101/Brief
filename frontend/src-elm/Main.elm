@@ -15,6 +15,7 @@ import Http
 import Material.Icons as Filled
 import Material.Icons.Outlined as Outlined
 import Material.Icons.Types exposing (Coloring(..))
+import OfflineQueue exposing (OfflineQueueOps, emptyOfflineQueue)
 import Page.EditLabels as EditLabels
 import Page.Home as Home
 import Page.LogIn as LogIn
@@ -33,7 +34,7 @@ import Url exposing (Url)
 
 subscriptions : Model -> Sub Msg
 subscriptions model =
-    case model of
+    case model.page of
         LogIn logInModel ->
             -- TODO:
             Sub.none
@@ -52,7 +53,7 @@ subscriptions model =
 -- MODEL
 
 
-type Model
+type Page
     = LogIn LogIn.Model
       -- TODO: check if session is valid on entering website,
       -- then go to either logIn or Home
@@ -60,17 +61,29 @@ type Model
     | EditLabels EditLabels.Model
 
 
+type alias Model =
+    { page : Page
+
+    -- sync stuff
+    , offlineQueue : OfflineQueueOps
+    , runningQueueOn : Maybe OfflineQueueOps
+    , lastSyncedAt : Posix
+    }
+
+
 
 -- MESSAGE
 
 
 type Msg
-    = GotLogInMsg LogIn.Msg
+    = ClickedLink UrlRequest
+    | ChangedUrl Url
+      -- Pages Msg
+    | GotLogInMsg LogIn.Msg
     | GotHomeMsg Home.Msg
     | GotEditLabelsMsg EditLabels.Msg
+      --
     | FullSyncResp (Result Http.Error Api.FullSyncResponse)
-    | ClickedLink UrlRequest
-    | ChangedUrl Url
 
 
 
@@ -81,27 +94,24 @@ type alias Flags =
     { seeds : List Int, hasSessionCookie : Bool, lastSyncedAt : Int }
 
 
-emptyOfflineQueue =
-    { createLabels = []
-    , deleteLabels = []
-    , createNotes = []
-    , deleteNotes = []
-    , editNotes = []
-    , changeLabelNames = []
-    }
-
-
 init : Flags -> Url -> Nav.Key -> ( Model, Cmd Msg )
 init flags url navKey =
-    let
-        seeds =
-            List.map Random.initialSeed flags.seeds
-    in
-    if flags.hasSessionCookie then
-        ( Home (Home.init { navKey = navKey, seeds = seeds, lastSyncedAt = flags.lastSyncedAt }), Cmd.none )
+    ( { offlineQueue = emptyOfflineQueue
+      , runningQueueOn = Nothing
+      , lastSyncedAt = Time.millisToPosix flags.lastSyncedAt
+      , page =
+            let
+                seeds =
+                    List.map Random.initialSeed flags.seeds
+            in
+            if flags.hasSessionCookie then
+                Home (Home.init { navKey = navKey, seeds = seeds })
 
-    else
-        ( LogIn (LogIn.init navKey seeds), Cmd.none )
+            else
+                LogIn (LogIn.init navKey seeds)
+      }
+    , Cmd.none
+    )
 
 
 main : Program Flags Model Msg
@@ -134,7 +144,7 @@ main =
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update topMsg topModel =
-    case ( topMsg, topModel ) of
+    case ( topMsg, topModel.page ) of
         -- TODO: fix this
         ( ClickedLink _, _ ) ->
             -- TODO:
@@ -142,79 +152,77 @@ update topMsg topModel =
 
         ( ChangedUrl newUrl, _ ) ->
             -- TODO:
-            (-- TODO: double check or change Route model
-             case Route.fromUrl newUrl of
-                Route.Home ->
-                    case topModel of
-                        Home _ ->
-                            -- TODO: better
-                            topModel |> pure
+            topModel |> pure
 
-                        LogIn { seeds, key } ->
-                            ( Home
-                                { -- TODO: better way
-                                  key = key
-                                , seeds = seeds
-                                , notes = []
-                                , isWritingANewNote = Nothing
-                                , newLabelName = ""
-                                , labels = []
-                                , labelsMenu = Nothing
-                                , filters =
-                                    { label = Nothing
-                                    , content = Nothing
-                                    }
-
-                                -- sync stuff
-                                , offlineQueue = emptyOfflineQueue
-                                , runningQueueOn = Nothing
-
-                                -- TODO:
-                                , lastSyncedAt = Time.millisToPosix 1
-                                }
-                            , Cmd.batch [ Api.fullSync FullSyncResp, requestRandomValues () ]
-                            )
-
-                        EditLabels _ ->
-                            case topModel of
-                                Home homeModel ->
-                                    ( EditLabels
-                                        (EditLabels.init
-                                            { seeds = homeModel.seeds
-                                            , labels = homeModel.labels
-                                            , notes = homeModel.notes
-                                            , offlineQueue = homeModel.offlineQueue
-                                            , runningQueueOn = homeModel.runningQueueOn
-                                            , lastSyncedAt = homeModel.lastSyncedAt
-                                            }
-                                        )
-                                    , Cmd.none
-                                    )
-
-                                _ ->
-                                    -- TODO:
-                                    topModel |> pure
-
-                Route.LogIn ->
-                    -- TODO:
-                    ( topModel, Cmd.none )
-
-                Route.EditLabels ->
-                    -- TODO:
-                    ( topModel, Cmd.none )
-            )
-
+        -- (-- TODO: double check or change Route model
+        --  case Route.fromUrl newUrl of
+        --     Route.Home ->
+        --         case topModel of
+        --             Home _ ->
+        --                 -- TODO: better
+        --                 topModel |> pure
+        --             LogIn { seeds, key } ->
+        --                 ( Home
+        --                     { -- TODO: better way
+        --                       key = key
+        --                     , seeds = seeds
+        --                     , notes = []
+        --                     , isWritingANewNote = Nothing
+        --                     , newLabelName = ""
+        --                     , labels = []
+        --                     , labelsMenu = Nothing
+        --                     , filters =
+        --                         { label = Nothing
+        --                         , content = Nothing
+        --                         }
+        --                     -- sync stuff
+        --                     , offlineQueue = emptyOfflineQueue
+        --                     , runningQueueOn = Nothing
+        --                     -- TODO:
+        --                     , lastSyncedAt = Time.millisToPosix 1
+        --                     }
+        --                 , Cmd.batch [ Api.fullSync FullSyncResp, requestRandomValues () ]
+        --                 )
+        --             EditLabels _ ->
+        --                 case topModel of
+        --                     Home homeModel ->
+        --                         ( EditLabels
+        --                             (EditLabels.init
+        --                                 { seeds = homeModel.seeds
+        --                                 , labels = homeModel.labels
+        --                                 , notes = homeModel.notes
+        --                                 , offlineQueue = homeModel.offlineQueue
+        --                                 , runningQueueOn = homeModel.runningQueueOn
+        --                                 , lastSyncedAt = homeModel.lastSyncedAt
+        --                                 }
+        --                             )
+        --                         , Cmd.none
+        --                         )
+        --                     _ ->
+        --                         -- TODO:
+        --                         topModel |> pure
+        --     Route.LogIn ->
+        --         -- TODO:
+        --         ( topModel, Cmd.none )
+        --     Route.EditLabels ->
+        --         -- TODO:
+        --         ( topModel, Cmd.none )
+        -- )
         ( GotLogInMsg loginMsg, LogIn logInModel ) ->
             LogIn.update loginMsg logInModel
-                |> updateWith LogIn GotLogInMsg
+                |> (\( m, c ) -> ( { topModel | page = LogIn m }, Cmd.map GotLogInMsg c ))
 
+        -- TODO:
+        --     |> updateWith LogIn GotLogInMsg
         ( GotHomeMsg homeMsg, Home homeModel ) ->
-            Home.update homeMsg homeModel
-                |> updateWith Home GotHomeMsg
+            topModel |> pure
 
+        -- TODO:
+        -- Home.update homeMsg homeModel
+        --     |> updateWith Home GotHomeMsg
         ( _, _ ) ->
             -- Disregard messages that arrived for the wrong page.
-            ( topModel, Cmd.none )
+            topModel |> pure
 
 
 updateWith toModel toMsg ( m, c ) =
@@ -238,13 +246,18 @@ view model =
             , backgroundRepeat repeat
             ]
         ]
-        [ case model of
+        [ case model.page of
             LogIn logInModel ->
                 Html.Styled.map GotLogInMsg (LogIn.logInView logInModel)
 
             Home homeModel ->
-                Html.Styled.map GotHomeMsg (Home.view homeModel)
+                -- TODO: fix this
+                div [] []
 
+            -- Html.Styled.map GotHomeMsg (Home.view homeModel)
             EditLabels editLabelsModel ->
-                Html.Styled.map GotEditLabelsMsg (EditLabels.view editLabelsModel)
+                -- TODO: fix this
+                div [] []
+
+        -- Html.Styled.map GotEditLabelsMsg (EditLabels.view editLabelsModel)
         ]
