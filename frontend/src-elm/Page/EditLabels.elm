@@ -1,6 +1,7 @@
 module Page.EditLabels exposing (..)
 
 import Api exposing (SyncableID(..))
+import Browser.Navigation as Nav
 import Cmd.Extra exposing (pure)
 import Css exposing (..)
 import CssHelpers exposing (black, delaGothicOne, error, padX, padY, publicSans, secondary, textColor, white)
@@ -17,6 +18,7 @@ import Material.Icons.Types exposing (Coloring(..))
 import OfflineQueue exposing (Action(..), OfflineQueueOps, emptyOfflineQueue, offlineQueueIsEmpty, qDeleteLabel, qDeleteLabels, qEditLabelName, qNewLabel, queueToOperations)
 import Ports exposing (receiveRandomValues, requestRandomValues, updateLastSyncedAt)
 import Random
+import Route
 import Svg.Styled
 import Task
 import Time exposing (Posix)
@@ -59,7 +61,8 @@ type EditLabelKind
 
 
 type alias Model =
-    { seeds : List Random.Seed
+    { key : Nav.Key
+    , seeds : List Random.Seed
     , selected : List EditLabelKind
     , searchQuery : String
     , confirmDeleteAllSelectedLabels : Bool
@@ -74,10 +77,12 @@ init :
     { seeds : List Random.Seed
     , labels : List Label
     , notes : List Note
+    , key : Nav.Key
     }
     -> Model
-init { labels, seeds, notes } =
-    { seeds = seeds
+init { labels, seeds, notes, key } =
+    { key = key
+    , seeds = seeds
     , selected = []
     , searchQuery = ""
     , confirmDeleteAllSelectedLabels = False
@@ -120,9 +125,7 @@ update msg model =
 
         GoHome ->
             -- TODO:
-            model
-                -- { model | editLabelsScreen = Nothing }
-                |> pureNoSignal
+            ( model, Nav.pushUrl model.key (Route.routeToString Route.Home), Nothing )
 
         ChangeSearchQuery newQuery ->
             { model | searchQuery = newQuery }

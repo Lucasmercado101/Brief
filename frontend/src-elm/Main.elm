@@ -36,19 +36,19 @@ import Url exposing (Url)
 
 subscriptions : Model -> Sub Msg
 subscriptions model =
-    case model.page of
-        LogIn logInModel ->
-            -- TODO:
+    case model of
+        LoggedOff logInModel ->
             Sub.none
 
-        -- LogIn.subscriptions logInModel |> Sub.map GotLogInMsg
-        Home homeModel ->
-            Home.subscriptions homeModel
-                |> Sub.map (\e -> GotPageMsg (GotHomeMsg e))
+        LoggedIn { page } ->
+            case page of
+                Home homeModel ->
+                    Home.subscriptions homeModel
+                        |> Sub.map (\e -> GotPageMsg (GotHomeMsg e))
 
-        EditLabels editLabelsModel ->
-            EditLabels.subscriptions editLabelsModel
-                |> Sub.map (\e -> GotPageMsg (GotEditLabelsMsg e))
+                EditLabels editLabelsModel ->
+                    EditLabels.subscriptions editLabelsModel
+                        |> Sub.map (\e -> GotPageMsg (GotEditLabelsMsg e))
 
 
 
@@ -56,14 +56,11 @@ subscriptions model =
 
 
 type Page
-    = LogIn LogIn.Model
-      -- TODO: check if session is valid on entering website,
-      -- then go to either logIn or Home
-    | Home Home.Model
+    = Home Home.Model
     | EditLabels EditLabels.Model
 
 
-type alias Model =
+type alias LoggedInModel =
     { page : Page
 
     -- sync stuff
@@ -71,6 +68,13 @@ type alias Model =
     , runningQueueOn : Maybe OfflineQueueOps
     , lastSyncedAt : Posix
     }
+
+
+type Model
+    = LoggedOff LogIn.Model
+      -- TODO: check if session is valid on entering website,
+      -- then go to either logIn or Home
+    | LoggedIn LoggedInModel
 
 
 
@@ -101,26 +105,31 @@ type alias Flags =
 
 init : Flags -> Url -> Nav.Key -> ( Model, Cmd Msg )
 init flags url navKey =
-    ( { offlineQueue = emptyOfflineQueue
-      , runningQueueOn = Nothing
-      , lastSyncedAt = Time.millisToPosix flags.lastSyncedAt
-      , page =
-            let
-                seeds =
-                    List.map Random.initialSeed flags.seeds
-            in
-            if flags.hasSessionCookie then
-                Home (Home.init { navKey = navKey, seeds = seeds })
+    let
+        seeds =
+            List.map Random.initialSeed flags.seeds
+    in
+    if flags.hasSessionCookie then
+        ( LoggedOff (LogIn.init navKey seeds), Cmd.none )
 
-            else
-                LogIn (LogIn.init navKey seeds)
-      }
-    , if flags.hasSessionCookie then
-        Api.fullSync FullSyncResp
+    else
+        ( LoggedIn
+            { offlineQueue = emptyOfflineQueue
+            , runningQueueOn = Nothing
+            , lastSyncedAt = Time.millisToPosix flags.lastSyncedAt
+            , page =
+                case Route.fromUrl url of
+                    Route.EditLabels ->
+                        EditLabels (EditLabels.init { seeds = seeds, labels = [], notes = [], key = navKey })
 
-      else
-        Cmd.none
-    )
+                    Route.Home ->
+                        Home (Home.init { navKey = navKey, seeds = seeds, labels = [], notes = [] })
+
+                    Route.LogIn ->
+                        Home (Home.init { navKey = navKey, seeds = seeds, labels = [], notes = [] })
+            }
+        , Api.fullSync FullSyncResp
+        )
 
 
 main : Program Flags Model Msg
@@ -161,20 +170,16 @@ update topMsg topModel =
 
         ChangedUrl newUrl ->
             (-- TODO: double check or change Route model
-             case Route.fromUrl newUrl of
-                Route.Home ->
-                    case topModel.page of
-                        Home _ ->
-                            -- TODO: better
-                            topModel |> pure
-
-                        LogIn { seeds, key } ->
-                            ( { topModel
-                                | page =
+             case topModel of
+                LoggedOff logInViewModel ->
+                    case Route.fromUrl newUrl of
+                        Route.Home ->
+                            -- TODO: more rigorous checking if succeeded in logging in
+                            ( LoggedIn
+                                { page =
                                     Home
-                                        { -- TODO: do this in a better way
-                                          key = key
-                                        , seeds = seeds
+                                        { key = logInViewModel.key
+                                        , seeds = logInViewModel.seeds
                                         , notes = []
                                         , isWritingANewNote = Nothing
                                         , newLabelName = ""
@@ -185,284 +190,303 @@ update topMsg topModel =
                                             , content = Nothing
                                             }
                                         }
-                              }
+                                , offlineQueue = emptyOfflineQueue
+                                , runningQueueOn = Nothing
+                                , lastSyncedAt = Time.millisToPosix 1
+                                }
                             , Cmd.batch [ Api.fullSync FullSyncResp, requestRandomValues () ]
                             )
 
-                        EditLabels _ ->
+                        Route.EditLabels ->
                             topModel |> pure
 
-                -- TODO:
-                -- case topModel of
-                --     Home homeModel ->
-                --         ( EditLabels
-                --             (EditLabels.init
-                --                 { seeds = homeModel.seeds
-                --                 , labels = homeModel.labels
-                --                 , notes = homeModel.notes
-                --                 , offlineQueue = homeModel.offlineQueue
-                --                 , runningQueueOn = homeModel.runningQueueOn
-                --                 , lastSyncedAt = homeModel.lastSyncedAt
-                --                 }
-                --             )
-                --         , Cmd.none
-                --         )
-                --     _ ->
-                --         -- TODO:
-                --         topModel |> pure
-                Route.LogIn ->
-                    -- TODO:
-                    ( topModel, Cmd.none )
+                        Route.LogIn ->
+                            topModel |> pure
 
-                Route.EditLabels ->
-                    -- TODO:
-                    case topModel.page of
-                        Home data ->
-                            { topModel
-                                | page =
-                                    EditLabels
-                                        (EditLabels.init
-                                            { seeds = data.seeds
-                                            , labels = data.labels
-                                            , notes = data.notes
-                                            }
-                                        )
-                            }
-                                |> pure
+                LoggedIn loggedInModel ->
+                    case Route.fromUrl newUrl of
+                        Route.Home ->
+                            case loggedInModel.page of
+                                Home _ ->
+                                    -- TODO: better
+                                    topModel |> pure
 
-                        _ ->
+                                EditLabels data ->
+                                    LoggedIn
+                                        { loggedInModel
+                                            | page =
+                                                Home
+                                                    (Home.init
+                                                        { seeds = data.seeds
+                                                        , labels = data.labels
+                                                        , notes = data.notes
+                                                        , navKey = data.key
+                                                        }
+                                                    )
+                                        }
+                                        |> pure
+
+                        Route.LogIn ->
                             ( topModel, Cmd.none )
+
+                        Route.EditLabels ->
+                            -- TODO:
+                            case loggedInModel.page of
+                                Home data ->
+                                    LoggedIn
+                                        { loggedInModel
+                                            | page =
+                                                EditLabels
+                                                    (EditLabels.init
+                                                        { seeds = data.seeds
+                                                        , labels = data.labels
+                                                        , notes = data.notes
+                                                        , key = data.key
+                                                        }
+                                                    )
+                                        }
+                                        |> pure
+
+                                _ ->
+                                    ( topModel, Cmd.none )
             )
 
         GotPageMsg pageMsg ->
-            case ( pageMsg, topModel.page ) of
-                ( GotLogInMsg loginMsg, LogIn logInModel ) ->
-                    LogIn.update loginMsg logInModel
-                        |> updateWith LogIn GotLogInMsg topModel
+            case topModel of
+                LoggedOff logInModel ->
+                    case pageMsg of
+                        GotLogInMsg loginMsg ->
+                            LogIn.update loginMsg logInModel
+                                |> (\( m, c ) -> ( LoggedOff m, Cmd.map GotPageMsg <| Cmd.map GotLogInMsg c ))
 
-                ( GotHomeMsg homeMsg, Home homeModel ) ->
-                    Home.update homeMsg homeModel
-                        |> updateHomeWithSignal Home GotHomeMsg topModel
+                        _ ->
+                            -- Disregard messages that arrived for the wrong page.
+                            topModel |> pure
 
-                ( GotEditLabelsMsg editLabelsMsg, EditLabels editLabelsModel ) ->
-                    EditLabels.update editLabelsMsg editLabelsModel
-                        |> updateEditLabelsWithSignal EditLabels GotEditLabelsMsg topModel
+                LoggedIn loggedInModel ->
+                    case ( pageMsg, loggedInModel.page ) of
+                        ( GotHomeMsg homeMsg, Home homeModel ) ->
+                            Home.update homeMsg homeModel
+                                |> updateHomeWithSignal Home GotHomeMsg loggedInModel
 
-                ( _, _ ) ->
-                    -- Disregard messages that arrived for the wrong page.
-                    topModel |> pure
+                        ( GotEditLabelsMsg editLabelsMsg, EditLabels editLabelsModel ) ->
+                            EditLabels.update editLabelsMsg editLabelsModel
+                                |> updateEditLabelsWithSignal EditLabels GotEditLabelsMsg loggedInModel
+
+                        ( _, _ ) ->
+                            -- Disregard messages that arrived for the wrong page.
+                            topModel |> pure
 
         FullSyncResp res ->
-            case res of
-                Ok ( notes, labels ) ->
-                    let
-                        updatedPageModel m =
-                            { m
-                                | labels =
-                                    List.map
-                                        (\l ->
-                                            { name = l.name
-                                            , id = DatabaseID l.id
-                                            , createdAt = l.createdAt
-                                            , updatedAt = l.updatedAt
-                                            }
-                                        )
-                                        labels
-                                , notes =
-                                    List.map
-                                        (\l ->
-                                            { id = DatabaseID l.id
-                                            , title = l.title
-                                            , content = l.content
-                                            , pinned = l.pinned
-                                            , labels = List.map DatabaseID l.labels
-                                            , createdAt = l.createdAt
-                                            , updatedAt = l.updatedAt
-                                            }
-                                        )
-                                        notes
-                            }
-                    in
-                    { topModel
-                        | page =
-                            case topModel.page of
-                                Home homeModel ->
-                                    Home (updatedPageModel homeModel)
-
-                                EditLabels editLabelsModel ->
-                                    EditLabels (updatedPageModel editLabelsModel)
-
-                                LogIn logInModel ->
-                                    -- TODO: separate LogIn from pages msg stuff
-                                    LogIn logInModel
-                    }
-                        |> pure
-
-                Err v ->
-                    -- TODO: handle 403
+            case topModel of
+                LoggedOff _ ->
                     topModel |> pure
+
+                LoggedIn loggedInModel ->
+                    case res of
+                        Ok ( notes, labels ) ->
+                            let
+                                updatedPageModel m =
+                                    { m
+                                        | labels =
+                                            List.map
+                                                (\l ->
+                                                    { name = l.name
+                                                    , id = DatabaseID l.id
+                                                    , createdAt = l.createdAt
+                                                    , updatedAt = l.updatedAt
+                                                    }
+                                                )
+                                                labels
+                                        , notes =
+                                            List.map
+                                                (\l ->
+                                                    { id = DatabaseID l.id
+                                                    , title = l.title
+                                                    , content = l.content
+                                                    , pinned = l.pinned
+                                                    , labels = List.map DatabaseID l.labels
+                                                    , createdAt = l.createdAt
+                                                    , updatedAt = l.updatedAt
+                                                    }
+                                                )
+                                                notes
+                                    }
+                            in
+                            LoggedIn
+                                { loggedInModel
+                                    | page =
+                                        case loggedInModel.page of
+                                            Home homeModel ->
+                                                Home (updatedPageModel homeModel)
+
+                                            EditLabels editLabelsModel ->
+                                                EditLabels (updatedPageModel editLabelsModel)
+                                }
+                                |> pure
+
+                        Err v ->
+                            -- TODO: handle 403
+                            topModel |> pure
 
         ReceivedChangesResp resp ->
-            case resp of
-                Ok { deleted, failedToCreate, failedToEdit, justSyncedAt, downSyncedData, justCreatedData } ->
-                    let
-                        updatePageModel m =
-                            { m
-                                | notes =
-                                    let
-                                        ( _, notOutdatedNotes ) =
-                                            List.partition
-                                                (\e -> List.any (\l -> sameId (DatabaseID l.id) e.id) downSyncedData.notes)
-                                                m.notes
-
-                                        updatedNotes : List Note
-                                        updatedNotes =
-                                            downSyncedData.notes
-                                                |> List.map
-                                                    (\e ->
-                                                        { id = DatabaseID e.id
-                                                        , title = e.title
-                                                        , content = e.content
-                                                        , pinned = e.pinned
-                                                        , createdAt = e.createdAt
-                                                        , updatedAt = e.updatedAt
-                                                        , labels = e.labels |> List.map DatabaseID
-                                                        }
-                                                    )
-                                    in
-                                    notOutdatedNotes
-                                        -- remove the ones that were failed to create
-                                        |> exclude (\l -> List.any (\e -> sameId l.id (OfflineID e)) failedToCreate)
-                                        -- remove the ones that don't exist in DB
-                                        |> exclude (\l -> List.any (\e -> sameId l.id (DatabaseID e)) deleted.notes)
-                                        -- update just created
-                                        |> List.map
-                                            (\l ->
-                                                case listFirst (\( _, offlineId ) -> sameId l.id (OfflineID offlineId)) justCreatedData.notes of
-                                                    Just ( v, _ ) ->
-                                                        { id = DatabaseID v.id
-                                                        , title = v.title
-                                                        , content = v.content
-                                                        , pinned = v.pinned
-                                                        , createdAt = v.createdAt
-                                                        , updatedAt = v.updatedAt
-                                                        , labels = v.labels |> List.map DatabaseID
-                                                        }
-
-                                                    Nothing ->
-                                                        l
-                                            )
-                                        |> (++) updatedNotes
-                                , labels =
-                                    let
-                                        ( _, notOutdatedLabels ) =
-                                            List.partition
-                                                (\e -> List.any (\l -> sameId (DatabaseID l.id) e.id) downSyncedData.labels)
-                                                m.labels
-
-                                        updatedLabels : List Label
-                                        updatedLabels =
-                                            downSyncedData.labels
-                                                |> List.map
-                                                    (\e ->
-                                                        { id = DatabaseID e.id
-                                                        , name = e.name
-                                                        , createdAt = e.createdAt
-                                                        , updatedAt = e.updatedAt
-                                                        }
-                                                    )
-                                    in
-                                    notOutdatedLabels
-                                        -- remove the ones that were failed to create
-                                        |> exclude (\l -> List.any (\e -> sameId l.id (OfflineID e)) failedToCreate)
-                                        -- remove the ones that don't exist in DB
-                                        |> exclude (\l -> List.any (\e -> sameId l.id (DatabaseID e)) deleted.labels)
-                                        -- update just created
-                                        |> List.map
-                                            (\l ->
-                                                case listFirst (\( _, offlineId ) -> sameId l.id (OfflineID offlineId)) justCreatedData.labels of
-                                                    Just ( v, _ ) ->
-                                                        { id = DatabaseID v.id
-                                                        , name = v.name
-                                                        , createdAt = v.createdAt
-                                                        , updatedAt = v.updatedAt
-                                                        }
-
-                                                    Nothing ->
-                                                        l
-                                            )
-                                        |> (++) updatedLabels
-                            }
-
-                        updatedPageModel =
-                            case topModel.page of
-                                Home homeModel ->
-                                    Home (updatePageModel homeModel)
-
-                                EditLabels editLabelsModel ->
-                                    EditLabels (updatePageModel editLabelsModel)
-
-                                LogIn logInModel ->
-                                    -- TODO: separate page
-                                    LogIn logInModel
-
-                        ( labels, notes ) =
-                            case updatedPageModel of
-                                Home homeModel ->
-                                    ( homeModel.labels, homeModel.notes )
-
-                                EditLabels editLabelsModel ->
-                                    ( editLabelsModel.labels, editLabelsModel.notes )
-
-                                LogIn logInModel ->
-                                    -- TODO: separate page
-                                    ( [], [] )
-                    in
-                    ( { topModel
-                        | page = updatedPageModel
-                        , offlineQueue = emptyOfflineQueue
-                        , runningQueueOn =
-                            if offlineQueueIsEmpty topModel.offlineQueue then
-                                Nothing
-
-                            else
-                                Just topModel.offlineQueue
-                        , lastSyncedAt = justSyncedAt
-                      }
-                    , Cmd.batch
-                        [ updateLastSyncedAt (Time.posixToMillis justSyncedAt)
-                        , if offlineQueueIsEmpty topModel.offlineQueue then
-                            Cmd.none
-
-                          else
-                            Api.sendChanges
-                                { operations = queueToOperations topModel.offlineQueue
-                                , lastSyncedAt = justSyncedAt
-                                , currentData =
-                                    { notes = notes |> List.map .id |> labelIDsSplitter |> Tuple.second
-                                    , labels = labels |> List.map .id |> labelIDsSplitter |> Tuple.second
-                                    }
-                                }
-                                ReceivedChangesResp
-                        ]
-                    )
-
-                Err _ ->
-                    -- TODO: error handling here
+            case topModel of
+                LoggedOff _ ->
                     topModel |> pure
+
+                LoggedIn loggedInModel ->
+                    case resp of
+                        Ok { deleted, failedToCreate, failedToEdit, justSyncedAt, downSyncedData, justCreatedData } ->
+                            let
+                                updatePageModel m =
+                                    { m
+                                        | notes =
+                                            let
+                                                ( _, notOutdatedNotes ) =
+                                                    List.partition
+                                                        (\e -> List.any (\l -> sameId (DatabaseID l.id) e.id) downSyncedData.notes)
+                                                        m.notes
+
+                                                updatedNotes : List Note
+                                                updatedNotes =
+                                                    downSyncedData.notes
+                                                        |> List.map
+                                                            (\e ->
+                                                                { id = DatabaseID e.id
+                                                                , title = e.title
+                                                                , content = e.content
+                                                                , pinned = e.pinned
+                                                                , createdAt = e.createdAt
+                                                                , updatedAt = e.updatedAt
+                                                                , labels = e.labels |> List.map DatabaseID
+                                                                }
+                                                            )
+                                            in
+                                            notOutdatedNotes
+                                                -- remove the ones that were failed to create
+                                                |> exclude (\l -> List.any (\e -> sameId l.id (OfflineID e)) failedToCreate)
+                                                -- remove the ones that don't exist in DB
+                                                |> exclude (\l -> List.any (\e -> sameId l.id (DatabaseID e)) deleted.notes)
+                                                -- update just created
+                                                |> List.map
+                                                    (\l ->
+                                                        case listFirst (\( _, offlineId ) -> sameId l.id (OfflineID offlineId)) justCreatedData.notes of
+                                                            Just ( v, _ ) ->
+                                                                { id = DatabaseID v.id
+                                                                , title = v.title
+                                                                , content = v.content
+                                                                , pinned = v.pinned
+                                                                , createdAt = v.createdAt
+                                                                , updatedAt = v.updatedAt
+                                                                , labels = v.labels |> List.map DatabaseID
+                                                                }
+
+                                                            Nothing ->
+                                                                l
+                                                    )
+                                                |> (++) updatedNotes
+                                        , labels =
+                                            let
+                                                ( _, notOutdatedLabels ) =
+                                                    List.partition
+                                                        (\e -> List.any (\l -> sameId (DatabaseID l.id) e.id) downSyncedData.labels)
+                                                        m.labels
+
+                                                updatedLabels : List Label
+                                                updatedLabels =
+                                                    downSyncedData.labels
+                                                        |> List.map
+                                                            (\e ->
+                                                                { id = DatabaseID e.id
+                                                                , name = e.name
+                                                                , createdAt = e.createdAt
+                                                                , updatedAt = e.updatedAt
+                                                                }
+                                                            )
+                                            in
+                                            notOutdatedLabels
+                                                -- remove the ones that were failed to create
+                                                |> exclude (\l -> List.any (\e -> sameId l.id (OfflineID e)) failedToCreate)
+                                                -- remove the ones that don't exist in DB
+                                                |> exclude (\l -> List.any (\e -> sameId l.id (DatabaseID e)) deleted.labels)
+                                                -- update just created
+                                                |> List.map
+                                                    (\l ->
+                                                        case listFirst (\( _, offlineId ) -> sameId l.id (OfflineID offlineId)) justCreatedData.labels of
+                                                            Just ( v, _ ) ->
+                                                                { id = DatabaseID v.id
+                                                                , name = v.name
+                                                                , createdAt = v.createdAt
+                                                                , updatedAt = v.updatedAt
+                                                                }
+
+                                                            Nothing ->
+                                                                l
+                                                    )
+                                                |> (++) updatedLabels
+                                    }
+
+                                updatedPageModel =
+                                    case loggedInModel.page of
+                                        Home homeModel ->
+                                            Home (updatePageModel homeModel)
+
+                                        EditLabels editLabelsModel ->
+                                            EditLabels (updatePageModel editLabelsModel)
+
+                                ( labels, notes ) =
+                                    case updatedPageModel of
+                                        Home homeModel ->
+                                            ( homeModel.labels, homeModel.notes )
+
+                                        EditLabels editLabelsModel ->
+                                            ( editLabelsModel.labels, editLabelsModel.notes )
+                            in
+                            ( LoggedIn
+                                { page = updatedPageModel
+                                , offlineQueue = emptyOfflineQueue
+                                , runningQueueOn =
+                                    if offlineQueueIsEmpty loggedInModel.offlineQueue then
+                                        Nothing
+
+                                    else
+                                        Just loggedInModel.offlineQueue
+                                , lastSyncedAt = justSyncedAt
+                                }
+                            , Cmd.batch
+                                [ updateLastSyncedAt (Time.posixToMillis justSyncedAt)
+                                , if offlineQueueIsEmpty loggedInModel.offlineQueue then
+                                    Cmd.none
+
+                                  else
+                                    Api.sendChanges
+                                        { operations = queueToOperations loggedInModel.offlineQueue
+                                        , lastSyncedAt = justSyncedAt
+                                        , currentData =
+                                            { notes = notes |> List.map .id |> labelIDsSplitter |> Tuple.second
+                                            , labels = labels |> List.map .id |> labelIDsSplitter |> Tuple.second
+                                            }
+                                        }
+                                        ReceivedChangesResp
+                                ]
+                            )
+
+                        Err _ ->
+                            -- TODO: error handling here
+                            topModel |> pure
 
 
 updateWith toModel toMsg topModel ( m, c ) =
     ( { topModel | page = toModel m }, Cmd.map GotPageMsg (Cmd.map toMsg c) )
 
 
-updateHomeWithSignal : (a -> Page) -> (c -> PageMsg) -> Model -> ( a, Cmd c, Maybe Home.Signal ) -> ( Model, Cmd Msg )
+updateHomeWithSignal : (a -> Page) -> (c -> PageMsg) -> LoggedInModel -> ( a, Cmd c, Maybe Home.Signal ) -> ( Model, Cmd Msg )
 updateHomeWithSignal toPageModel toPageMsg topModel ( m, c, maybeSignal ) =
     let
         ( mappedModel, mappedCmd ) =
             ( { topModel | page = toPageModel m }, Cmd.map GotPageMsg (Cmd.map toPageMsg c) )
     in
-    case maybeSignal of
+    (case maybeSignal of
         Nothing ->
             ( mappedModel, mappedCmd )
 
@@ -475,10 +499,6 @@ updateHomeWithSignal toPageModel toPageMsg topModel ( m, c, maybeSignal ) =
 
                         EditLabels editLabelsModel ->
                             ( editLabelsModel.labels, editLabelsModel.notes )
-
-                        LogIn logInModel ->
-                            -- TODO: separate page
-                            ( [], [] )
                     )
                         |> (\( l, n ) -> ( l |> List.map .id |> labelIDsSplitter |> Tuple.second, n |> List.map .id |> labelIDsSplitter |> Tuple.second ))
             in
@@ -490,15 +510,17 @@ updateHomeWithSignal toPageModel toPageMsg topModel ( m, c, maybeSignal ) =
                     )
                     noteIds
                     labelIds
+    )
+        |> (\( m1, c1 ) -> ( LoggedIn m1, c1 ))
 
 
-updateEditLabelsWithSignal : (a -> Page) -> (c -> PageMsg) -> Model -> ( a, Cmd c, Maybe EditLabels.Signal ) -> ( Model, Cmd Msg )
+updateEditLabelsWithSignal : (a -> Page) -> (c -> PageMsg) -> LoggedInModel -> ( a, Cmd c, Maybe EditLabels.Signal ) -> ( Model, Cmd Msg )
 updateEditLabelsWithSignal toPageModel toPageMsg topModel ( m, c, maybeSignal ) =
     let
         ( mappedModel, mappedCmd ) =
             ( { topModel | page = toPageModel m }, Cmd.map GotPageMsg (Cmd.map toPageMsg c) )
     in
-    case maybeSignal of
+    (case maybeSignal of
         Nothing ->
             ( mappedModel, mappedCmd )
 
@@ -511,10 +533,6 @@ updateEditLabelsWithSignal toPageModel toPageMsg topModel ( m, c, maybeSignal ) 
 
                         EditLabels editLabelsModel ->
                             ( editLabelsModel.labels, editLabelsModel.notes )
-
-                        LogIn logInModel ->
-                            -- TODO: separate page
-                            ( [], [] )
                     )
                         |> (\( l, n ) -> ( l |> List.map .id |> labelIDsSplitter |> Tuple.second, n |> List.map .id |> labelIDsSplitter |> Tuple.second ))
             in
@@ -526,9 +544,11 @@ updateEditLabelsWithSignal toPageModel toPageMsg topModel ( m, c, maybeSignal ) 
                     )
                     noteIds
                     labelIds
+    )
+        |> (\( m1, c1 ) -> ( LoggedIn m1, c1 ))
 
 
-addToQueue : (OfflineQueueOps -> OfflineQueueOps) -> List Api.DbID -> List Api.DbID -> ( Model, Cmd Msg ) -> ( Model, Cmd Msg )
+addToQueue : (OfflineQueueOps -> OfflineQueueOps) -> List Api.DbID -> List Api.DbID -> ( LoggedInModel, Cmd Msg ) -> ( LoggedInModel, Cmd Msg )
 addToQueue operation notesIds labelsIds ( model, cmds ) =
     let
         currentOperations =
@@ -575,15 +595,17 @@ view model =
             , backgroundRepeat repeat
             ]
         ]
-        [ (case model.page of
-            LogIn logInModel ->
+        [ (case model of
+            LoggedOff logInModel ->
                 Html.Styled.map GotLogInMsg (LogIn.logInView logInModel)
 
-            Home homeModel ->
-                Html.Styled.map GotHomeMsg (Home.view homeModel (maybeToBool model.runningQueueOn))
+            LoggedIn { page, runningQueueOn } ->
+                case page of
+                    Home homeModel ->
+                        Html.Styled.map GotHomeMsg (Home.view homeModel (maybeToBool runningQueueOn))
 
-            EditLabels editLabelsModel ->
-                Html.Styled.map GotEditLabelsMsg (EditLabels.view editLabelsModel)
+                    EditLabels editLabelsModel ->
+                        Html.Styled.map GotEditLabelsMsg (EditLabels.view editLabelsModel)
           )
             |> Html.Styled.map GotPageMsg
         ]

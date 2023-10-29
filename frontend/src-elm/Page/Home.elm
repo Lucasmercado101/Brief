@@ -75,14 +75,14 @@ type alias Model =
     }
 
 
-init : { navKey : Nav.Key, seeds : List Random.Seed } -> Model
-init { navKey, seeds } =
+init : { navKey : Nav.Key, seeds : List Random.Seed, labels : List Label, notes : List Note } -> Model
+init { navKey, seeds, labels, notes } =
     ({ key = navKey
      , seeds = seeds
-     , notes = []
+     , notes = notes
      , isWritingANewNote = Nothing
      , newLabelName = ""
-     , labels = []
+     , labels = labels
      , labelsMenu = Nothing
      , filters =
         { label = Nothing
