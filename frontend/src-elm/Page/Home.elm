@@ -1054,16 +1054,7 @@ note model data =
                 [ boxShadow4 (px 6) (px 6) (px 0) (rgb 0 0 0) ]
             ]
         ]
-        [ div [ onClick (ChangeNotePinned ( data.id, not data.pinned )) ]
-            [ text
-                (if data.pinned then
-                    "pinned"
-
-                 else
-                    "unpin"
-                )
-            ]
-        , noteTitle
+        [ noteTitle
         , content
         , labelsFooter
         ]
