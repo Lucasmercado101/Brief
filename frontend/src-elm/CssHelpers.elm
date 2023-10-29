@@ -1,6 +1,8 @@
 module CssHelpers exposing (..)
 
-import Css exposing (Color, ColorValue, Style, color, fontFamilies, pct, property, rgb, rgba, sansSerif, width)
+import Css exposing (Color, ColorValue, Style, color, column, displayFlex, flexDirection, fontFamilies, pct, property, rgb, rgba, row, sansSerif, width)
+import Html.Styled exposing (Html)
+import Html.Styled.Attributes exposing (css)
 
 
 publicSans : Style
@@ -97,3 +99,13 @@ textColor =
 fullWidth : Style
 fullWidth =
     width (pct 100)
+
+
+col : List (Html.Styled.Attribute msg) -> List (Html msg) -> Html msg
+col attrs content =
+    Html.Styled.div (css [ displayFlex, flexDirection column ] :: attrs) content
+
+
+row : List (Html.Styled.Attribute msg) -> List (Html msg) -> Html msg
+row attrs content =
+    Html.Styled.div (css [ displayFlex, flexDirection Css.row ] :: attrs) content
