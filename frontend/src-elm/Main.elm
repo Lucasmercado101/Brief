@@ -115,7 +115,11 @@ init flags url navKey =
             else
                 LogIn (LogIn.init navKey seeds)
       }
-    , Cmd.none
+    , if flags.hasSessionCookie then
+        Api.fullSync FullSyncResp
+
+      else
+        Cmd.none
     )
 
 
