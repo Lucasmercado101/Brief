@@ -617,7 +617,7 @@ note model data =
         labelsFooter =
             case data.labels of
                 [] ->
-                    div [] []
+                    text ""
 
                 labels ->
                     div
@@ -626,6 +626,7 @@ note model data =
                             , displayFlex
                             , flexWrap wrap
                             , gap 5
+                            , marginTop auto
                             ]
                         ]
                         (List.map
