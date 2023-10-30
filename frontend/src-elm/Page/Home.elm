@@ -9,8 +9,9 @@ import DataTypes exposing (Label, Note)
 import Helpers exposing (exclude, idDiff, labelIDsSplitter, listFirst, or, partitionFirst, sameId)
 import Html.Styled exposing (Html, br, button, div, form, img, input, label, li, nav, p, span, strong, text, textarea, ul)
 import Html.Styled.Attributes exposing (class, css, for, id, placeholder, src, style, title, type_, value)
-import Html.Styled.Events exposing (onClick, onInput, onSubmit)
+import Html.Styled.Events exposing (onClick, onInput, onSubmit, stopPropagationOn)
 import Http
+import Json.Decode
 import Material.Icons as Filled
 import Material.Icons.Outlined as Outlined
 import Material.Icons.Types exposing (Coloring(..))
@@ -99,10 +100,12 @@ type alias NewNoteData =
 
 
 type Msg
-    = ChangeNotePinned ( SyncableID, Bool )
+    = NoOp
+    | ChangeNotePinned ( SyncableID, Bool )
     | ReceivedRandomValues (List Int)
     | RemoveLabelFromNote { noteID : SyncableID, labelID : SyncableID }
     | SelectedNote SyncableID
+    | ClickedMouse
       -- Labels menu
     | SelectLabelToFilterBy SyncableID
     | OpenLabelsMenu
@@ -118,6 +121,17 @@ type Signal
 update : Msg -> Model -> ( Model, Cmd Msg, Maybe Signal )
 update msg model =
     case msg of
+        NoOp ->
+            model |> pureNoSignal
+
+        ClickedMouse ->
+            case model.selectedNote of
+                Just _ ->
+                    ( { model | selectedNote = Nothing }, Cmd.none, Nothing )
+
+                Nothing ->
+                    model |> pureNoSignal
+
         ChangeNotePinned ( uid, newPinnedVal ) ->
             { model
                 | notes =
@@ -223,9 +237,27 @@ update msg model =
             ( { model | labelsMenu = Nothing }, Route.replaceUrl model.key Route.EditLabels, Nothing )
 
 
+alwaysStopPropagation : a -> ( a, Bool )
+alwaysStopPropagation x =
+    ( x, True )
+
+
+clickedOnSelectedNote : Svg.Styled.Attribute Msg
+clickedOnSelectedNote =
+    stopPropagationOn "click" (Json.Decode.succeed ( NoOp, True ))
+
+
 view : Model -> Bool -> Html Msg
 view model isSyncing =
-    div [ css [ displayFlex, flexDirection column, height (pct 100), overflow auto ] ]
+    div
+        [ case model.selectedNote of
+            Just val ->
+                onClick ClickedMouse
+
+            Nothing ->
+                css []
+        , css [ displayFlex, flexDirection column, height (pct 100), overflow auto ]
+        ]
         [ nav
             [ css
                 [ backgroundColor (rgb 140 20 254)
@@ -629,7 +661,12 @@ note model ( data, selected ) =
 
                 Just title ->
                     div
-                        [ css
+                        [ if selected then
+                            clickedOnSelectedNote
+
+                          else
+                            css []
+                        , css
                             [ delaGothicOne
                             , borderBottom3 (px 1) solid (rgb 0 0 0)
                             , padding (px 10)
@@ -638,7 +675,14 @@ note model ( data, selected ) =
                         [ text title ]
 
         content =
-            p [ css [ publicSans, padding (px 10) ] ]
+            p
+                [ if selected then
+                    clickedOnSelectedNote
+
+                  else
+                    css []
+                , css [ publicSans, padding (px 10) ]
+                ]
                 (let
                     -- NOTE: \n doesn't break into a newline so I do this
                     makeParagraph : List (Html msg) -> List String -> List (Html msg)
@@ -729,7 +773,14 @@ note model ( data, selected ) =
                 text ""
 
             else
-                row [ css [ backgroundColor white, justifyContent spaceBetween, borderBottom3 (px 3) solid black ] ]
+                row
+                    [ if selected then
+                        clickedOnSelectedNote
+
+                      else
+                        css []
+                    , css [ backgroundColor white, justifyContent spaceBetween, borderBottom3 (px 3) solid black ]
+                    ]
                     [ div
                         [ css
                             [ if data.pinned then
