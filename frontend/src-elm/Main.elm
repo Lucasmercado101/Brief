@@ -130,6 +130,9 @@ init flags url navKey =
             , lastSyncedAt = Time.millisToPosix flags.lastSyncedAt
             , page =
                 case Route.fromUrl url of
+                    -- TODO: notes and labels should be combined into
+                    -- "data" with NotLoaded and Loaded states
+                    -- or https://package.elm-lang.org/packages/krisajenkins/remotedata/latest/RemoteData
                     Route.EditLabels ->
                         EditLabels (EditLabels.init { seeds = seeds, labels = [], notes = [], key = navKey })
 
