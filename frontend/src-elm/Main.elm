@@ -19,6 +19,7 @@ import Material.Icons.Outlined as Outlined
 import Material.Icons.Types exposing (Coloring(..))
 import OfflineQueue exposing (Action(..), OfflineQueueOps, actionMapToFn, emptyOfflineQueue, offlineQueueIsEmpty, qCreateNewNote, qDeleteNote, qEditNoteLabels, qNewLabel, qToggleNotePin, queueToOperations)
 import Page.EditLabels as EditLabels
+import Page.EditNote as EditNote
 import Page.Home as Home exposing (Signal(..))
 import Page.LogIn as LogIn
 import Ports exposing (requestRandomValues, updateLastSyncedAt)
@@ -41,14 +42,22 @@ subscriptions model =
             Sub.none
 
         LoggedIn { page } ->
+            let
+                map msg =
+                    Sub.map (\e -> GotPageMsg (msg e))
+            in
             case page of
                 Home homeModel ->
                     Home.subscriptions homeModel
-                        |> Sub.map (\e -> GotPageMsg (GotHomeMsg e))
+                        |> map GotHomeMsg
 
                 EditLabels editLabelsModel ->
                     EditLabels.subscriptions editLabelsModel
-                        |> Sub.map (\e -> GotPageMsg (GotEditLabelsMsg e))
+                        |> map GotEditLabelsMsg
+
+                EditNote editNoteModel ->
+                    EditNote.subscriptions editNoteModel
+                        |> map GotEditNoteMsg
 
 
 
@@ -58,6 +67,7 @@ subscriptions model =
 type Page
     = Home Home.Model
     | EditLabels EditLabels.Model
+    | EditNote EditNote.Model
 
 
 type alias LoggedInModel =
@@ -85,6 +95,7 @@ type PageMsg
     = GotLogInMsg LogIn.Msg
     | GotHomeMsg Home.Msg
     | GotEditLabelsMsg EditLabels.Msg
+    | GotEditNoteMsg EditNote.Msg
 
 
 type Msg
@@ -127,6 +138,9 @@ init flags url navKey =
 
                     Route.LogIn ->
                         Home (Home.init { key = navKey, seeds = seeds, labels = [], notes = [] })
+
+                    Route.EditNote noteId ->
+                        EditNote (EditNote.init { noteId = noteId, key = navKey, seeds = seeds, labels = [], notes = [] })
             }
         , Api.fullSync FullSyncResp
         )
@@ -198,6 +212,9 @@ update topMsg topModel =
                         Route.LogIn ->
                             topModel |> pure
 
+                        Route.EditNote _ ->
+                            topModel |> pure
+
                 LoggedIn loggedInModel ->
                     case Route.fromUrl newUrl of
                         Route.Home ->
@@ -221,8 +238,20 @@ update topMsg topModel =
                                         }
                                         |> pure
 
-                        Route.LogIn ->
-                            ( topModel, Cmd.none )
+                                EditNote data ->
+                                    LoggedIn
+                                        { loggedInModel
+                                            | page =
+                                                Home
+                                                    (Home.init
+                                                        { seeds = data.seeds
+                                                        , labels = data.labels
+                                                        , notes = data.notes
+                                                        , key = data.key
+                                                        }
+                                                    )
+                                        }
+                                        |> pure
 
                         Route.EditLabels ->
                             -- TODO:
@@ -244,6 +273,30 @@ update topMsg topModel =
 
                                 _ ->
                                     ( topModel, Cmd.none )
+
+                        Route.EditNote noteId ->
+                            case loggedInModel.page of
+                                Home data ->
+                                    LoggedIn
+                                        { loggedInModel
+                                            | page =
+                                                EditNote
+                                                    (EditNote.init
+                                                        { seeds = data.seeds
+                                                        , labels = data.labels
+                                                        , notes = data.notes
+                                                        , noteId = noteId
+                                                        , key = data.key
+                                                        }
+                                                    )
+                                        }
+                                        |> pure
+
+                                _ ->
+                                    ( topModel, Cmd.none )
+
+                        Route.LogIn ->
+                            ( topModel, Cmd.none )
             )
 
         GotPageMsg pageMsg ->
@@ -317,6 +370,9 @@ update topMsg topModel =
 
                                             EditLabels editLabelsModel ->
                                                 EditLabels (updatedPageModel editLabelsModel)
+
+                                            EditNote editNoteModel ->
+                                                EditNote (updatedPageModel editNoteModel)
                                 }
                                 |> pure
 
@@ -429,6 +485,9 @@ update topMsg topModel =
                                         EditLabels editLabelsModel ->
                                             EditLabels (updatePageModel editLabelsModel)
 
+                                        EditNote editNoteModel ->
+                                            EditNote (updatePageModel editNoteModel)
+
                                 ( labels, notes ) =
                                     case updatedPageModel of
                                         Home homeModel ->
@@ -436,6 +495,9 @@ update topMsg topModel =
 
                                         EditLabels editLabelsModel ->
                                             ( editLabelsModel.labels, editLabelsModel.notes )
+
+                                        EditNote editNoteModel ->
+                                            ( editNoteModel.labels, editNoteModel.notes )
                             in
                             ( LoggedIn
                                 { page = updatedPageModel
@@ -494,6 +556,9 @@ updateHomeWithSignal toPageModel toPageMsg topModel ( m, c, maybeSignal ) =
 
                         EditLabels editLabelsModel ->
                             ( editLabelsModel.labels, editLabelsModel.notes )
+
+                        EditNote editNoteModel ->
+                            ( editNoteModel.labels, editNoteModel.notes )
                     )
                         |> (\( l, n ) -> ( l |> List.map .id |> labelIDsSplitter |> Tuple.second, n |> List.map .id |> labelIDsSplitter |> Tuple.second ))
             in
@@ -528,6 +593,9 @@ updateEditLabelsWithSignal toPageModel toPageMsg topModel ( m, c, maybeSignal ) 
 
                         EditLabels editLabelsModel ->
                             ( editLabelsModel.labels, editLabelsModel.notes )
+
+                        EditNote editNoteModel ->
+                            ( editNoteModel.labels, editNoteModel.notes )
                     )
                         |> (\( l, n ) -> ( l |> List.map .id |> labelIDsSplitter |> Tuple.second, n |> List.map .id |> labelIDsSplitter |> Tuple.second ))
             in
@@ -601,6 +669,9 @@ view model =
 
                     EditLabels editLabelsModel ->
                         Html.Styled.map GotEditLabelsMsg (EditLabels.view editLabelsModel)
+
+                    EditNote editNoteModel ->
+                        Html.Styled.map GotEditNoteMsg (EditNote.view editNoteModel)
           )
             |> Html.Styled.map GotPageMsg
         ]

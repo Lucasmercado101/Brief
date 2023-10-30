@@ -1,14 +1,30 @@
 module Route exposing (..)
 
+import Api exposing (SyncableID(..))
 import Browser.Navigation as Nav
 import Url exposing (Url)
-import Url.Parser exposing (Parser, map, oneOf, parse, s, top)
+import Url.Parser exposing ((</>), Parser, map, oneOf, parse, s, top)
 
 
 type Route
     = Home
     | LogIn
     | EditLabels
+    | EditNote SyncableID
+
+
+syncableIDParser : Parser (SyncableID -> b) b
+syncableIDParser =
+    Url.Parser.custom
+        "SYNCABLE_ID"
+        (\e ->
+            case String.toInt e of
+                Just v ->
+                    Just (DatabaseID v)
+
+                Nothing ->
+                    Just (OfflineID e)
+        )
 
 
 parser : Parser (Route -> a) a
@@ -17,6 +33,8 @@ parser =
         [ map Home top
         , map LogIn (s "log-in")
         , map EditLabels (s "edit-labels")
+        , map EditNote
+            (s "edit-note" </> syncableIDParser)
         ]
 
 
@@ -52,4 +70,16 @@ routeToString route =
 
                 EditLabels ->
                     "edit-labels"
+
+                EditNote noteId ->
+                    let
+                        id =
+                            case noteId of
+                                DatabaseID v ->
+                                    String.fromInt v
+
+                                OfflineID v ->
+                                    v
+                    in
+                    "edit-note" ++ "/" ++ id
            )
