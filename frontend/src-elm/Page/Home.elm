@@ -46,8 +46,6 @@ type alias LabelsColumnMenu =
 type alias Model =
     { key : Nav.Key
     , seeds : List Random.Seed
-    , notes : List Note
-    , labels : List Label
     , isWritingANewNote : Maybe NewNoteData
     , newLabelName : String
     , labelsMenu : LabelsColumnMenu
@@ -55,16 +53,22 @@ type alias Model =
         { label : Maybe SyncableID
         , content : Maybe String
         }
+    , selectedNote : Maybe SyncableID
+
+    -- global data
+    , notes : List Note
+    , labels : List Label
     }
 
 
-init : { navKey : Nav.Key, seeds : List Random.Seed, labels : List Label, notes : List Note } -> Model
-init { navKey, seeds, labels, notes } =
-    ({ key = navKey
+init : { key : Nav.Key, seeds : List Random.Seed, labels : List Label, notes : List Note } -> Model
+init { key, seeds, labels, notes } =
+    ({ key = key
      , seeds = seeds
      , notes = notes
      , isWritingANewNote = Nothing
      , newLabelName = ""
+     , selectedNote = Nothing
      , labels = labels
      , labelsMenu = Nothing
      , filters =
@@ -98,6 +102,7 @@ type Msg
     = ChangeNotePinned ( SyncableID, Bool )
     | ReceivedRandomValues (List Int)
     | RemoveLabelFromNote { noteID : SyncableID, labelID : SyncableID }
+    | SelectedNote SyncableID
       -- Labels menu
     | SelectLabelToFilterBy SyncableID
     | OpenLabelsMenu
@@ -113,6 +118,71 @@ type Signal
 update : Msg -> Model -> ( Model, Cmd Msg, Maybe Signal )
 update msg model =
     case msg of
+        ChangeNotePinned ( uid, newPinnedVal ) ->
+            { model
+                | notes =
+                    List.map
+                        (\n ->
+                            if n.id == uid then
+                                { n | pinned = newPinnedVal }
+
+                            else
+                                n
+                        )
+                        model.notes
+            }
+                |> pureWithSignal (OfflineQueueAction (QToggleNotePin uid newPinnedVal))
+
+        RemoveLabelFromNote { noteID, labelID } ->
+            let
+                ( noteExists, restNotes ) =
+                    partitionFirst (\n -> sameId n.id noteID) model.notes
+            in
+            case noteExists of
+                Nothing ->
+                    model |> pureNoSignal
+
+                Just noteData ->
+                    let
+                        newNotes =
+                            noteData.labels |> exclude (sameId labelID)
+                    in
+                    { model | notes = { noteData | labels = newNotes } :: restNotes }
+                        |> pureWithSignal (OfflineQueueAction (QEditNoteLabels noteID (Just newNotes)))
+
+        ReceivedRandomValues values ->
+            { model | seeds = List.map Random.initialSeed values }
+                |> pureNoSignal
+
+        SelectedNote id ->
+            { model
+                | selectedNote =
+                    case model.selectedNote of
+                        Nothing ->
+                            Just id
+
+                        Just oldId ->
+                            if sameId id oldId then
+                                Nothing
+
+                            else
+                                Just id
+            }
+                |> pureNoSignal
+
+        -- TODO: for when there's multiple selected
+        -- let
+        --     noteAlreadySelected =
+        --         List.any (sameId id) model.selectedNotes
+        -- in
+        -- { model
+        --     | selectedNotes =
+        --         if noteAlreadySelected then
+        --             model.selectedNotes |> exclude (sameId id)
+        --         else
+        --             id :: model.selectedNotes
+        -- }
+        -- |> pureNoSignal
         -- Labels column menu
         OpenLabelsMenu ->
             { model | labelsMenu = Just "" }
@@ -151,42 +221,6 @@ update msg model =
 
         GoToEditLabelsScreen ->
             ( { model | labelsMenu = Nothing }, Route.replaceUrl model.key Route.EditLabels, Nothing )
-
-        ChangeNotePinned ( uid, newPinnedVal ) ->
-            { model
-                | notes =
-                    List.map
-                        (\n ->
-                            if n.id == uid then
-                                { n | pinned = newPinnedVal }
-
-                            else
-                                n
-                        )
-                        model.notes
-            }
-                |> pureWithSignal (OfflineQueueAction (QToggleNotePin uid newPinnedVal))
-
-        RemoveLabelFromNote { noteID, labelID } ->
-            let
-                ( noteExists, restNotes ) =
-                    partitionFirst (\n -> sameId n.id noteID) model.notes
-            in
-            case noteExists of
-                Nothing ->
-                    model |> pureNoSignal
-
-                Just noteData ->
-                    let
-                        newNotes =
-                            noteData.labels |> exclude (sameId labelID)
-                    in
-                    { model | notes = { noteData | labels = newNotes } :: restNotes }
-                        |> pureWithSignal (OfflineQueueAction (QEditNoteLabels noteID (Just newNotes)))
-
-        ReceivedRandomValues values ->
-            { model | seeds = List.map Random.initialSeed values }
-                |> pureNoSignal
 
 
 view : Model -> Bool -> Html Msg
@@ -561,14 +595,34 @@ notesGrid model =
                                             Nothing ->
                                                 e
                                    )
+                                |> List.map
+                                    (\e ->
+                                        ( e
+                                        , case model.selectedNote of
+                                            Nothing ->
+                                                False
+
+                                            Just selId ->
+                                                sameId e.id selId
+                                        )
+                                    )
+                             -- TODO: for when multiple can be selected
+                             -- |> List.map
+                             --     (\e ->
+                             --         case List.any (sameId e.id) model.selectedNotes of
+                             --             True ->
+                             --                 ( e, True )
+                             --             False ->
+                             --                 ( e, False )
+                             --     )
                             )
                         )
             ]
         ]
 
 
-note : Model -> Note -> Html Msg
-note model data =
+note : Model -> ( Note, Bool ) -> Html Msg
+note model ( data, selected ) =
     let
         noteTitle =
             case data.title of
@@ -633,7 +687,13 @@ note model data =
                             (\l ->
                                 div
                                     [ css
-                                        [ backgroundColor (hex "#6ac0ff")
+                                        [ backgroundColor
+                                            (if selected then
+                                                white
+
+                                             else
+                                                primary
+                                            )
                                         , padding (px 2)
                                         , border3 (px 1) solid (rgb 0 0 0)
                                         , hover [ boxShadow4 (px 3) (px 3) (px 0) (rgb 0 0 0) ]
@@ -668,16 +728,27 @@ note model data =
     in
     div
         [ css
-            [ border3 (px 3) solid (rgb 0 0 0)
-            , displayFlex
-            , flexDirection column
-            , maxWidth (px 240)
-            , minWidth (px 240)
-            , minHeight (px 120)
-            , backgroundColor (rgb 255 203 127)
-            , hover
-                [ boxShadow4 (px 6) (px 6) (px 0) (rgb 0 0 0) ]
-            ]
+            ([ border3 (px 3) solid (rgb 0 0 0)
+             , displayFlex
+             , flexDirection column
+             , maxWidth (px 240)
+             , minWidth (px 240)
+             , minHeight (px 120)
+             , backgroundColor (rgb 255 203 127)
+             , hover [ boxShadow4 (px 6) (px 6) (px 0) (rgb 0 0 0) ]
+             ]
+                ++ (if selected then
+                        [ backgroundColor primary
+                        ]
+
+                    else
+                        []
+                   )
+            )
+
+        -- TODO: like elm blueprint planner, check if clicked and released on same spot
+        -- otherwise picks up selecting text
+        , onClick (SelectedNote data.id)
         ]
         [ noteTitle
         , content
