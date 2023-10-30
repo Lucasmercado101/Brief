@@ -39,23 +39,6 @@ subscriptions _ =
     receiveRandomValues ReceivedRandomValues
 
 
-getNewTimeAndCreateLabel : { id : String, name : String } -> Cmd Msg
-getNewTimeAndCreateLabel data =
-    Task.perform (CreateNewLabel data) Time.now
-
-
-getNewTimeForCreateNewNote :
-    { id : String
-    , title : String
-    , content : String
-    , pinned : Bool
-    , labels : List Api.SyncableID
-    }
-    -> Cmd Msg
-getNewTimeForCreateNewNote data =
-    Task.perform (GotCurrentTimeForNewNote data) Time.now
-
-
 type alias LabelsColumnMenu =
     Maybe String
 
@@ -113,35 +96,14 @@ type alias NewNoteData =
 
 type Msg
     = ChangeNotePinned ( SyncableID, Bool )
-    | RequestTimeForNewLabelCreation
     | ReceivedRandomValues (List Int)
+    | RemoveLabelFromNote { noteID : SyncableID, labelID : SyncableID }
       -- Labels menu
     | SelectLabelToFilterBy SyncableID
     | OpenLabelsMenu
     | CloseLabelsMenu
     | ChangeLabelsSearchQuery String
     | GoToEditLabelsScreen
-      --
-    | NewTitleChange String
-    | NewNoteContentChange String
-    | CreateNewLabel { id : String, name : String } Posix
-    | DeleteNote SyncableID
-    | BeginWritingNewNote
-    | RequestTimeForCreateNewNote
-    | GotCurrentTimeForNewNote
-        { id : String
-        , title : String
-        , content : String
-        , pinned : Bool
-        , labels : List SyncableID
-        }
-        Posix
-    | BeginAddingNewNoteLabels
-    | SearchLabelsQueryChange String
-    | AddLabelToNewNote SyncableID
-    | RemoveLabelFromNewNote SyncableID
-    | RemoveLabelFromNote { noteID : SyncableID, labelID : SyncableID }
-    | ChangeNewLabelName String
 
 
 type Signal
@@ -222,233 +184,9 @@ update msg model =
                     { model | notes = { noteData | labels = newNotes } :: restNotes }
                         |> pureWithSignal (OfflineQueueAction (QEditNoteLabels noteID (Just newNotes)))
 
-        DeleteNote toDeleteNoteID ->
-            { model | notes = model.notes |> exclude (.id >> sameId toDeleteNoteID) }
-                |> pureWithSignal (OfflineQueueAction (QDeleteNote toDeleteNoteID))
-
-        ChangeNewLabelName newName ->
-            { model | newLabelName = newName }
-                |> pureNoSignal
-
-        RequestTimeForNewLabelCreation ->
-            if String.length model.newLabelName == 0 then
-                model |> pureNoSignal
-
-            else if List.any (\l -> l.name == model.newLabelName) model.labels then
-                -- TODO: make this visual to the user in the form of an error
-                model |> pureNoSignal
-
-            else
-                let
-                    newLabelOfflineId : String
-                    newLabelOfflineId =
-                        generateUID model.seeds |> Tuple.first
-
-                    newLabel =
-                        { id = newLabelOfflineId
-                        , name = model.newLabelName
-                        }
-                in
-                ( model, Cmd.batch [ requestRandomValues (), getNewTimeAndCreateLabel newLabel ], Nothing )
-
-        CreateNewLabel data time ->
-            { model
-                | newLabelName = ""
-                , labels =
-                    { id = OfflineID data.id
-                    , name = data.name
-                    , updatedAt = time
-                    , createdAt = time
-                    }
-                        :: model.labels
-            }
-                |> pureWithSignal (OfflineQueueAction (QNewLabel { offlineId = data.id, name = data.name }))
-
         ReceivedRandomValues values ->
             { model | seeds = List.map Random.initialSeed values }
                 |> pureNoSignal
-
-        BeginWritingNewNote ->
-            { model
-                | isWritingANewNote =
-                    Just
-                        { title = ""
-                        , content = ""
-                        , labels = Nothing
-                        }
-            }
-                |> pureNoSignal
-
-        NewTitleChange s ->
-            { model
-                | isWritingANewNote =
-                    Maybe.map
-                        (\data ->
-                            { data
-                                | title = s
-                            }
-                        )
-                        model.isWritingANewNote
-            }
-                |> pureNoSignal
-
-        NewNoteContentChange s ->
-            { model
-                | isWritingANewNote =
-                    Maybe.map
-                        (\data ->
-                            { data | content = s }
-                        )
-                        model.isWritingANewNote
-            }
-                |> pureNoSignal
-
-        SearchLabelsQueryChange s ->
-            { model
-                | isWritingANewNote =
-                    Maybe.map
-                        (\data ->
-                            { data
-                                | labels =
-                                    Maybe.map
-                                        (\{ labels } ->
-                                            { labels = labels
-                                            , labelsSearchQuery = s
-                                            }
-                                        )
-                                        data.labels
-                            }
-                        )
-                        model.isWritingANewNote
-            }
-                |> pureNoSignal
-
-        AddLabelToNewNote newLabel ->
-            { model
-                | isWritingANewNote =
-                    Maybe.map
-                        (\data ->
-                            { data
-                                | labels =
-                                    Maybe.map
-                                        (\{ labelsSearchQuery, labels } ->
-                                            { labels = newLabel :: labels
-                                            , labelsSearchQuery = labelsSearchQuery
-                                            }
-                                        )
-                                        data.labels
-                            }
-                        )
-                        model.isWritingANewNote
-            }
-                |> pureNoSignal
-
-        RemoveLabelFromNewNote labelID ->
-            { model
-                | isWritingANewNote =
-                    model.isWritingANewNote
-                        |> Maybe.map
-                            (\data ->
-                                { data
-                                    | labels =
-                                        data.labels
-                                            |> Maybe.map
-                                                (\{ labelsSearchQuery, labels } ->
-                                                    { labels = labels |> exclude (sameId labelID)
-                                                    , labelsSearchQuery = labelsSearchQuery
-                                                    }
-                                                )
-                                }
-                            )
-            }
-                |> pureNoSignal
-
-        RequestTimeForCreateNewNote ->
-            case model.isWritingANewNote of
-                Nothing ->
-                    model |> pureNoSignal
-
-                Just newNoteData ->
-                    if String.length newNoteData.content == 0 then
-                        model |> pureNoSignal
-
-                    else
-                        let
-                            newNoteOfflineId =
-                                generateUID model.seeds |> Tuple.first
-
-                            newNote =
-                                { id = newNoteOfflineId
-                                , title = newNoteData.title
-                                , content = newNoteData.content
-                                , pinned = False
-                                , labels =
-                                    case newNoteData.labels of
-                                        Just { labels } ->
-                                            labels
-
-                                        Nothing ->
-                                            []
-                                }
-                        in
-                        ( model
-                        , Cmd.batch [ requestRandomValues (), getNewTimeForCreateNewNote newNote ]
-                        , Nothing
-                        )
-
-        GotCurrentTimeForNewNote noteData time ->
-            let
-                newNote : Note
-                newNote =
-                    { id = OfflineID noteData.id
-                    , title =
-                        if String.length noteData.title == 0 then
-                            Nothing
-
-                        else
-                            Just noteData.title
-                    , content = noteData.content
-                    , pinned = noteData.pinned
-                    , labels = noteData.labels
-                    , createdAt = time
-                    , updatedAt = time
-                    }
-            in
-            { model
-                | isWritingANewNote = Nothing
-                , notes = newNote :: model.notes
-            }
-                |> pureWithSignal
-                    (OfflineQueueAction
-                        (QCreateNewNote
-                            { offlineId = noteData.id
-                            , title = newNote.title
-                            , content = newNote.content
-                            , pinned = newNote.pinned
-                            , labels = newNote.labels
-                            }
-                        )
-                    )
-
-        BeginAddingNewNoteLabels ->
-            case model.isWritingANewNote of
-                Just data ->
-                    { model
-                        | isWritingANewNote =
-                            Just
-                                { data
-                                    | labels =
-                                        Just
-                                            { labels = []
-                                            , labelsSearchQuery = ""
-                                            }
-                                }
-                    }
-                        |> pureNoSignal
-
-                Nothing ->
-                    model
-                        |> pureNoSignal
 
 
 view : Model -> Bool -> Html Msg
