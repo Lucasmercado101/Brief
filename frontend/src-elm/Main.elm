@@ -123,10 +123,10 @@ init flags url navKey =
                         EditLabels (EditLabels.init { seeds = seeds, labels = [], notes = [], key = navKey })
 
                     Route.Home ->
-                        Home (Home.init { navKey = navKey, seeds = seeds, labels = [], notes = [] })
+                        Home (Home.init { key = navKey, seeds = seeds, labels = [], notes = [] })
 
                     Route.LogIn ->
-                        Home (Home.init { navKey = navKey, seeds = seeds, labels = [], notes = [] })
+                        Home (Home.init { key = navKey, seeds = seeds, labels = [], notes = [] })
             }
         , Api.fullSync FullSyncResp
         )
@@ -178,18 +178,13 @@ update topMsg topModel =
                             ( LoggedIn
                                 { page =
                                     Home
-                                        { key = logInViewModel.key
-                                        , seeds = logInViewModel.seeds
-                                        , notes = []
-                                        , isWritingANewNote = Nothing
-                                        , newLabelName = ""
-                                        , labels = []
-                                        , labelsMenu = Nothing
-                                        , filters =
-                                            { label = Nothing
-                                            , content = Nothing
+                                        (Home.init
+                                            { key = logInViewModel.key
+                                            , seeds = logInViewModel.seeds
+                                            , labels = []
+                                            , notes = []
                                             }
-                                        }
+                                        )
                                 , offlineQueue = emptyOfflineQueue
                                 , runningQueueOn = Nothing
                                 , lastSyncedAt = Time.millisToPosix 1
@@ -220,7 +215,7 @@ update topMsg topModel =
                                                         { seeds = data.seeds
                                                         , labels = data.labels
                                                         , notes = data.notes
-                                                        , navKey = data.key
+                                                        , key = data.key
                                                         }
                                                     )
                                         }
