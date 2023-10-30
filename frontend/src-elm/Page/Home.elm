@@ -45,10 +45,7 @@ type alias LabelsColumnMenu =
 
 
 type alias Model =
-    { key : Nav.Key
-    , seeds : List Random.Seed
-    , isWritingANewNote : Maybe NewNoteData
-    , newLabelName : String
+    { newLabelName : String
     , labelsMenu : LabelsColumnMenu
     , filters :
         { label : Maybe SyncableID
@@ -57,6 +54,8 @@ type alias Model =
     , selectedNote : Maybe SyncableID
 
     -- global data
+    , key : Nav.Key
+    , seeds : List Random.Seed
     , notes : List Note
     , labels : List Label
     }
@@ -67,7 +66,6 @@ init { key, seeds, labels, notes } =
     ({ key = key
      , seeds = seeds
      , notes = notes
-     , isWritingANewNote = Nothing
      , newLabelName = ""
      , selectedNote = Nothing
      , labels = labels
@@ -88,17 +86,6 @@ init { key, seeds, labels, notes } =
     )
 
 
-type alias NewNoteData =
-    { title : String
-    , content : String
-    , labels :
-        Maybe
-            { labels : List SyncableID
-            , labelsSearchQuery : String
-            }
-    }
-
-
 type Msg
     = NoOp
     | ChangeNotePinned ( SyncableID, Bool )
@@ -106,6 +93,7 @@ type Msg
     | RemoveLabelFromNote { noteID : SyncableID, labelID : SyncableID }
     | SelectedNote SyncableID
     | ClickedMouse
+    | EditNote SyncableID
       -- Labels menu
     | SelectLabelToFilterBy SyncableID
     | OpenLabelsMenu
@@ -123,6 +111,9 @@ update msg model =
     case msg of
         NoOp ->
             model |> pureNoSignal
+
+        EditNote id ->
+            ( model, Route.replaceUrl model.key (Route.EditNote id), Nothing )
 
         ClickedMouse ->
             case model.selectedNote of
@@ -661,12 +652,7 @@ note model ( data, selected ) =
 
                 Just title ->
                     div
-                        [ if selected then
-                            clickedOnSelectedNote
-
-                          else
-                            css []
-                        , css
+                        [ css
                             [ delaGothicOne
                             , borderBottom3 (px 1) solid (rgb 0 0 0)
                             , padding (px 10)
@@ -676,12 +662,7 @@ note model ( data, selected ) =
 
         content =
             p
-                [ if selected then
-                    clickedOnSelectedNote
-
-                  else
-                    css []
-                , css [ publicSans, padding (px 10) ]
+                [ css [ publicSans, padding (px 10) ]
                 ]
                 (let
                     -- NOTE: \n doesn't break into a newline so I do this
@@ -774,12 +755,7 @@ note model ( data, selected ) =
 
             else
                 row
-                    [ if selected then
-                        clickedOnSelectedNote
-
-                      else
-                        css []
-                    , css [ backgroundColor white, justifyContent spaceBetween, borderBottom3 (px 3) solid black ]
+                    [ css [ backgroundColor white, justifyContent spaceBetween, borderBottom3 (px 3) solid black ]
                     ]
                     [ div
                         [ css
@@ -810,6 +786,7 @@ note model ( data, selected ) =
                             , borderLeft3 (px 3) solid black
                             , cursor pointer
                             ]
+                        , onClick (EditNote data.id)
                         ]
                         [ Filled.edit 32 Inherit |> Svg.Styled.fromUnstyled ]
                     ]
@@ -833,6 +810,11 @@ note model ( data, selected ) =
                         []
                    )
             )
+         , if selected then
+            clickedOnSelectedNote
+
+           else
+            css []
 
          -- TODO: like elm blueprint planner, check if clicked and released on same spot
          -- otherwise picks up selecting text
