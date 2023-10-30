@@ -3,8 +3,8 @@ module Page.Home exposing (..)
 import Api exposing (SyncableID(..))
 import Browser.Navigation as Nav
 import Cmd.Extra exposing (pure)
-import Css exposing (alignItems, auto, backgroundColor, bold, bolder, border, border3, borderBottom3, borderLeft3, borderRight3, boxShadow4, center, color, column, cursor, displayFlex, ellipsis, flexDirection, flexStart, flexWrap, fontSize, fontWeight, height, hex, hidden, hover, inherit, int, justifyContent, margin, margin2, marginBottom, marginLeft, marginRight, marginTop, maxWidth, minHeight, minWidth, noWrap, overflow, overflowY, padding, padding2, paddingLeft, paddingRight, paddingTop, pct, pointer, position, property, px, rgb, row, solid, spaceBetween, start, sticky, textAlign, textOverflow, top, transparent, whiteSpace, width, wrap)
-import CssHelpers exposing (black, col, delaGothicOne, displayGrid, error, fullWidth, gap, mx, padX, padY, primary, publicSans, secondary, textColor, userSelectNone, white)
+import Css exposing (alignItems, auto, backgroundColor, bold, bolder, border, border3, borderBottom3, borderLeft3, borderRight3, boxShadow4, center, color, column, cursor, displayFlex, ellipsis, flexDirection, flexStart, flexWrap, fontSize, fontWeight, height, hex, hidden, hover, inherit, int, justifyContent, margin, margin2, marginBottom, marginLeft, marginRight, marginTop, maxWidth, minHeight, minWidth, noWrap, overflow, overflowY, padding, padding2, paddingLeft, paddingRight, paddingTop, pct, pointer, position, property, px, rgb, solid, spaceBetween, start, sticky, textAlign, textOverflow, top, transparent, whiteSpace, width, wrap)
+import CssHelpers exposing (black, col, delaGothicOne, displayGrid, error, fullWidth, gap, mx, padX, padY, primary, publicSans, row, secondary, textColor, userSelectNone, white)
 import DataTypes exposing (Label, Note)
 import Helpers exposing (exclude, idDiff, labelIDsSplitter, listFirst, or, partitionFirst, sameId)
 import Html.Styled exposing (Html, br, button, div, form, img, input, label, li, nav, p, span, strong, text, textarea, ul)
@@ -571,13 +571,11 @@ notesGrid model =
                     div [] []
 
                 _ ->
-                    div
+                    row
                         [ -- TODO: give the tiled effect of google keep
                           -- using translate and transitions
                           css
-                            [ displayFlex
-                            , flexDirection row
-                            , flexWrap wrap
+                            [ flexWrap wrap
                             , marginTop (px 30)
                             , alignItems flexStart
                             , gap 10
@@ -725,9 +723,48 @@ note model ( data, selected ) =
                             )
                             (model.labels |> List.filter (\e -> List.any (\r -> r == e.id) labels))
                         )
+
+        topActions =
+            if not selected then
+                text ""
+
+            else
+                row [ css [ backgroundColor white, justifyContent spaceBetween, borderBottom3 (px 3) solid black ] ]
+                    [ div
+                        [ css
+                            [ if data.pinned then
+                                backgroundColor black
+
+                              else
+                                hover [ backgroundColor black, color white ]
+                            , color
+                                (if data.pinned then
+                                    white
+
+                                 else
+                                    black
+                                )
+                            , borderRight3 (px 3) solid black
+                            , cursor pointer
+                            ]
+                        , onClick (ChangeNotePinned ( data.id, not data.pinned ))
+                        ]
+                        [ Filled.push_pin 32 Inherit |> Svg.Styled.fromUnstyled ]
+                    , div
+                        [ css
+                            [ hover
+                                [ backgroundColor black
+                                , color white
+                                ]
+                            , borderLeft3 (px 3) solid black
+                            , cursor pointer
+                            ]
+                        ]
+                        [ Filled.edit 32 Inherit |> Svg.Styled.fromUnstyled ]
+                    ]
     in
     div
-        [ css
+        ([ css
             ([ border3 (px 3) solid (rgb 0 0 0)
              , displayFlex
              , flexDirection column
@@ -746,11 +783,19 @@ note model ( data, selected ) =
                    )
             )
 
-        -- TODO: like elm blueprint planner, check if clicked and released on same spot
-        -- otherwise picks up selecting text
-        , onClick (SelectedNote data.id)
-        ]
-        [ noteTitle
+         -- TODO: like elm blueprint planner, check if clicked and released on same spot
+         -- otherwise picks up selecting text
+         ]
+            ++ (if selected then
+                    []
+
+                else
+                    [ onClick (SelectedNote data.id) ]
+                -- TODO: unselect on click outside of note
+               )
+        )
+        [ topActions
+        , noteTitle
         , content
         , labelsFooter
         ]
