@@ -841,7 +841,8 @@ note model ( data, selected ) =
                     []
 
                 else
-                    [ onClick (SelectedNote data.id) ]
+                    [ stopPropagationOn "click" (Json.Decode.succeed ( SelectedNote data.id, True ))
+                    ]
                 -- TODO: unselect on click outside of note
                )
         )
