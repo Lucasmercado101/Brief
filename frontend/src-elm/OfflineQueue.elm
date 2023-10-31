@@ -67,6 +67,7 @@ type alias OQChangeLabelName =
 type Action
     = QToggleNotePin SyncableID Bool
     | QEditNoteLabels SyncableID (Maybe (List SyncableID))
+    | QEditNote OQEditNote
     | QDeleteNote OQDeleteNote
     | QNewLabel OQCreateLabel
     | QCreateNewNote OQCreateNote
@@ -83,6 +84,9 @@ actionMapToFn action =
 
         QEditNoteLabels uid newLabels ->
             qEditNoteLabels uid newLabels
+
+        QEditNote editData ->
+            qEditNote editData
 
         QDeleteNote uid ->
             qDeleteNote uid
