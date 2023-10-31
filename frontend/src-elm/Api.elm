@@ -572,10 +572,11 @@ type alias ChangesResponse =
         , labels : List DbID
         }
     , failedToCreate : List OfflineId
-    , failedToEdit :
-        { notes : List SyncableID
-        , labels : List SyncableID
-        }
+
+    -- , failedToEdit :
+    --     { notes : List SyncableID
+    --     , labels : List SyncableID
+    --     }
     , justSyncedAt : Posix
 
     -- Brings latest data, only those that were edited
@@ -607,11 +608,11 @@ changesResponseDecoder =
                 , JD.map OfflineID string
                 ]
 
-        failedToEditDecoder =
-            map2 (\a b -> { notes = a, labels = b })
-                (field "notes" (list offlineFirstDecoder))
-                (field "labels" (list offlineFirstDecoder))
-
+        -- TODO: this is incorrect, fix decoder
+        -- failedToEditDecoder =
+        --     map2 (\a b -> { notes = a, labels = b })
+        --         (field "notes" (list offlineFirstDecoder))
+        --         (field "labels" (list offlineFirstDecoder))
         downSyncNoteDecoder : Decoder (Either ( Note, OfflineId ) Note)
         downSyncNoteDecoder =
             map8
@@ -689,8 +690,8 @@ changesResponseDecoder =
                 (field "notes" (list downSyncNoteDecoder))
                 (field "labels" (list downSyncLabelDecoder))
     in
-    map5
-        (\a b c d e ->
+    map4
+        (\a b d e ->
             let
                 offlineOrJustCreatedPartitioner : List (Either ( a, OfflineId ) a) -> List ( a, OfflineId ) -> List a -> ( List ( a, OfflineId ), List a )
                 offlineOrJustCreatedPartitioner eithers items offlineIds =
@@ -715,7 +716,6 @@ changesResponseDecoder =
             in
             { deleted = a
             , failedToCreate = b
-            , failedToEdit = c
             , justSyncedAt = d
             , downSyncedData =
                 { notes = downSyncedNotes
@@ -729,7 +729,7 @@ changesResponseDecoder =
         )
         (field "deleted" deletedDecoder)
         (field "failedToCreate" (list string))
-        (field "failedToEdit" failedToEditDecoder)
+        -- (field "failedToEdit" failedToEditDecoder)
         (field "justSyncedAt" posixTime)
         (field "data" downSyncedDataDecoder)
 
