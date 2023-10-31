@@ -6,7 +6,7 @@ import Css exposing (alignItems, backgroundColor, bold, bolder, border, border3,
 import CssHelpers exposing (black, col, delaGothicOne, error, gap, padX, padY, primary, publicSans, row, secondary, textColor, white)
 import DataTypes exposing (Label, Note)
 import Dog exposing (dog2Svg)
-import Helpers exposing (listFirst, sameId)
+import Helpers exposing (listFirst, maybeToBool, sameId)
 import Html.Styled exposing (Html, button, div, input, p, strong, text, textarea)
 import Html.Styled.Attributes exposing (autofocus, class, css, placeholder, title, value)
 import Html.Styled.Events exposing (onClick, onInput)
@@ -47,7 +47,7 @@ type alias Model =
 
 
 type EditingState
-    = Editing Note
+    = Editing Note (Maybe String)
     | ConfirmDeletion Note
 
 
@@ -66,7 +66,7 @@ init { notes, labels, noteId, seeds, key, noteData } =
     , noteId = noteId
     , seeds = seeds
     , key = key
-    , noteData = Maybe.map Editing noteData
+    , noteData = Maybe.map (\e -> Editing e Nothing) noteData
     }
 
 
@@ -83,6 +83,7 @@ type Msg
     | RequestDeletion
     | CancelDeletion
     | ConfirmNoteDeletion
+    | ToggleEditLabels Bool
 
 
 type Signal
@@ -110,10 +111,10 @@ update msg model =
                                 ConfirmDeletion _ ->
                                     model
 
-                                Editing noteData ->
+                                Editing noteData isEditingLabels ->
                                     { model
                                         | noteData =
-                                            Just (Editing (fn noteData))
+                                            Just (Editing (fn noteData) isEditingLabels)
                                     }
 
                         Nothing ->
@@ -129,7 +130,7 @@ update msg model =
                                         ConfirmDeletion noteData ->
                                             newNoteState noteData
 
-                                        Editing noteData ->
+                                        Editing noteData _ ->
                                             newNoteState noteData
                                 )
                                 model.noteData
@@ -140,11 +141,35 @@ update msg model =
                     model |> pureNoSignal
 
                 RequestDeletion ->
-                    changeNoteState ConfirmDeletion
+                    { model
+                        | noteData =
+                            Maybe.map
+                                (\noteState ->
+                                    case noteState of
+                                        ConfirmDeletion noteData ->
+                                            noteState
+
+                                        Editing noteData _ ->
+                                            ConfirmDeletion noteData
+                                )
+                                model.noteData
+                    }
                         |> pureNoSignal
 
                 CancelDeletion ->
-                    changeNoteState Editing
+                    { model
+                        | noteData =
+                            Maybe.map
+                                (\noteState ->
+                                    case noteState of
+                                        ConfirmDeletion noteData ->
+                                            Editing noteData Nothing
+
+                                        Editing _ _ ->
+                                            noteState
+                                )
+                                model.noteData
+                    }
                         |> pureNoSignal
 
                 ConfirmNoteDeletion ->
@@ -165,7 +190,7 @@ update msg model =
                                 ConfirmDeletion _ ->
                                     model |> pureNoSignal
 
-                                Editing noteData ->
+                                Editing noteData _ ->
                                     let
                                         titleChanged =
                                             noteData.title /= originalNote.title
@@ -211,6 +236,19 @@ update msg model =
 
                 ChangeContent s ->
                     changeNoteData (\e -> { e | content = s })
+                        |> pureNoSignal
+
+                ToggleEditLabels newVal ->
+                    changeNoteState
+                        (\e ->
+                            Editing e
+                                (if newVal then
+                                    Just ""
+
+                                 else
+                                    Nothing
+                                )
+                        )
                         |> pureNoSignal
 
                 ChangePin newVal ->
@@ -297,7 +335,7 @@ view model =
                                 ]
                             ]
 
-                    Editing val ->
+                    Editing val isEditingLabels ->
                         let
                             topActions =
                                 row [ css [ justifyContent spaceBetween, alignItems center, backgroundColor white, borderBottom3 (px 3) solid black ] ]
@@ -348,7 +386,26 @@ view model =
                                         , onClick RequestDeletion
                                         ]
                                         [ Filled.delete 28 Inherit |> Svg.Styled.fromUnstyled ]
-                                    , button [ css [ hover [ backgroundColor black, color white ], border (px 0), cursor pointer, displayFlex, justifyContent center, alignItems center, paddingTop (px 8), paddingBottom (px 6), padX (px 8), borderLeft3 (px 2) solid black ] ] [ Filled.label 28 Inherit |> Svg.Styled.fromUnstyled ]
+                                    , button
+                                        [ css
+                                            [ if maybeToBool isEditingLabels then
+                                                Css.batch [ hover [ backgroundColor white, color black ], color white, backgroundColor black ]
+
+                                              else
+                                                Css.batch [ hover [ backgroundColor black, color white ], color black, backgroundColor white ]
+                                            , border (px 0)
+                                            , cursor pointer
+                                            , displayFlex
+                                            , justifyContent center
+                                            , alignItems center
+                                            , paddingTop (px 8)
+                                            , paddingBottom (px 6)
+                                            , padX (px 8)
+                                            , borderLeft3 (px 2) solid black
+                                            ]
+                                        , onClick (ToggleEditLabels (not (maybeToBool isEditingLabels)))
+                                        ]
+                                        [ Filled.label 28 Inherit |> Svg.Styled.fromUnstyled ]
                                     ]
 
                             editNoteCard =
@@ -391,19 +448,28 @@ view model =
                                 ]
                             ]
                             [ editNoteCard
-                            , labelsCard model model.labels
+                            , case isEditingLabels of
+                                Just searchQuery ->
+                                    labelsCard val searchQuery model.labels
+
+                                Nothing ->
+                                    text ""
                             ]
                 ]
 
 
-labelsCard : Model -> List Label -> Html Msg
-labelsCard model labels =
+labelsCard : Note -> String -> List Label -> Html Msg
+labelsCard note labelsSearchQuery labels =
     let
+        labelExists =
+            1
+
         header =
             row [ css [ backgroundColor white, justifyContent spaceBetween, alignItems center, paddingLeft (px 12), minWidth (px 400), borderBottom3 (px 3) solid black ] ]
                 [ p [ css [ delaGothicOne, fontSize (px 24) ] ] [ text "Labels" ]
                 , button
                     [ css [ hover [ backgroundColor black ], border (px 0), cursor pointer, displayFlex, color white, justifyContent center, alignItems center, backgroundColor error, padding (px 8), borderLeft3 (px 2) solid black ]
+                    , onClick (ToggleEditLabels False)
                     ]
                     [ Filled.close 32 Inherit |> Svg.Styled.fromUnstyled ]
                 ]
@@ -411,9 +477,6 @@ labelsCard model labels =
         content =
             case labels of
                 [] ->
-                    div [] []
-
-                _ ->
                     col [ css [ padding (px 32), alignItems center, gap 12 ] ]
                         [ dog2Svg 100 |> Svg.Styled.fromUnstyled
                         , col [ css [ publicSans ] ]
@@ -427,6 +490,9 @@ labelsCard model labels =
                             ]
                             []
                         ]
+
+                _ ->
+                    div [] []
 
         createNewLabelBtn =
             button [ css [ border (px 0), fontSize (px 16), publicSans, fontWeight (int 900), padding (px 18), borderTop3 (px 3) solid black ] ] [ text "CREATE NEW LABEL" ]
