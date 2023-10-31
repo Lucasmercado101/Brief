@@ -5,9 +5,10 @@ import Browser.Navigation as Nav
 import Css exposing (alignItems, backgroundColor, bold, bolder, border, border3, borderBottom3, borderLeft3, borderRight3, borderTop, borderTop3, center, color, column, cursor, display, displayFlex, flexDirection, fontSize, fontWeight, height, hover, inline, inlineBlock, int, justifyContent, marginBottom, marginTop, maxHeight, maxWidth, minWidth, none, padding, paddingBottom, paddingLeft, paddingTop, pct, pointer, px, resize, solid, spaceBetween, stretch, textAlign, transparent, vertical, width)
 import CssHelpers exposing (black, col, delaGothicOne, error, gap, padX, padY, primary, publicSans, row, secondary, textColor, white)
 import DataTypes exposing (Label, Note)
+import Dog exposing (dog2Svg)
 import Helpers exposing (listFirst, sameId)
 import Html.Styled exposing (Html, button, div, input, p, strong, text, textarea)
-import Html.Styled.Attributes exposing (autofocus, css, placeholder, title, value)
+import Html.Styled.Attributes exposing (autofocus, class, css, placeholder, title, value)
 import Html.Styled.Events exposing (onClick, onInput)
 import Material.Icons as Filled
 import Material.Icons.Outlined as Outlined
@@ -399,17 +400,33 @@ labelsCard : Model -> List Label -> Html Msg
 labelsCard model labels =
     let
         header =
-            row [ css [ backgroundColor white, justifyContent spaceBetween, alignItems center, paddingLeft (px 12), minWidth (px 400) ] ]
+            row [ css [ backgroundColor white, justifyContent spaceBetween, alignItems center, paddingLeft (px 12), minWidth (px 400), borderBottom3 (px 3) solid black ] ]
                 [ p [ css [ delaGothicOne, fontSize (px 24) ] ] [ text "Labels" ]
                 , button
                     [ css [ hover [ backgroundColor black ], border (px 0), cursor pointer, displayFlex, color white, justifyContent center, alignItems center, backgroundColor error, padding (px 8), borderLeft3 (px 2) solid black ]
-                    , onClick RequestDeletion
                     ]
-                    [ Filled.delete 32 Inherit |> Svg.Styled.fromUnstyled ]
+                    [ Filled.close 32 Inherit |> Svg.Styled.fromUnstyled ]
                 ]
 
         content =
-            div [] []
+            case labels of
+                [] ->
+                    div [] []
+
+                _ ->
+                    col [ css [ padding (px 32), alignItems center, gap 12 ] ]
+                        [ dog2Svg 100 |> Svg.Styled.fromUnstyled
+                        , col [ css [ publicSans ] ]
+                            [ p [ css [ textAlign center, fontSize (px 24) ] ] [ text "There are no labels!" ]
+                            , p [ css [ textAlign center, fontSize (px 24) ] ] [ text "Create one!" ]
+                            ]
+                        , input
+                            [ css [ border3 (px 2) solid black, padding (px 6), publicSans, width (pct 100) ]
+                            , placeholder "Work"
+                            , class "input"
+                            ]
+                            []
+                        ]
 
         createNewLabelBtn =
             button [ css [ border (px 0), fontSize (px 16), publicSans, fontWeight (int 900), padding (px 18), borderTop3 (px 3) solid black ] ] [ text "CREATE NEW LABEL" ]
