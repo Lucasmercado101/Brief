@@ -6,7 +6,7 @@ import Cmd.Extra exposing (pure)
 import Css exposing (alignItems, auto, backgroundColor, bold, bolder, border, border3, borderBottom3, borderLeft3, borderRight3, boxShadow4, center, color, column, cursor, displayFlex, ellipsis, flexDirection, flexStart, flexWrap, fontSize, fontWeight, height, hex, hidden, hover, inherit, int, justifyContent, margin, margin2, marginBottom, marginLeft, marginRight, marginTop, maxWidth, minHeight, minWidth, noWrap, overflow, overflowY, padding, padding2, paddingLeft, paddingRight, paddingTop, pct, pointer, position, property, px, rgb, solid, spaceBetween, start, sticky, textAlign, textOverflow, top, transparent, whiteSpace, width, wrap)
 import CssHelpers exposing (black, col, delaGothicOne, displayGrid, error, fullWidth, gap, mx, padX, padY, primary, publicSans, row, secondary, textColor, userSelectNone, white)
 import DataTypes exposing (Label, Note)
-import Helpers exposing (exclude, idDiff, labelIDsSplitter, listFirst, or, partitionFirst, sameId)
+import Helpers exposing (exclude, getCurrentTime, idDiff, labelIDsSplitter, listFirst, or, partitionFirst, sameId)
 import Html.Styled exposing (Html, br, button, div, form, img, input, label, li, nav, p, span, strong, text, textarea, ul)
 import Html.Styled.Attributes exposing (class, css, for, id, placeholder, src, style, title, type_, value)
 import Html.Styled.Events exposing (onClick, onInput, onSubmit, stopPropagationOn)
@@ -94,6 +94,8 @@ type Msg
     | SelectedNote SyncableID
     | ClickedMouse
     | EditNote SyncableID
+    | RequestTimeForNewNoteCreation
+    | CreateAndEditNote Posix
       -- Labels menu
     | SelectLabelToFilterBy SyncableID
     | OpenLabelsMenu
@@ -111,6 +113,41 @@ update msg model =
     case msg of
         NoOp ->
             model |> pureNoSignal
+
+        RequestTimeForNewNoteCreation ->
+            ( model, Cmd.batch [ getCurrentTime CreateAndEditNote, requestRandomValues () ], Nothing )
+
+        CreateAndEditNote currentTime ->
+            let
+                offlineId : String
+                offlineId =
+                    generateUID model.seeds |> Tuple.first
+
+                newNote =
+                    { id = offlineId
+                    , title = Nothing
+                    , content = "Hello world!"
+                    , pinned = False
+                    , labels = []
+                    }
+            in
+            -- TODO: handle case where note could not be created but i'm in note editing page
+            -- handle that response
+            ( { model
+                | notes =
+                    { id = OfflineID offlineId
+                    , title = Nothing
+                    , content = "Hello world!"
+                    , pinned = False
+                    , createdAt = currentTime
+                    , updatedAt = currentTime
+                    , labels = []
+                    }
+                        :: model.notes
+              }
+            , Route.replaceUrl model.key (Route.EditNote (OfflineID offlineId))
+            , Just (OfflineQueueAction (QCreateNewNote newNote))
+            )
 
         EditNote id ->
             ( model, Route.replaceUrl model.key (Route.EditNote id), Nothing )
@@ -561,7 +598,7 @@ notesGrid model =
                         ]
                     ]
                     [ text "Notes - ", text (model.notes |> List.length |> String.fromInt), text " Total" ]
-                , div
+                , button
                     [ css
                         [ publicSans
                         , fontWeight (int 800)
@@ -575,6 +612,7 @@ notesGrid model =
                         -- 2 notes size + padding
                         , width (px 505)
                         ]
+                    , onClick RequestTimeForNewNoteCreation
                     ]
                     [ text "CREATE NEW NOTE"
                     ]

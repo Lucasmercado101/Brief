@@ -335,7 +335,23 @@ update topMsg topModel =
                                         |> pure
 
                                 Route.EditNote noteIdToEdit ->
-                                    topModel |> pure
+                                    LoggedIn
+                                        { loggedInModel
+                                            | page =
+                                                EditNote
+                                                    (EditNote.init
+                                                        { seeds = pageData.seeds
+                                                        , labels = pageData.labels
+                                                        , notes = pageData.notes
+                                                        , key = pageData.key
+                                                        , noteId = noteIdToEdit
+
+                                                        -- TODO: handle empty state when no data has been loaded yet
+                                                        , noteData = listFirst (.id >> sameId noteIdToEdit) pageData.notes
+                                                        }
+                                                    )
+                                        }
+                                        |> pure
 
                                 Route.LogIn ->
                                     topModel |> pure
@@ -523,7 +539,7 @@ update topMsg topModel =
                                                 |> (++) updatedLabels
                                     }
 
-                                updatedPageModel =
+                                upPageModel1 =
                                     case loggedInModel.page of
                                         Home homeModel ->
                                             Home (updatePageModel homeModel)
@@ -536,7 +552,7 @@ update topMsg topModel =
                                             EditNote (updatePageModel editNoteModel)
 
                                 ( labels, notes ) =
-                                    case updatedPageModel of
+                                    case upPageModel1 of
                                         Home homeModel ->
                                             ( homeModel.labels, homeModel.notes )
 
@@ -545,6 +561,31 @@ update topMsg topModel =
 
                                         EditNote editNoteModel ->
                                             ( editNoteModel.labels, editNoteModel.notes )
+
+                                ( updatedPageModel, cmd1 ) =
+                                    case upPageModel1 of
+                                        EditNote editNoteModel ->
+                                            case editNoteModel.noteId of
+                                                OfflineID offlineId ->
+                                                    let
+                                                        justCreatedTheNote =
+                                                            listFirst (\( onlineId, prevOfflineId ) -> prevOfflineId == offlineId) justCreatedData.notes
+                                                    in
+                                                    case justCreatedTheNote of
+                                                        Just ( note, _ ) ->
+                                                            ( upPageModel1, Route.replaceUrl editNoteModel.key (Route.EditNote (DatabaseID note.id)) )
+
+                                                        Nothing ->
+                                                            ( upPageModel1, Cmd.none )
+
+                                                DatabaseID _ ->
+                                                    ( upPageModel1, Cmd.none )
+
+                                        Home _ ->
+                                            ( upPageModel1, Cmd.none )
+
+                                        EditLabels _ ->
+                                            ( upPageModel1, Cmd.none )
                             in
                             ( LoggedIn
                                 { page = updatedPageModel
@@ -558,7 +599,8 @@ update topMsg topModel =
                                 , lastSyncedAt = justSyncedAt
                                 }
                             , Cmd.batch
-                                [ updateLastSyncedAt (Time.posixToMillis justSyncedAt)
+                                [ cmd1
+                                , updateLastSyncedAt (Time.posixToMillis justSyncedAt)
                                 , if offlineQueueIsEmpty loggedInModel.offlineQueue then
                                     Cmd.none
 

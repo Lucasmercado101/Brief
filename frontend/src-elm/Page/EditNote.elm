@@ -6,7 +6,7 @@ import Css exposing (alignItems, backgroundColor, bold, bolder, border, border3,
 import CssHelpers exposing (black, col, delaGothicOne, error, gap, padX, padY, primary, publicSans, row, secondary, textColor, white)
 import DataTypes exposing (Label, Note)
 import Dog exposing (dog2Svg)
-import Helpers exposing (exclude, listFirst, maybeToBool, partitionFirst, sameId)
+import Helpers exposing (exclude, getCurrentTime, listFirst, maybeToBool, partitionFirst, sameId)
 import Html.Styled exposing (Html, button, div, input, li, p, strong, text, textarea, ul)
 import Html.Styled.Attributes exposing (autofocus, class, css, disabled, placeholder, title, value)
 import Html.Styled.Events exposing (onClick, onInput)
@@ -36,12 +36,6 @@ pureWithSignal s m =
 subscriptions : Model -> Sub Msg
 subscriptions model =
     receiveRandomValues ReceivedRandomValues
-
-
-getCurrentTime : (Posix -> Msg) -> Cmd Msg
-getCurrentTime msg =
-    Time.now
-        |> Task.perform msg
 
 
 type alias Model =
