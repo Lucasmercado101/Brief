@@ -141,7 +141,7 @@ init flags url navKey =
                         Home (Home.init { key = navKey, seeds = seeds, labels = [], notes = [] })
 
                     Route.EditNote noteId ->
-                        EditNote (EditNote.init { noteId = noteId, key = navKey, seeds = seeds, labels = [], notes = [] })
+                        EditNote (EditNote.init { noteId = noteId, key = navKey, seeds = seeds, labels = [], notes = [], noteData = Nothing })
             }
         , Api.fullSync FullSyncResp
         )
@@ -217,87 +217,128 @@ update topMsg topModel =
                             topModel |> pure
 
                 LoggedIn loggedInModel ->
-                    case Route.fromUrl newUrl of
-                        Route.Home ->
-                            case loggedInModel.page of
-                                Home _ ->
-                                    -- TODO: better
-                                    topModel |> pure
-
-                                EditLabels data ->
+                    case loggedInModel.page of
+                        Home pageData ->
+                            case Route.fromUrl newUrl of
+                                Route.EditLabels ->
                                     LoggedIn
                                         { loggedInModel
                                             | page =
                                                 Home
                                                     (Home.init
-                                                        { seeds = data.seeds
-                                                        , labels = data.labels
-                                                        , notes = data.notes
-                                                        , key = data.key
+                                                        { seeds = pageData.seeds
+                                                        , labels = pageData.labels
+                                                        , notes = pageData.notes
+                                                        , key = pageData.key
                                                         }
                                                     )
                                         }
                                         |> pure
 
-                                EditNote data ->
-                                    LoggedIn
-                                        { loggedInModel
-                                            | page =
-                                                Home
-                                                    (Home.init
-                                                        { seeds = data.seeds
-                                                        , labels = data.labels
-                                                        , notes = data.notes
-                                                        , key = data.key
-                                                        }
-                                                    )
-                                        }
-                                        |> pure
-
-                        Route.EditLabels ->
-                            -- TODO:
-                            case loggedInModel.page of
-                                Home data ->
-                                    LoggedIn
-                                        { loggedInModel
-                                            | page =
-                                                EditLabels
-                                                    (EditLabels.init
-                                                        { seeds = data.seeds
-                                                        , labels = data.labels
-                                                        , notes = data.notes
-                                                        , key = data.key
-                                                        }
-                                                    )
-                                        }
-                                        |> pure
-
-                                _ ->
-                                    ( topModel, Cmd.none )
-
-                        Route.EditNote noteId ->
-                            case loggedInModel.page of
-                                Home data ->
+                                Route.EditNote noteIdToEdit ->
                                     LoggedIn
                                         { loggedInModel
                                             | page =
                                                 EditNote
                                                     (EditNote.init
-                                                        { seeds = data.seeds
-                                                        , labels = data.labels
-                                                        , notes = data.notes
-                                                        , noteId = noteId
-                                                        , key = data.key
+                                                        { seeds = pageData.seeds
+                                                        , labels = pageData.labels
+                                                        , notes = pageData.notes
+                                                        , key = pageData.key
+                                                        , noteId = noteIdToEdit
+
+                                                        -- TODO: handle empty state when no data has been loaded yet
+                                                        , noteData = listFirst (.id >> sameId noteIdToEdit) pageData.notes
                                                         }
                                                     )
                                         }
                                         |> pure
 
-                                _ ->
-                                    ( topModel, Cmd.none )
+                                Route.Home ->
+                                    topModel |> pure
 
-                        Route.LogIn ->
-                            ( topModel, Cmd.none )
+                                Route.LogIn ->
+                                    topModel |> pure
+
+                        EditLabels pageData ->
+                            case Route.fromUrl newUrl of
+                                Route.EditNote noteIdToEdit ->
+                                    LoggedIn
+                                        { loggedInModel
+                                            | page =
+                                                EditNote
+                                                    (EditNote.init
+                                                        { seeds = pageData.seeds
+                                                        , labels = pageData.labels
+                                                        , notes = pageData.notes
+                                                        , key = pageData.key
+                                                        , noteId = noteIdToEdit
+
+                                                        -- TODO: handle empty state when no data has been loaded yet
+                                                        , noteData = listFirst (.id >> sameId noteIdToEdit) pageData.notes
+                                                        }
+                                                    )
+                                        }
+                                        |> pure
+
+                                Route.Home ->
+                                    LoggedIn
+                                        { loggedInModel
+                                            | page =
+                                                Home
+                                                    (Home.init
+                                                        { seeds = pageData.seeds
+                                                        , labels = pageData.labels
+                                                        , notes = pageData.notes
+                                                        , key = pageData.key
+                                                        }
+                                                    )
+                                        }
+                                        |> pure
+
+                                Route.EditLabels ->
+                                    topModel |> pure
+
+                                Route.LogIn ->
+                                    topModel |> pure
+
+                        EditNote pageData ->
+                            case Route.fromUrl newUrl of
+                                Route.Home ->
+                                    LoggedIn
+                                        { loggedInModel
+                                            | page =
+                                                Home
+                                                    (Home.init
+                                                        { seeds = pageData.seeds
+                                                        , labels = pageData.labels
+                                                        , notes = pageData.notes
+                                                        , key = pageData.key
+                                                        }
+                                                    )
+                                        }
+                                        |> pure
+
+                                Route.EditLabels ->
+                                    LoggedIn
+                                        { loggedInModel
+                                            | page =
+                                                Home
+                                                    (Home.init
+                                                        { seeds = pageData.seeds
+                                                        , labels = pageData.labels
+                                                        , notes = pageData.notes
+                                                        , key = pageData.key
+                                                        }
+                                                    )
+                                        }
+                                        |> pure
+
+                                Route.EditNote noteIdToEdit ->
+                                    topModel |> pure
+
+                                Route.LogIn ->
+                                    topModel |> pure
             )
 
         GotPageMsg pageMsg ->

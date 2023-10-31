@@ -41,6 +41,7 @@ type alias Model =
     , seeds : List Random.Seed
     , notes : List Note
     , labels : List Label
+    , noteData : Maybe Note
     }
 
 
@@ -50,14 +51,16 @@ init :
     , noteId : SyncableID
     , seeds : List Random.Seed
     , key : Nav.Key
+    , noteData : Maybe Note
     }
     -> Model
-init { notes, labels, noteId, seeds, key } =
+init { notes, labels, noteId, seeds, key, noteData } =
     { notes = notes
     , labels = labels
     , noteId = noteId
     , seeds = seeds
     , key = key
+    , noteData = noteData
     }
 
 
