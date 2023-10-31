@@ -1,6 +1,8 @@
 module Helpers exposing (..)
 
 import Api exposing (SyncableID(..))
+import Task
+import Time exposing (Posix)
 
 
 idDiff : SyncableID -> SyncableID -> Bool
@@ -124,3 +126,9 @@ maybeToBool maybe =
 
         Nothing ->
             False
+
+
+getCurrentTime : (Posix -> msg) -> Cmd msg
+getCurrentTime msg =
+    Time.now
+        |> Task.perform msg
