@@ -41,8 +41,13 @@ type alias Model =
     , seeds : List Random.Seed
     , notes : List Note
     , labels : List Label
-    , noteData : Maybe Note
+    , noteData : Maybe EditingState
     }
+
+
+type EditingState
+    = Editing Note
+    | ConfirmDeletion Note
 
 
 init :
@@ -60,7 +65,7 @@ init { notes, labels, noteId, seeds, key, noteData } =
     , noteId = noteId
     , seeds = seeds
     , key = key
-    , noteData = noteData
+    , noteData = Maybe.map Editing noteData
     }
 
 
@@ -74,6 +79,9 @@ type Msg
     | ChangePin Bool
     | ChangeTitle String
     | ChangeContent String
+    | RequestDeletion
+    | CancelDeletion
+    | ConfirmNoteDeletion
 
 
 type Signal
@@ -93,55 +101,105 @@ update msg model =
 
         Just originalNote ->
             let
+                changeNoteData : (Note -> Note) -> Model
                 changeNoteData fn =
+                    case model.noteData of
+                        Just editingState ->
+                            case editingState of
+                                ConfirmDeletion _ ->
+                                    model
+
+                                Editing noteData ->
+                                    { model
+                                        | noteData =
+                                            Just (Editing (fn noteData))
+                                    }
+
+                        Nothing ->
+                            model
+
+                changeNoteState : (Note -> EditingState) -> Model
+                changeNoteState newNoteState =
                     { model
                         | noteData =
-                            model.noteData
-                                |> Maybe.map fn
+                            Maybe.map
+                                (\noteState ->
+                                    case noteState of
+                                        ConfirmDeletion noteData ->
+                                            newNoteState noteData
+
+                                        Editing noteData ->
+                                            newNoteState noteData
+                                )
+                                model.noteData
                     }
             in
             case msg of
                 NoOp ->
                     model |> pureNoSignal
 
+                RequestDeletion ->
+                    changeNoteState ConfirmDeletion
+                        |> pureNoSignal
+
+                CancelDeletion ->
+                    changeNoteState Editing
+                        |> pureNoSignal
+
+                ConfirmNoteDeletion ->
+                    case model.noteData of
+                        Just _ ->
+                            ( model
+                            , Route.replaceUrl model.key Route.Home
+                            , Just (OfflineQueueAction (QDeleteNote originalNote.id))
+                            )
+
+                        Nothing ->
+                            model |> pureNoSignal
+
                 FinishEditing ->
                     case model.noteData of
-                        Just noteData ->
-                            let
-                                titleChanged =
-                                    noteData.title /= originalNote.title
+                        Just noteState ->
+                            case noteState of
+                                ConfirmDeletion _ ->
+                                    model |> pureNoSignal
 
-                                contentChanged =
-                                    noteData.content /= originalNote.content
+                                Editing noteData ->
+                                    let
+                                        titleChanged =
+                                            noteData.title /= originalNote.title
 
-                                queueSignal =
-                                    if titleChanged || contentChanged then
-                                        Just
-                                            (OfflineQueueAction
-                                                (QEditNote
-                                                    { id = originalNote.id
-                                                    , title =
-                                                        if titleChanged then
-                                                            noteData.title
+                                        contentChanged =
+                                            noteData.content /= originalNote.content
 
-                                                        else
-                                                            Nothing
-                                                    , content =
-                                                        if contentChanged then
-                                                            Just noteData.content
+                                        queueSignal =
+                                            if titleChanged || contentChanged then
+                                                Just
+                                                    (OfflineQueueAction
+                                                        (QEditNote
+                                                            { id = originalNote.id
+                                                            , title =
+                                                                if titleChanged then
+                                                                    noteData.title
 
-                                                        else
-                                                            Nothing
-                                                    , pinned = Nothing
-                                                    , labels = Nothing
-                                                    }
-                                                )
-                                            )
+                                                                else
+                                                                    Nothing
+                                                            , content =
+                                                                if contentChanged then
+                                                                    Just noteData.content
 
-                                    else
-                                        Nothing
-                            in
-                            ( model, Route.replaceUrl model.key Route.Home, queueSignal )
+                                                                else
+                                                                    Nothing
+                                                            , pinned = Nothing
+                                                            , labels = Nothing
+                                                            }
+                                                        )
+                                                    )
+
+                                            else
+                                                Nothing
+                                    in
+                                    ( model, Route.replaceUrl model.key Route.Home, queueSignal )
 
                         Nothing ->
                             model |> pureNoSignal
@@ -183,147 +241,150 @@ view model =
             -- TODO: empty state when no note or just redirect?
             div [] [ text "Note Not found" ]
 
-        Just val ->
-            let
-                topActions =
-                    row [ css [ justifyContent spaceBetween, alignItems center, backgroundColor white, borderBottom3 (px 3) solid black ] ]
-                        [ button
-                            [ css
-                                [ border (px 0)
-                                , if val.pinned then
-                                    hover [ color black, backgroundColor white ]
-
-                                  else
-                                    hover [ backgroundColor black, color white ]
-                                , cursor pointer
-                                , displayFlex
-                                , justifyContent center
-                                , alignItems center
-                                , paddingTop (px 8)
-                                , paddingBottom (px 6)
-                                , padX (px 8)
-                                , borderRight3 (px 2) solid black
-                                , if val.pinned then
-                                    Css.batch [ backgroundColor black, color white ]
-
-                                  else
-                                    Css.batch []
-                                ]
-                            , title
-                                (if val.pinned then
-                                    "Unpin"
-
-                                 else
-                                    "pin"
-                                )
-                            , onClick (ChangePin (not val.pinned))
-                            ]
-                            [ Filled.push_pin 32 Inherit |> Svg.Styled.fromUnstyled ]
-                        , p [ css [ delaGothicOne, fontSize (px 24) ] ] [ text "Editing Note" ]
-                        , button
-                            [ css [ hover [ backgroundColor black, color white ], border (px 0), cursor pointer, displayFlex, justifyContent center, alignItems center, paddingTop (px 8), paddingBottom (px 6), padX (px 8), backgroundColor primary, borderLeft3 (px 2) solid black, color black ]
-                            , onClick FinishEditing
-                            ]
-                            [ Filled.check 32 Inherit |> Svg.Styled.fromUnstyled ]
-                        ]
-
-                bottomActions =
-                    row [ css [ justifyContent spaceBetween, backgroundColor white, borderTop3 (px 3) solid black ] ]
-                        [ button [ css [ border (px 0), cursor pointer, displayFlex, color white, justifyContent center, alignItems center, backgroundColor error, paddingTop (px 8), paddingBottom (px 6), padX (px 8), borderRight3 (px 2) solid black ] ] [ Filled.delete 28 Inherit |> Svg.Styled.fromUnstyled ]
-                        , button [ css [ border (px 0), cursor pointer, displayFlex, justifyContent center, alignItems center, paddingTop (px 8), paddingBottom (px 6), padX (px 8), borderLeft3 (px 2) solid black ] ] [ Filled.label 28 Inherit |> Svg.Styled.fromUnstyled ]
-                        ]
-
-                confirmDeleteCard { name, id } =
-                    div
-                        [ css
-                            [ backgroundColor secondary
-                            , border3 (px 5) solid black
-                            , displayFlex
-                            , flexDirection column
-                            , maxWidth (px 480)
-                            , minWidth (px 480)
-                            ]
-                        ]
-                        [ p [ css [ delaGothicOne, fontSize (px 38), marginTop (px 12), marginBottom (px 16), textAlign center ] ] [ text "Really?" ]
-                        , div [ css [ display inlineBlock, textAlign center ] ]
-                            [ p [ css [ publicSans, fontSize (px 18), display inline ] ]
-                                [ text
-                                    ("Are you sure you want to delete "
-                                        ++ (case name of
-                                                Just _ ->
-                                                    "note \""
-
-                                                Nothing ->
-                                                    "this note?"
-                                           )
-                                    )
-                                ]
-                            , case name of
-                                Just noteName ->
-                                    strong [ css [ fontWeight (int 900), publicSans, fontSize (px 18), display inline ] ] [ text noteName ]
-
-                                Nothing ->
-                                    text ""
-                            , case name of
-                                Just noteName ->
-                                    p [ css [ publicSans, fontSize (px 18), display inline ] ] [ text "\"?" ]
-
-                                Nothing ->
-                                    text ""
-                            ]
-                        , div [ css [ displayFlex, marginTop (px 16), backgroundColor white ] ]
-                            [ button
-                                [ css [ hover [ textColor white, backgroundColor black ], cursor pointer, fontWeight bold, backgroundColor transparent, border (px 0), publicSans, fontSize (px 22), borderTop3 (px 5) solid black, width (pct 100), padY (px 10), textAlign center ]
-
-                                -- , onClick (CancelDeleteLabel id)
-                                ]
-                                [ text "Cancel" ]
-                            , button
-                                [ css [ hover [ textColor white, backgroundColor black ], cursor pointer, fontWeight bold, backgroundColor error, textColor white, border (px 0), publicSans, fontSize (px 22), width (pct 100), borderLeft3 (px 5) solid black, borderTop3 (px 5) solid black, padY (px 10), textAlign center ]
-
-                                -- , onClick (ConfirmDeleteLabel id)
-                                ]
-                                [ text "Confirm" ]
-                            ]
-                        ]
-            in
-            -- TODO: add max title and content length
+        Just editingStatus ->
             row [ css [ height (pct 100), justifyContent center, alignItems center ] ]
-                [ div
-                    [ css
-                        [ -- TODO: a better width
-                          minWidth (px 400)
-                        , height (pct 100)
-                        , displayFlex
-                        , alignItems center
-                        ]
-                    ]
-                    [ col [ css [ backgroundColor secondary, border3 (px 3) solid black, maxHeight (pct 70), width (pct 100) ] ]
-                        [ topActions
-                        , textarea
-                            [ css [ delaGothicOne, fontSize (px 24), padding (px 16), backgroundColor transparent, border (px 0), resize vertical ]
-                            , autofocus True
-                            , placeholder "Note Title Here."
-                            , onInput ChangeTitle
-                            , value
-                                (case val.title of
-                                    Just t ->
-                                        t
+                [ case editingStatus of
+                    ConfirmDeletion data ->
+                        div
+                            [ css
+                                [ backgroundColor secondary
+                                , border3 (px 5) solid black
+                                , displayFlex
+                                , flexDirection column
+                                , maxWidth (px 480)
+                                , minWidth (px 480)
+                                ]
+                            ]
+                            [ p [ css [ delaGothicOne, fontSize (px 38), marginTop (px 12), marginBottom (px 16), textAlign center ] ] [ text "Really?" ]
+                            , div [ css [ display inlineBlock, textAlign center ] ]
+                                [ p [ css [ publicSans, fontSize (px 18), display inline ] ]
+                                    [ text
+                                        ("Are you sure you want to delete "
+                                            ++ (case data.title of
+                                                    Just _ ->
+                                                        "note \""
+
+                                                    Nothing ->
+                                                        "this note?"
+                                               )
+                                        )
+                                    ]
+                                , case data.title of
+                                    Just noteName ->
+                                        strong [ css [ fontWeight (int 900), publicSans, fontSize (px 18), display inline ] ] [ text noteName ]
 
                                     Nothing ->
-                                        ""
-                                )
+                                        text ""
+                                , case data.title of
+                                    Just _ ->
+                                        p [ css [ publicSans, fontSize (px 18), display inline ] ] [ text "\"?" ]
+
+                                    Nothing ->
+                                        text ""
+                                ]
+                            , div [ css [ displayFlex, marginTop (px 16), backgroundColor white ] ]
+                                [ button
+                                    [ css [ hover [ textColor white, backgroundColor black ], cursor pointer, fontWeight bold, backgroundColor transparent, border (px 0), publicSans, fontSize (px 22), borderTop3 (px 5) solid black, width (pct 100), padY (px 10), textAlign center ]
+                                    , onClick CancelDeletion
+                                    ]
+                                    [ text "Cancel" ]
+                                , button
+                                    [ css [ hover [ textColor white, backgroundColor black ], cursor pointer, fontWeight bold, backgroundColor error, textColor white, border (px 0), publicSans, fontSize (px 22), width (pct 100), borderLeft3 (px 5) solid black, borderTop3 (px 5) solid black, padY (px 10), textAlign center ]
+                                    , onClick ConfirmNoteDeletion
+                                    ]
+                                    [ text "Confirm" ]
+                                ]
                             ]
-                            []
-                        , textarea
-                            [ css [ publicSans, padding (px 16), backgroundColor transparent, border (px 0), fontSize (px 16), resize vertical ]
-                            , onInput ChangeContent
-                            , value val.content
-                            , placeholder "Note Content Here."
+
+                    Editing val ->
+                        let
+                            topActions =
+                                row [ css [ justifyContent spaceBetween, alignItems center, backgroundColor white, borderBottom3 (px 3) solid black ] ]
+                                    [ button
+                                        [ css
+                                            [ border (px 0)
+                                            , if val.pinned then
+                                                hover [ color black, backgroundColor white ]
+
+                                              else
+                                                hover [ backgroundColor black, color white ]
+                                            , cursor pointer
+                                            , displayFlex
+                                            , justifyContent center
+                                            , alignItems center
+                                            , paddingTop (px 8)
+                                            , paddingBottom (px 6)
+                                            , padX (px 8)
+                                            , borderRight3 (px 2) solid black
+                                            , if val.pinned then
+                                                Css.batch [ backgroundColor black, color white ]
+
+                                              else
+                                                Css.batch []
+                                            ]
+                                        , title
+                                            (if val.pinned then
+                                                "Unpin"
+
+                                             else
+                                                "pin"
+                                            )
+                                        , onClick (ChangePin (not val.pinned))
+                                        ]
+                                        [ Filled.push_pin 32 Inherit |> Svg.Styled.fromUnstyled ]
+                                    , p [ css [ delaGothicOne, fontSize (px 24) ] ] [ text "Editing Note" ]
+                                    , button
+                                        [ css [ hover [ backgroundColor black, color white ], border (px 0), cursor pointer, displayFlex, justifyContent center, alignItems center, paddingTop (px 8), paddingBottom (px 6), padX (px 8), backgroundColor primary, borderLeft3 (px 2) solid black, color black ]
+                                        , onClick FinishEditing
+                                        ]
+                                        [ Filled.check 32 Inherit |> Svg.Styled.fromUnstyled ]
+                                    ]
+
+                            bottomActions =
+                                row [ css [ justifyContent spaceBetween, backgroundColor white, borderTop3 (px 3) solid black ] ]
+                                    [ button
+                                        [ css [ border (px 0), cursor pointer, displayFlex, color white, justifyContent center, alignItems center, backgroundColor error, paddingTop (px 8), paddingBottom (px 6), padX (px 8), borderRight3 (px 2) solid black ]
+                                        , onClick RequestDeletion
+                                        ]
+                                        [ Filled.delete 28 Inherit |> Svg.Styled.fromUnstyled ]
+                                    , button [ css [ border (px 0), cursor pointer, displayFlex, justifyContent center, alignItems center, paddingTop (px 8), paddingBottom (px 6), padX (px 8), borderLeft3 (px 2) solid black ] ] [ Filled.label 28 Inherit |> Svg.Styled.fromUnstyled ]
+                                    ]
+                        in
+                        -- TODO: add max title and content length
+                        div
+                            [ css
+                                [ -- TODO: a better width
+                                  minWidth (px 400)
+                                , height (pct 100)
+                                , displayFlex
+                                , alignItems center
+                                ]
                             ]
-                            []
-                        , bottomActions
-                        ]
-                    , confirmDeleteCard { name = val.title, id = model.noteId }
-                    ]
+                            [ col [ css [ backgroundColor secondary, border3 (px 3) solid black, maxHeight (pct 70), width (pct 100) ] ]
+                                [ topActions
+                                , textarea
+                                    [ css [ delaGothicOne, fontSize (px 24), padding (px 16), backgroundColor transparent, border (px 0), resize vertical ]
+                                    , autofocus True
+                                    , placeholder "Note Title Here."
+                                    , onInput ChangeTitle
+                                    , value
+                                        (case val.title of
+                                            Just t ->
+                                                t
+
+                                            Nothing ->
+                                                ""
+                                        )
+                                    ]
+                                    []
+                                , textarea
+                                    [ css [ publicSans, padding (px 16), backgroundColor transparent, border (px 0), fontSize (px 16), resize vertical ]
+                                    , onInput ChangeContent
+                                    , value val.content
+                                    , placeholder "Note Content Here."
+                                    ]
+                                    []
+                                , bottomActions
+                                ]
+                            ]
                 ]
