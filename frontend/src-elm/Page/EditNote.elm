@@ -2,12 +2,12 @@ module Page.EditNote exposing (..)
 
 import Api exposing (SyncableID)
 import Browser.Navigation as Nav
-import Css exposing (alignItems, backgroundColor, border3, borderBottom3, borderLeft3, borderRight3, borderTop3, center, color, cursor, displayFlex, fontSize, height, hover, justifyContent, padding, paddingBottom, paddingTop, pct, pointer, px, solid, spaceBetween, width)
+import Css exposing (alignItems, backgroundColor, border, border3, borderBottom3, borderLeft3, borderRight3, borderTop3, center, color, cursor, displayFlex, fontSize, height, hover, justifyContent, maxHeight, minWidth, none, padding, paddingBottom, paddingTop, pct, pointer, px, resize, solid, spaceBetween, stretch, transparent, vertical, width)
 import CssHelpers exposing (black, col, delaGothicOne, error, padX, publicSans, row, secondary, white)
 import DataTypes exposing (Label, Note)
 import Helpers exposing (listFirst, sameId)
-import Html.Styled exposing (Html, div, p, text)
-import Html.Styled.Attributes exposing (css, title)
+import Html.Styled exposing (Html, div, input, p, text, textarea)
+import Html.Styled.Attributes exposing (autofocus, css, title, value)
 import Html.Styled.Events exposing (onClick)
 import Material.Icons as Filled
 import Material.Icons.Outlined as Outlined
@@ -181,13 +181,18 @@ view model =
                 [ div
                     [ css
                         [ -- TODO: a better width
-                          width (px 400)
+                          minWidth (px 400)
+                        , height (pct 100)
+                        , displayFlex
+                        , alignItems center
                         ]
                     ]
-                    [ col [ css [ backgroundColor secondary, border3 (px 3) solid black ] ]
+                    [ col [ css [ backgroundColor secondary, border3 (px 3) solid black, maxHeight (pct 70), width (pct 100) ] ]
                         [ topActions
-                        , p [ css [ delaGothicOne, fontSize (px 24), padding (px 16) ] ]
-                            [ text
+                        , textarea
+                            [ css [ delaGothicOne, fontSize (px 24), padding (px 16), backgroundColor transparent, border (px 0), resize vertical ]
+                            , autofocus True
+                            , value
                                 (case val.title of
                                     Just t ->
                                         t
@@ -196,7 +201,12 @@ view model =
                                         ""
                                 )
                             ]
-                        , p [ css [ publicSans, padding (px 16) ] ] [ text val.content ]
+                            []
+                        , textarea
+                            [ css [ publicSans, padding (px 16), backgroundColor transparent, border (px 0), fontSize (px 16), resize vertical ]
+                            , value val.content
+                            ]
+                            []
                         , bottomActions
                         ]
                     ]
