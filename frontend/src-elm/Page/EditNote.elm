@@ -1,6 +1,6 @@
 module Page.EditNote exposing (..)
 
-import Api exposing (SyncableID)
+import Api exposing (SyncableID(..))
 import Browser.Navigation as Nav
 import Css exposing (alignItems, backgroundColor, bold, bolder, border, border3, borderBottom3, borderLeft3, borderRight3, borderTop, borderTop3, center, color, column, cursor, display, displayFlex, flexDirection, fontSize, fontWeight, height, hover, inline, inlineBlock, int, justifyContent, marginBottom, marginTop, maxHeight, maxWidth, minWidth, none, padding, paddingBottom, paddingLeft, paddingTop, pct, pointer, px, resize, solid, spaceBetween, stretch, textAlign, transparent, vertical, width)
 import CssHelpers exposing (black, col, delaGothicOne, error, gap, padX, padY, primary, publicSans, row, secondary, textColor, white)
@@ -8,15 +8,19 @@ import DataTypes exposing (Label, Note)
 import Dog exposing (dog2Svg)
 import Helpers exposing (listFirst, maybeToBool, sameId)
 import Html.Styled exposing (Html, button, div, input, p, strong, text, textarea)
-import Html.Styled.Attributes exposing (autofocus, class, css, placeholder, title, value)
+import Html.Styled.Attributes exposing (autofocus, class, css, disabled, placeholder, title, value)
 import Html.Styled.Events exposing (onClick, onInput)
 import Material.Icons as Filled
 import Material.Icons.Outlined as Outlined
 import Material.Icons.Types exposing (Coloring(..))
 import OfflineQueue exposing (Action(..))
+import Ports exposing (receiveRandomValues, requestRandomValues)
 import Random
 import Route
 import Svg.Styled
+import Task
+import Time exposing (Posix)
+import UID exposing (generateUID)
 
 
 pureNoSignal : Model -> ( Model, Cmd msg, Maybe Signal )
@@ -31,7 +35,13 @@ pureWithSignal s m =
 
 subscriptions : Model -> Sub Msg
 subscriptions model =
-    Sub.none
+    receiveRandomValues ReceivedRandomValues
+
+
+getCurrentTime : (Posix -> Msg) -> Cmd Msg
+getCurrentTime msg =
+    Time.now
+        |> Task.perform msg
 
 
 type alias Model =
@@ -84,6 +94,10 @@ type Msg
     | CancelDeletion
     | ConfirmNoteDeletion
     | ToggleEditLabels Bool
+    | RequestTimeForNewLabelCreation
+    | CreateNewLabel Posix
+    | ReceivedRandomValues (List Int)
+    | ChangeLabelSearchQuery String
 
 
 type Signal
@@ -120,18 +134,17 @@ update msg model =
                         Nothing ->
                             model
 
-                changeNoteState : (Note -> EditingState) -> Model
-                changeNoteState newNoteState =
+                changeEditingState fn =
                     { model
                         | noteData =
                             Maybe.map
                                 (\noteState ->
                                     case noteState of
                                         ConfirmDeletion noteData ->
-                                            newNoteState noteData
+                                            ConfirmDeletion noteData
 
-                                        Editing noteData _ ->
-                                            newNoteState noteData
+                                        Editing noteData isEditingLabels ->
+                                            fn noteData isEditingLabels |> (\( e, v ) -> Editing e v)
                                 )
                                 model.noteData
                     }
@@ -238,19 +251,6 @@ update msg model =
                     changeNoteData (\e -> { e | content = s })
                         |> pureNoSignal
 
-                ToggleEditLabels newVal ->
-                    changeNoteState
-                        (\e ->
-                            Editing e
-                                (if newVal then
-                                    Just ""
-
-                                 else
-                                    Nothing
-                                )
-                        )
-                        |> pureNoSignal
-
                 ChangePin newVal ->
                     ( { model
                         | notes =
@@ -267,6 +267,83 @@ update msg model =
                     , Cmd.none
                     , Just (OfflineQueueAction (QToggleNotePin originalNote.id newVal))
                     )
+
+                ToggleEditLabels newVal ->
+                    changeEditingState
+                        (\data _ ->
+                            ( data
+                            , if newVal then
+                                Just ""
+
+                              else
+                                Nothing
+                            )
+                        )
+                        |> pureNoSignal
+
+                ChangeLabelSearchQuery newQuery ->
+                    changeEditingState
+                        (\data searchQuery ->
+                            ( data, Just newQuery )
+                        )
+                        |> pureNoSignal
+
+                RequestTimeForNewLabelCreation ->
+                    ( model
+                    , Cmd.batch [ requestRandomValues (), getCurrentTime CreateNewLabel ]
+                    , Nothing
+                    )
+
+                CreateNewLabel timeNow ->
+                    (case model.noteData of
+                        Just noteState ->
+                            case noteState of
+                                ConfirmDeletion noteData ->
+                                    Nothing
+
+                                Editing noteData labelsSearchQuery ->
+                                    case labelsSearchQuery of
+                                        Just query ->
+                                            Just query
+
+                                        Nothing ->
+                                            Nothing
+
+                        Nothing ->
+                            Nothing
+                    )
+                        |> (\v ->
+                                case v of
+                                    Just searchQuery ->
+                                        let
+                                            offlineId : String
+                                            offlineId =
+                                                generateUID model.seeds |> Tuple.first
+
+                                            newLabel : Label
+                                            newLabel =
+                                                { createdAt = timeNow
+                                                , updatedAt = timeNow
+                                                , id = OfflineID offlineId
+                                                , name = searchQuery
+                                                }
+                                        in
+                                        if String.length searchQuery /= 0 then
+                                            ( { model | labels = newLabel :: model.labels }
+                                            , requestRandomValues ()
+                                            , Nothing
+                                            )
+
+                                        else
+                                            model |> pureNoSignal
+
+                                    Nothing ->
+                                        model |> pureNoSignal
+                           )
+
+                ReceivedRandomValues values ->
+                    { model | seeds = List.map Random.initialSeed values }
+                        |> pureNoSignal
 
 
 
@@ -461,7 +538,12 @@ labelsCard : Note -> String -> List Label -> Html Msg
 labelsCard note labelsSearchQuery labels =
     let
         labelExists =
-            1
+            case labels of
+                [] ->
+                    False
+
+                x :: xs ->
+                    List.any (\e -> e.name == labelsSearchQuery) labels
 
         header =
             row [ css [ backgroundColor white, justifyContent spaceBetween, alignItems center, paddingLeft (px 12), minWidth (px 400), borderBottom3 (px 3) solid black ] ]
@@ -486,6 +568,7 @@ labelsCard note labelsSearchQuery labels =
                             [ css [ border3 (px 2) solid black, padding (px 6), publicSans, width (pct 100) ]
                             , placeholder "Work"
                             , class "input"
+                            , onInput ChangeLabelSearchQuery
                             ]
                             []
                         ]
@@ -494,10 +577,18 @@ labelsCard note labelsSearchQuery labels =
                     div [] []
 
         createNewLabelBtn =
-            button [ css [ border (px 0), fontSize (px 16), publicSans, fontWeight (int 900), padding (px 18), borderTop3 (px 3) solid black ] ] [ text "CREATE NEW LABEL" ]
+            button
+                [ css [ border (px 0), fontSize (px 16), publicSans, fontWeight (int 900), padding (px 18), borderTop3 (px 3) solid black, cursor pointer ]
+                , onClick RequestTimeForNewLabelCreation
+                ]
+                [ text "CREATE NEW LABEL" ]
     in
     col [ css [ backgroundColor secondary, border3 (px 3) solid black, maxHeight (pct 70), width (pct 100) ] ]
         [ header
         , content
-        , createNewLabelBtn
+        , if labelExists then
+            text ""
+
+          else
+            createNewLabelBtn
         ]
