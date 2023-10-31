@@ -2,12 +2,12 @@ module Page.EditNote exposing (..)
 
 import Api exposing (SyncableID(..))
 import Browser.Navigation as Nav
-import Css exposing (alignItems, backgroundColor, bold, bolder, border, border3, borderBottom3, borderLeft3, borderRight3, borderTop, borderTop3, center, color, column, cursor, display, displayFlex, flexDirection, fontSize, fontWeight, height, hover, inline, inlineBlock, int, justifyContent, marginBottom, marginTop, maxHeight, maxWidth, minWidth, none, padding, paddingBottom, paddingLeft, paddingTop, pct, pointer, px, resize, solid, spaceBetween, stretch, textAlign, transparent, vertical, width)
+import Css exposing (alignItems, backgroundColor, bold, bolder, border, border3, borderBottom3, borderLeft3, borderRight3, borderTop, borderTop3, center, color, column, cursor, display, displayFlex, flexDirection, flexWrap, fontSize, fontWeight, height, hover, inline, inlineBlock, int, justifyContent, marginBottom, marginTop, maxHeight, maxWidth, minWidth, none, padding, paddingBottom, paddingLeft, paddingTop, pct, pointer, px, resize, solid, spaceBetween, stretch, textAlign, transparent, vertical, width, wrap)
 import CssHelpers exposing (black, col, delaGothicOne, error, gap, padX, padY, primary, publicSans, row, secondary, textColor, white)
 import DataTypes exposing (Label, Note)
 import Dog exposing (dog2Svg)
 import Helpers exposing (listFirst, maybeToBool, sameId)
-import Html.Styled exposing (Html, button, div, input, p, strong, text, textarea)
+import Html.Styled exposing (Html, button, div, input, li, p, strong, text, textarea, ul)
 import Html.Styled.Attributes exposing (autofocus, class, css, disabled, placeholder, title, value)
 import Html.Styled.Events exposing (onClick, onInput)
 import Material.Icons as Filled
@@ -295,52 +295,88 @@ update msg model =
                     )
 
                 CreateNewLabel timeNow ->
-                    (case model.noteData of
+                    case model.noteData of
                         Just noteState ->
                             case noteState of
                                 ConfirmDeletion noteData ->
-                                    Nothing
+                                    model |> pureNoSignal
 
                                 Editing noteData labelsSearchQuery ->
                                     case labelsSearchQuery of
                                         Just query ->
-                                            Just query
+                                            let
+                                                offlineId : String
+                                                offlineId =
+                                                    generateUID model.seeds |> Tuple.first
+
+                                                newLabel : Label
+                                                newLabel =
+                                                    { createdAt = timeNow
+                                                    , updatedAt = timeNow
+                                                    , id = OfflineID offlineId
+                                                    , name = query
+                                                    }
+                                            in
+                                            if String.length query /= 0 then
+                                                ( { model
+                                                    | labels = newLabel :: model.labels
+                                                    , noteData =
+                                                        Just (Editing noteData (Just ""))
+                                                  }
+                                                , requestRandomValues ()
+                                                  -- TODO:
+                                                , Nothing
+                                                )
+
+                                            else
+                                                model |> pureNoSignal
 
                                         Nothing ->
-                                            Nothing
-
-                        Nothing ->
-                            Nothing
-                    )
-                        |> (\v ->
-                                case v of
-                                    Just searchQuery ->
-                                        let
-                                            offlineId : String
-                                            offlineId =
-                                                generateUID model.seeds |> Tuple.first
-
-                                            newLabel : Label
-                                            newLabel =
-                                                { createdAt = timeNow
-                                                , updatedAt = timeNow
-                                                , id = OfflineID offlineId
-                                                , name = searchQuery
-                                                }
-                                        in
-                                        if String.length searchQuery /= 0 then
-                                            ( { model | labels = newLabel :: model.labels }
-                                            , requestRandomValues ()
-                                            , Nothing
-                                            )
-
-                                        else
                                             model |> pureNoSignal
 
-                                    Nothing ->
-                                        model |> pureNoSignal
-                           )
+                        Nothing ->
+                            model |> pureNoSignal
 
+                -- (case model.noteData of
+                --     Just noteState ->
+                --         case noteState of
+                --             ConfirmDeletion noteData ->
+                --                 Nothing
+                --             Editing noteData labelsSearchQuery ->
+                --                 case labelsSearchQuery of
+                --                     Just query ->
+                --                         Just query
+                --                     Nothing ->
+                --                         Nothing
+                --     Nothing ->
+                --         Nothing
+                -- )
+                --     |> (\v ->
+                --             case v of
+                --                 Just searchQuery ->
+                --                     let
+                --                         offlineId : String
+                --                         offlineId =
+                --                             generateUID model.seeds |> Tuple.first
+                --                         newLabel : Label
+                --                         newLabel =
+                --                             { createdAt = timeNow
+                --                             , updatedAt = timeNow
+                --                             , id = OfflineID offlineId
+                --                             , name = searchQuery
+                --                             }
+                --                     in
+                --                     if String.length searchQuery /= 0 then
+                --                         ( { model | labels = newLabel :: model.labels }
+                --                         , requestRandomValues ()
+                --                           -- TODO:
+                --                         , Nothing
+                --                         )
+                --                     else
+                --                         model |> pureNoSignal
+                --                 Nothing ->
+                --                     model |> pureNoSignal
+                --        )
                 ReceivedRandomValues values ->
                     { model | seeds = List.map Random.initialSeed values }
                         |> pureNoSignal
@@ -538,12 +574,15 @@ labelsCard : Note -> String -> List Label -> Html Msg
 labelsCard note labelsSearchQuery labels =
     let
         labelExists =
-            case labels of
-                [] ->
-                    False
+            labelsSearchQuery
+                == ""
+                || (case labels of
+                        [] ->
+                            False
 
-                x :: xs ->
-                    List.any (\e -> e.name == labelsSearchQuery) labels
+                        x :: xs ->
+                            List.any (\e -> (e.name |> String.toLower) == (labelsSearchQuery |> String.toLower)) labels
+                   )
 
         header =
             row [ css [ backgroundColor white, justifyContent spaceBetween, alignItems center, paddingLeft (px 12), minWidth (px 400), borderBottom3 (px 3) solid black ] ]
@@ -555,6 +594,16 @@ labelsCard note labelsSearchQuery labels =
                     [ Filled.close 32 Inherit |> Svg.Styled.fromUnstyled ]
                 ]
 
+        searchQueryInput =
+            input
+                [ css [ border3 (px 2) solid black, padding (px 6), publicSans, width (pct 100) ]
+                , placeholder "Work"
+                , class "input"
+                , value labelsSearchQuery
+                , onInput ChangeLabelSearchQuery
+                ]
+                []
+
         content =
             case labels of
                 [] ->
@@ -564,17 +613,23 @@ labelsCard note labelsSearchQuery labels =
                             [ p [ css [ textAlign center, fontSize (px 24) ] ] [ text "There are no labels!" ]
                             , p [ css [ textAlign center, fontSize (px 24) ] ] [ text "Create one!" ]
                             ]
-                        , input
-                            [ css [ border3 (px 2) solid black, padding (px 6), publicSans, width (pct 100) ]
-                            , placeholder "Work"
-                            , class "input"
-                            , onInput ChangeLabelSearchQuery
-                            ]
-                            []
+                        , searchQueryInput
                         ]
 
-                _ ->
-                    div [] []
+                allLabels ->
+                    col [ css [ padding (px 12), gap 12 ] ]
+                        [ col [ css [ gap 8 ] ]
+                            [ p [ css [ publicSans, fontSize (px 18) ] ] [ text ("All labels (" ++ (List.length labels |> String.fromInt) ++ "):") ]
+                            , searchQueryInput
+                            ]
+                        , ul [ css [ displayFlex, flexWrap wrap, gap 10 ] ]
+                            (List.map
+                                (\e ->
+                                    li [ css [ backgroundColor primary, padding (px 3), publicSans, border3 (px 1) solid black ] ] [ text e.name ]
+                                )
+                                allLabels
+                            )
+                        ]
 
         createNewLabelBtn =
             button
