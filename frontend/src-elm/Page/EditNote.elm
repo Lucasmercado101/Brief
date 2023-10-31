@@ -305,6 +305,10 @@ update msg model =
                                     case labelsSearchQuery of
                                         Just query ->
                                             let
+                                                labelName : String
+                                                labelName =
+                                                    query |> String.trim
+
                                                 offlineId : String
                                                 offlineId =
                                                     generateUID model.seeds |> Tuple.first
@@ -314,7 +318,7 @@ update msg model =
                                                     { createdAt = timeNow
                                                     , updatedAt = timeNow
                                                     , id = OfflineID offlineId
-                                                    , name = query
+                                                    , name = labelName
                                                     }
                                             in
                                             if String.length query /= 0 then
@@ -581,7 +585,7 @@ labelsCard note labelsSearchQuery labels =
                             False
 
                         x :: xs ->
-                            List.any (\e -> (e.name |> String.toLower) == (labelsSearchQuery |> String.toLower)) labels
+                            List.any (\e -> (e.name |> String.toLower) == (labelsSearchQuery |> String.toLower |> String.trim)) labels
                    )
 
         header =
