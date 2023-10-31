@@ -6,7 +6,7 @@ import Css exposing (alignItems, backgroundColor, bold, bolder, border, border3,
 import CssHelpers exposing (black, col, delaGothicOne, error, gap, padX, padY, primary, publicSans, row, secondary, textColor, white)
 import DataTypes exposing (Label, Note)
 import Dog exposing (dog2Svg)
-import Helpers exposing (exclude, listFirst, maybeToBool, sameId)
+import Helpers exposing (exclude, listFirst, maybeToBool, partitionFirst, sameId)
 import Html.Styled exposing (Html, button, div, input, li, p, strong, text, textarea, ul)
 import Html.Styled.Attributes exposing (autofocus, class, css, disabled, placeholder, title, value)
 import Html.Styled.Events exposing (onClick, onInput)
@@ -213,8 +213,11 @@ update msg model =
                                         contentChanged =
                                             noteData.content /= originalNote.content
 
+                                        labelsChanged =
+                                            noteData.labels /= originalNote.labels
+
                                         queueSignal =
-                                            if titleChanged || contentChanged then
+                                            if titleChanged || contentChanged || labelsChanged then
                                                 Just
                                                     (OfflineQueueAction
                                                         (QEditNote
@@ -232,7 +235,12 @@ update msg model =
                                                                 else
                                                                     Nothing
                                                             , pinned = Nothing
-                                                            , labels = Nothing
+                                                            , labels =
+                                                                if labelsChanged then
+                                                                    Just noteData.labels
+
+                                                                else
+                                                                    Nothing
                                                             }
                                                         )
                                                     )
@@ -240,7 +248,40 @@ update msg model =
                                             else
                                                 Nothing
                                     in
-                                    ( model, Route.replaceUrl model.key Route.Home, queueSignal )
+                                    ( { model
+                                        | notes =
+                                            model.notes
+                                                |> List.map
+                                                    (\e ->
+                                                        if sameId e.id originalNote.id then
+                                                            { e
+                                                                | title =
+                                                                    if titleChanged then
+                                                                        noteData.title
+
+                                                                    else
+                                                                        e.title
+                                                                , content =
+                                                                    if contentChanged then
+                                                                        noteData.content
+
+                                                                    else
+                                                                        e.content
+                                                                , labels =
+                                                                    if labelsChanged then
+                                                                        noteData.labels
+
+                                                                    else
+                                                                        e.labels
+                                                            }
+
+                                                        else
+                                                            e
+                                                    )
+                                      }
+                                    , Route.replaceUrl model.key Route.Home
+                                    , queueSignal
+                                    )
 
                         Nothing ->
                             model |> pureNoSignal
