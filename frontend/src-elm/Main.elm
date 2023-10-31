@@ -449,7 +449,7 @@ update topMsg topModel =
 
                 LoggedIn loggedInModel ->
                     case resp of
-                        Ok { deleted, failedToCreate, failedToEdit, justSyncedAt, downSyncedData, justCreatedData } ->
+                        Ok { deleted, failedToCreate, justSyncedAt, downSyncedData, justCreatedData } ->
                             let
                                 updatePageModel m =
                                     { m
@@ -562,6 +562,8 @@ update topMsg topModel =
                                         EditNote editNoteModel ->
                                             ( editNoteModel.labels, editNoteModel.notes )
 
+                                -- TODO: in this same way also update editLabels
+                                -- so that selected offlienIDs are now selected OnlineIDs
                                 ( updatedPageModel, cmd1 ) =
                                     case upPageModel1 of
                                         EditNote editNoteModel ->
@@ -586,27 +588,97 @@ update topMsg topModel =
 
                                         EditLabels _ ->
                                             ( upPageModel1, Cmd.none )
+
+                                -- NOTE: What is being done here is that when we have the response with newly create IDs
+                                -- we replace old offlineIDs in the queue with the newly created ones.
+                                updatedOfflineQueue =
+                                    { -- Create is always going to be created with an offlineID
+                                      createLabels = loggedInModel.offlineQueue.createLabels
+                                    , createNotes = loggedInModel.offlineQueue.createNotes
+
+                                    --
+                                    , deleteLabels =
+                                        loggedInModel.offlineQueue.deleteLabels
+                                            |> List.map
+                                                (\deleteLabelId ->
+                                                    let
+                                                        labelHasBeenCreated =
+                                                            listFirst (\( onlineId, prevOfflineId ) -> sameId (OfflineID prevOfflineId) deleteLabelId) justCreatedData.labels
+                                                    in
+                                                    case labelHasBeenCreated of
+                                                        Just ( justCreatedLabelId, _ ) ->
+                                                            DatabaseID justCreatedLabelId.id
+
+                                                        Nothing ->
+                                                            deleteLabelId
+                                                )
+                                    , deleteNotes =
+                                        loggedInModel.offlineQueue.deleteNotes
+                                            |> List.map
+                                                (\deleteNoteId ->
+                                                    let
+                                                        noteHasBeenCreated =
+                                                            listFirst (\( onlineId, prevOfflineId ) -> sameId (OfflineID prevOfflineId) deleteNoteId) justCreatedData.notes
+                                                    in
+                                                    case noteHasBeenCreated of
+                                                        Just ( justCreatedNoteId, _ ) ->
+                                                            DatabaseID justCreatedNoteId.id
+
+                                                        Nothing ->
+                                                            deleteNoteId
+                                                )
+                                    , editNotes =
+                                        loggedInModel.offlineQueue.editNotes
+                                            |> List.map
+                                                (\editNote ->
+                                                    let
+                                                        noteHasBeenCreated =
+                                                            listFirst (\( onlineId, prevOfflineId ) -> sameId (OfflineID prevOfflineId) editNote.id) justCreatedData.notes
+                                                    in
+                                                    case noteHasBeenCreated of
+                                                        Just ( justCreatedNote, _ ) ->
+                                                            { editNote | id = DatabaseID justCreatedNote.id }
+
+                                                        Nothing ->
+                                                            editNote
+                                                )
+                                    , changeLabelNames =
+                                        loggedInModel.offlineQueue.changeLabelNames
+                                            |> List.map
+                                                (\changeLabelName ->
+                                                    let
+                                                        labelHasBeenCreated =
+                                                            listFirst (\( onlineId, prevOfflineId ) -> sameId (OfflineID prevOfflineId) changeLabelName.id) justCreatedData.labels
+                                                    in
+                                                    case labelHasBeenCreated of
+                                                        Just ( justCreatedLabelId, _ ) ->
+                                                            { changeLabelName | id = DatabaseID justCreatedLabelId.id }
+
+                                                        Nothing ->
+                                                            changeLabelName
+                                                )
+                                    }
                             in
                             ( LoggedIn
                                 { page = updatedPageModel
                                 , offlineQueue = emptyOfflineQueue
                                 , runningQueueOn =
-                                    if offlineQueueIsEmpty loggedInModel.offlineQueue then
+                                    if offlineQueueIsEmpty updatedOfflineQueue then
                                         Nothing
 
                                     else
-                                        Just loggedInModel.offlineQueue
+                                        Just updatedOfflineQueue
                                 , lastSyncedAt = justSyncedAt
                                 }
                             , Cmd.batch
                                 [ cmd1
                                 , updateLastSyncedAt (Time.posixToMillis justSyncedAt)
-                                , if offlineQueueIsEmpty loggedInModel.offlineQueue then
+                                , if offlineQueueIsEmpty updatedOfflineQueue then
                                     Cmd.none
 
                                   else
                                     Api.sendChanges
-                                        { operations = queueToOperations loggedInModel.offlineQueue
+                                        { operations = queueToOperations updatedOfflineQueue
                                         , lastSyncedAt = justSyncedAt
                                         , currentData =
                                             { notes = notes |> List.map .id |> labelIDsSplitter |> Tuple.second
