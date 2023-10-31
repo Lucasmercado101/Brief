@@ -14,8 +14,6 @@ import Html.Styled exposing (Html, br, button, div, form, img, input, label, li,
 import Html.Styled.Attributes exposing (class, css, for, id, placeholder, src, style, title, type_, value)
 import Html.Styled.Events exposing (onClick, onInput, onSubmit)
 import Http
-import Material.Icons as Filled
-import Material.Icons.Outlined as Outlined
 import Material.Icons.Types exposing (Coloring(..))
 import OfflineQueue exposing (Action(..), OfflineQueueOps, actionMapToFn, emptyOfflineQueue, offlineQueueIsEmpty, qCreateNewNote, qDeleteNote, qEditNoteLabels, qNewLabel, qToggleNotePin, queueToOperations)
 import Page.EditLabels as EditLabels
@@ -324,6 +322,10 @@ update topMsg topModel =
                             EditLabels.update editLabelsMsg editLabelsModel
                                 |> updateEditLabelsWithSignal EditLabels GotEditLabelsMsg loggedInModel
 
+                        ( GotEditNoteMsg editNoteMsg, EditNote editNoteModel ) ->
+                            EditNote.update editNoteMsg editNoteModel
+                                |> updateEditNoteWithSignal EditNote GotEditNoteMsg loggedInModel
+
                         ( _, _ ) ->
                             -- Disregard messages that arrived for the wrong page.
                             topModel |> pure
@@ -606,6 +608,43 @@ updateEditLabelsWithSignal toPageModel toPageMsg topModel ( m, c, maybeSignal ) 
                 |> addToQueue
                     (case signal of
                         EditLabels.OfflineQueueAction action ->
+                            actionMapToFn action
+                    )
+                    noteIds
+                    labelIds
+    )
+        |> (\( m1, c1 ) -> ( LoggedIn m1, c1 ))
+
+
+updateEditNoteWithSignal : (a -> Page) -> (c -> PageMsg) -> LoggedInModel -> ( a, Cmd c, Maybe EditNote.Signal ) -> ( Model, Cmd Msg )
+updateEditNoteWithSignal toPageModel toPageMsg topModel ( m, c, maybeSignal ) =
+    let
+        ( mappedModel, mappedCmd ) =
+            ( { topModel | page = toPageModel m }, Cmd.map GotPageMsg (Cmd.map toPageMsg c) )
+    in
+    (case maybeSignal of
+        Nothing ->
+            ( mappedModel, mappedCmd )
+
+        Just signal ->
+            let
+                ( labelIds, noteIds ) =
+                    (case topModel.page of
+                        Home homeModel ->
+                            ( homeModel.labels, homeModel.notes )
+
+                        EditLabels editLabelsModel ->
+                            ( editLabelsModel.labels, editLabelsModel.notes )
+
+                        EditNote editNoteModel ->
+                            ( editNoteModel.labels, editNoteModel.notes )
+                    )
+                        |> (\( l, n ) -> ( l |> List.map .id |> labelIDsSplitter |> Tuple.second, n |> List.map .id |> labelIDsSplitter |> Tuple.second ))
+            in
+            ( mappedModel, mappedCmd )
+                |> addToQueue
+                    (case signal of
+                        EditNote.OfflineQueueAction action ->
                             actionMapToFn action
                     )
                     noteIds
