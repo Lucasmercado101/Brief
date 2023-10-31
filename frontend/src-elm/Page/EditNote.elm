@@ -409,7 +409,7 @@ view model =
                                     ]
 
                             editNoteCard =
-                                col [ css [ backgroundColor secondary, border3 (px 3) solid black, maxHeight (pct 70), width (pct 100) ] ]
+                                col [ css [ backgroundColor secondary, border3 (px 3) solid black, maxHeight (pct 70), width (pct 100), minWidth (px 400) ] ]
                                     [ topActions
                                     , textarea
                                         [ css [ delaGothicOne, fontSize (px 24), padding (px 16), backgroundColor transparent, border (px 0), resize vertical ]
@@ -440,8 +440,7 @@ view model =
                         div
                             [ css
                                 [ -- TODO: a better width
-                                  minWidth (px 400)
-                                , height (pct 100)
+                                  height (pct 100)
                                 , displayFlex
                                 , alignItems center
                                 , gap 32
