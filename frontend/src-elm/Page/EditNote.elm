@@ -2,7 +2,7 @@ module Page.EditNote exposing (..)
 
 import Api exposing (SyncableID)
 import Browser.Navigation as Nav
-import Css exposing (alignItems, backgroundColor, border3, borderBottom3, borderLeft3, borderRight3, borderTop3, center, fontSize, height, justifyContent, padding, paddingBottom, paddingTop, pct, px, solid, spaceBetween, width)
+import Css exposing (alignItems, backgroundColor, border3, borderBottom3, borderLeft3, borderRight3, borderTop3, center, color, cursor, displayFlex, fontSize, height, justifyContent, padding, paddingBottom, paddingTop, pct, pointer, px, solid, spaceBetween, width)
 import CssHelpers exposing (black, col, delaGothicOne, error, padX, publicSans, row, secondary, white)
 import DataTypes exposing (Label, Note)
 import Helpers exposing (listFirst, sameId)
@@ -66,18 +66,19 @@ view model =
         Just val ->
             let
                 topActions =
-                    row [ css [ justifyContent spaceBetween, backgroundColor white, borderBottom3 (px 3) solid black ] ]
-                        [ div [ css [ paddingTop (px 8), paddingBottom (px 6), padX (px 8), borderRight3 (px 2) solid black ] ] [ Filled.push_pin 32 Inherit |> Svg.Styled.fromUnstyled ]
+                    row [ css [ justifyContent spaceBetween, alignItems center, backgroundColor white, borderBottom3 (px 3) solid black ] ]
+                        [ div [ css [ cursor pointer, displayFlex, justifyContent center, alignItems center, paddingTop (px 8), paddingBottom (px 6), padX (px 8), borderRight3 (px 2) solid black ] ] [ Filled.push_pin 32 Inherit |> Svg.Styled.fromUnstyled ]
                         , p [ css [ delaGothicOne, fontSize (px 24) ] ] [ text "Editing Note" ]
-                        , div [ css [ paddingTop (px 8), paddingBottom (px 6), padX (px 8), backgroundColor error, borderLeft3 (px 2) solid black ] ] [ Filled.close 32 Inherit |> Svg.Styled.fromUnstyled ]
+                        , div [ css [ cursor pointer, displayFlex, justifyContent center, alignItems center, paddingTop (px 8), paddingBottom (px 6), padX (px 8), backgroundColor error, borderLeft3 (px 2) solid black, color white ] ] [ Filled.close 32 Inherit |> Svg.Styled.fromUnstyled ]
                         ]
 
                 bottomActions =
                     row [ css [ justifyContent spaceBetween, backgroundColor white, borderTop3 (px 3) solid black ] ]
-                        [ div [ css [ backgroundColor error, paddingTop (px 8), paddingBottom (px 6), padX (px 8), borderRight3 (px 2) solid black ] ] [ Filled.delete 28 Inherit |> Svg.Styled.fromUnstyled ]
-                        , div [ css [ paddingTop (px 8), paddingBottom (px 6), padX (px 8), borderLeft3 (px 2) solid black ] ] [ Filled.label 28 Inherit |> Svg.Styled.fromUnstyled ]
+                        [ div [ css [ cursor pointer, displayFlex, color white, justifyContent center, alignItems center, backgroundColor error, paddingTop (px 8), paddingBottom (px 6), padX (px 8), borderRight3 (px 2) solid black ] ] [ Filled.delete 28 Inherit |> Svg.Styled.fromUnstyled ]
+                        , div [ css [ cursor pointer, displayFlex, justifyContent center, alignItems center, paddingTop (px 8), paddingBottom (px 6), padX (px 8), borderLeft3 (px 2) solid black ] ] [ Filled.label 28 Inherit |> Svg.Styled.fromUnstyled ]
                         ]
             in
+            -- TODO: add max title and content length
             row [ css [ height (pct 100), justifyContent center, alignItems center ] ]
                 [ div
                     [ css
