@@ -10,6 +10,10 @@
   padding: 0;
 }
 
+ul {
+  list-style: none;
+}
+
 /* https://stackoverflow.com/a/10639419 */
 
 html {
