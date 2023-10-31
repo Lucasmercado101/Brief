@@ -776,11 +776,14 @@ note model ( data, selected ) =
                                             , cursor pointer
                                             ]
                                         , type_ "button"
-                                        , onClick
-                                            (RemoveLabelFromNote
-                                                { noteID = data.id
-                                                , labelID = l.id
-                                                }
+                                        , stopPropagationOn "click"
+                                            (Json.Decode.succeed
+                                                ( RemoveLabelFromNote
+                                                    { noteID = data.id
+                                                    , labelID = l.id
+                                                    }
+                                                , True
+                                                )
                                             )
                                         ]
                                         [ text "X" ]
