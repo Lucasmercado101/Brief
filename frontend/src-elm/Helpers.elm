@@ -96,6 +96,12 @@ exclude pred list =
     List.filter (not << pred) list
 
 
+
+{-
+   Get the first item in the list whose pred returns True
+-}
+
+
 listFirst : (a -> Bool) -> List a -> Maybe a
 listFirst pred list =
     case list of
