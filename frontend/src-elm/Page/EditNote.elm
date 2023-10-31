@@ -508,11 +508,27 @@ view model =
                                         [ Filled.label 28 Inherit |> Svg.Styled.fromUnstyled ]
                                     ]
 
+                            labels =
+                                ul [ css [ displayFlex, flexWrap wrap, gap 10, padding (px 16) ] ]
+                                    (List.map
+                                        (\e ->
+                                            li
+                                                []
+                                                [ div
+                                                    [ css [ fontSize (px 16), backgroundColor primary, padding (px 3), publicSans, border3 (px 1) solid black ] ]
+                                                    [ text e.name ]
+                                                ]
+                                        )
+                                        (model.labels
+                                            |> List.filter (\e -> List.any (\e2 -> sameId e.id e2) val.labels)
+                                        )
+                                    )
+
                             editNoteCard =
                                 col [ css [ backgroundColor secondary, border3 (px 3) solid black, maxHeight (pct 70), width (pct 100), minWidth (px 400) ] ]
                                     [ topActions
                                     , textarea
-                                        [ css [ delaGothicOne, fontSize (px 24), padding (px 16), backgroundColor transparent, border (px 0), resize vertical ]
+                                        [ css [ delaGothicOne, fontSize (px 24), border (px 0), borderBottom3 (px 3) solid black, padding (px 16), backgroundColor transparent, resize vertical ]
                                         , autofocus True
                                         , placeholder "Note Title Here."
                                         , onInput ChangeTitle
@@ -533,6 +549,11 @@ view model =
                                         , placeholder "Note Content Here."
                                         ]
                                         []
+                                    , if maybeToBool isEditingLabels then
+                                        text ""
+
+                                      else
+                                        labels
                                     , bottomActions
                                     ]
                         in
