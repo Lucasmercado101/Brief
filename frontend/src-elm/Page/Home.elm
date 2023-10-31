@@ -542,6 +542,7 @@ labelsMenuColumn { labels, filters, labelsMenu } =
 
 notesGrid : Model -> Html Msg
 notesGrid model =
+    -- TODO: add sorting of notes, add an order prop in back
     let
         header =
             div
