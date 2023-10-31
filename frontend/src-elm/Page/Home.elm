@@ -698,7 +698,7 @@ note model ( data, selected ) =
                     text ""
 
                 labels ->
-                    div
+                    ul
                         [ css
                             [ padding (px 10)
                             , displayFlex
@@ -709,7 +709,7 @@ note model ( data, selected ) =
                         ]
                         (List.map
                             (\l ->
-                                div
+                                li
                                     [ css
                                         [ backgroundColor
                                             (if selected then
@@ -722,6 +722,7 @@ note model ( data, selected ) =
                                         , border3 (px 1) solid (rgb 0 0 0)
                                         , hover [ boxShadow4 (px 3) (px 3) (px 0) (rgb 0 0 0) ]
                                         , displayFlex
+                                        , publicSans
                                         ]
                                     , class "note-label"
                                     ]
