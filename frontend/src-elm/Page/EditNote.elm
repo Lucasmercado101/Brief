@@ -2,11 +2,11 @@ module Page.EditNote exposing (..)
 
 import Api exposing (SyncableID)
 import Browser.Navigation as Nav
-import Css exposing (alignItems, backgroundColor, border, border3, borderBottom3, borderLeft3, borderRight3, borderTop3, center, color, cursor, displayFlex, fontSize, height, hover, justifyContent, maxHeight, minWidth, none, padding, paddingBottom, paddingTop, pct, pointer, px, resize, solid, spaceBetween, stretch, transparent, vertical, width)
-import CssHelpers exposing (black, col, delaGothicOne, error, padX, primary, publicSans, row, secondary, white)
+import Css exposing (alignItems, backgroundColor, bold, border, border3, borderBottom3, borderLeft3, borderRight3, borderTop3, center, color, column, cursor, display, displayFlex, flexDirection, fontSize, fontWeight, height, hover, inline, inlineBlock, int, justifyContent, marginBottom, marginTop, maxHeight, maxWidth, minWidth, none, padding, paddingBottom, paddingTop, pct, pointer, px, resize, solid, spaceBetween, stretch, textAlign, transparent, vertical, width)
+import CssHelpers exposing (black, col, delaGothicOne, error, padX, padY, primary, publicSans, row, secondary, textColor, white)
 import DataTypes exposing (Label, Note)
 import Helpers exposing (listFirst, sameId)
-import Html.Styled exposing (Html, button, div, input, p, text, textarea)
+import Html.Styled exposing (Html, button, div, input, p, strong, text, textarea)
 import Html.Styled.Attributes exposing (autofocus, css, placeholder, title, value)
 import Html.Styled.Events exposing (onClick, onInput)
 import Material.Icons as Filled
@@ -232,6 +232,60 @@ view model =
                         [ button [ css [ border (px 0), cursor pointer, displayFlex, color white, justifyContent center, alignItems center, backgroundColor error, paddingTop (px 8), paddingBottom (px 6), padX (px 8), borderRight3 (px 2) solid black ] ] [ Filled.delete 28 Inherit |> Svg.Styled.fromUnstyled ]
                         , button [ css [ border (px 0), cursor pointer, displayFlex, justifyContent center, alignItems center, paddingTop (px 8), paddingBottom (px 6), padX (px 8), borderLeft3 (px 2) solid black ] ] [ Filled.label 28 Inherit |> Svg.Styled.fromUnstyled ]
                         ]
+
+                confirmDeleteCard { name, id } =
+                    div
+                        [ css
+                            [ backgroundColor secondary
+                            , border3 (px 5) solid black
+                            , displayFlex
+                            , flexDirection column
+                            , maxWidth (px 480)
+                            , minWidth (px 480)
+                            ]
+                        ]
+                        [ p [ css [ delaGothicOne, fontSize (px 38), marginTop (px 12), marginBottom (px 16), textAlign center ] ] [ text "Really?" ]
+                        , div [ css [ display inlineBlock, textAlign center ] ]
+                            [ p [ css [ publicSans, fontSize (px 18), display inline ] ]
+                                [ text
+                                    ("Are you sure you want to delete "
+                                        ++ (case name of
+                                                Just _ ->
+                                                    "note \""
+
+                                                Nothing ->
+                                                    "this note?"
+                                           )
+                                    )
+                                ]
+                            , case name of
+                                Just noteName ->
+                                    strong [ css [ fontWeight (int 900), publicSans, fontSize (px 18), display inline ] ] [ text noteName ]
+
+                                Nothing ->
+                                    text ""
+                            , case name of
+                                Just noteName ->
+                                    p [ css [ publicSans, fontSize (px 18), display inline ] ] [ text "\"?" ]
+
+                                Nothing ->
+                                    text ""
+                            ]
+                        , div [ css [ displayFlex, marginTop (px 16), backgroundColor white ] ]
+                            [ button
+                                [ css [ hover [ textColor white, backgroundColor black ], cursor pointer, fontWeight bold, backgroundColor transparent, border (px 0), publicSans, fontSize (px 22), borderTop3 (px 5) solid black, width (pct 100), padY (px 10), textAlign center ]
+
+                                -- , onClick (CancelDeleteLabel id)
+                                ]
+                                [ text "Cancel" ]
+                            , button
+                                [ css [ hover [ textColor white, backgroundColor black ], cursor pointer, fontWeight bold, backgroundColor error, textColor white, border (px 0), publicSans, fontSize (px 22), width (pct 100), borderLeft3 (px 5) solid black, borderTop3 (px 5) solid black, padY (px 10), textAlign center ]
+
+                                -- , onClick (ConfirmDeleteLabel id)
+                                ]
+                                [ text "Confirm" ]
+                            ]
+                        ]
             in
             -- TODO: add max title and content length
             row [ css [ height (pct 100), justifyContent center, alignItems center ] ]
@@ -270,5 +324,6 @@ view model =
                             []
                         , bottomActions
                         ]
+                    , confirmDeleteCard { name = val.title, id = model.noteId }
                     ]
                 ]
