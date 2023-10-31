@@ -224,8 +224,8 @@ update topMsg topModel =
                                     LoggedIn
                                         { loggedInModel
                                             | page =
-                                                Home
-                                                    (Home.init
+                                                EditLabels
+                                                    (EditLabels.init
                                                         { seeds = pageData.seeds
                                                         , labels = pageData.labels
                                                         , notes = pageData.notes
