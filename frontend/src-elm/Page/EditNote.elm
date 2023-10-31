@@ -2,8 +2,8 @@ module Page.EditNote exposing (..)
 
 import Api exposing (SyncableID)
 import Browser.Navigation as Nav
-import Css exposing (alignItems, backgroundColor, bold, border, border3, borderBottom3, borderLeft3, borderRight3, borderTop3, center, color, column, cursor, display, displayFlex, flexDirection, fontSize, fontWeight, height, hover, inline, inlineBlock, int, justifyContent, marginBottom, marginTop, maxHeight, maxWidth, minWidth, none, padding, paddingBottom, paddingTop, pct, pointer, px, resize, solid, spaceBetween, stretch, textAlign, transparent, vertical, width)
-import CssHelpers exposing (black, col, delaGothicOne, error, padX, padY, primary, publicSans, row, secondary, textColor, white)
+import Css exposing (alignItems, backgroundColor, bold, bolder, border, border3, borderBottom3, borderLeft3, borderRight3, borderTop, borderTop3, center, color, column, cursor, display, displayFlex, flexDirection, fontSize, fontWeight, height, hover, inline, inlineBlock, int, justifyContent, marginBottom, marginTop, maxHeight, maxWidth, minWidth, none, padding, paddingBottom, paddingLeft, paddingTop, pct, pointer, px, resize, solid, spaceBetween, stretch, textAlign, transparent, vertical, width)
+import CssHelpers exposing (black, col, delaGothicOne, error, gap, padX, padY, primary, publicSans, row, secondary, textColor, white)
 import DataTypes exposing (Label, Note)
 import Helpers exposing (listFirst, sameId)
 import Html.Styled exposing (Html, button, div, input, p, strong, text, textarea)
@@ -349,6 +349,34 @@ view model =
                                         [ Filled.delete 28 Inherit |> Svg.Styled.fromUnstyled ]
                                     , button [ css [ hover [ backgroundColor black, color white ], border (px 0), cursor pointer, displayFlex, justifyContent center, alignItems center, paddingTop (px 8), paddingBottom (px 6), padX (px 8), borderLeft3 (px 2) solid black ] ] [ Filled.label 28 Inherit |> Svg.Styled.fromUnstyled ]
                                     ]
+
+                            editNoteCard =
+                                col [ css [ backgroundColor secondary, border3 (px 3) solid black, maxHeight (pct 70), width (pct 100) ] ]
+                                    [ topActions
+                                    , textarea
+                                        [ css [ delaGothicOne, fontSize (px 24), padding (px 16), backgroundColor transparent, border (px 0), resize vertical ]
+                                        , autofocus True
+                                        , placeholder "Note Title Here."
+                                        , onInput ChangeTitle
+                                        , value
+                                            (case val.title of
+                                                Just t ->
+                                                    t
+
+                                                Nothing ->
+                                                    ""
+                                            )
+                                        ]
+                                        []
+                                    , textarea
+                                        [ css [ publicSans, padding (px 16), backgroundColor transparent, border (px 0), fontSize (px 16), resize vertical ]
+                                        , onInput ChangeContent
+                                        , value val.content
+                                        , placeholder "Note Content Here."
+                                        ]
+                                        []
+                                    , bottomActions
+                                    ]
                         in
                         -- TODO: add max title and content length
                         div
@@ -358,33 +386,36 @@ view model =
                                 , height (pct 100)
                                 , displayFlex
                                 , alignItems center
+                                , gap 32
                                 ]
                             ]
-                            [ col [ css [ backgroundColor secondary, border3 (px 3) solid black, maxHeight (pct 70), width (pct 100) ] ]
-                                [ topActions
-                                , textarea
-                                    [ css [ delaGothicOne, fontSize (px 24), padding (px 16), backgroundColor transparent, border (px 0), resize vertical ]
-                                    , autofocus True
-                                    , placeholder "Note Title Here."
-                                    , onInput ChangeTitle
-                                    , value
-                                        (case val.title of
-                                            Just t ->
-                                                t
-
-                                            Nothing ->
-                                                ""
-                                        )
-                                    ]
-                                    []
-                                , textarea
-                                    [ css [ publicSans, padding (px 16), backgroundColor transparent, border (px 0), fontSize (px 16), resize vertical ]
-                                    , onInput ChangeContent
-                                    , value val.content
-                                    , placeholder "Note Content Here."
-                                    ]
-                                    []
-                                , bottomActions
-                                ]
+                            [ editNoteCard
+                            , labelsCard model model.labels
                             ]
                 ]
+
+
+labelsCard : Model -> List Label -> Html Msg
+labelsCard model labels =
+    let
+        header =
+            row [ css [ backgroundColor white, justifyContent spaceBetween, alignItems center, paddingLeft (px 12), minWidth (px 400) ] ]
+                [ p [ css [ delaGothicOne, fontSize (px 24) ] ] [ text "Labels" ]
+                , button
+                    [ css [ hover [ backgroundColor black ], border (px 0), cursor pointer, displayFlex, color white, justifyContent center, alignItems center, backgroundColor error, padding (px 8), borderLeft3 (px 2) solid black ]
+                    , onClick RequestDeletion
+                    ]
+                    [ Filled.delete 32 Inherit |> Svg.Styled.fromUnstyled ]
+                ]
+
+        content =
+            div [] []
+
+        createNewLabelBtn =
+            button [ css [ border (px 0), fontSize (px 16), publicSans, fontWeight (int 900), padding (px 18), borderTop3 (px 3) solid black ] ] [ text "CREATE NEW LABEL" ]
+    in
+    col [ css [ backgroundColor secondary, border3 (px 3) solid black, maxHeight (pct 70), width (pct 100) ] ]
+        [ header
+        , content
+        , createNewLabelBtn
+        ]
