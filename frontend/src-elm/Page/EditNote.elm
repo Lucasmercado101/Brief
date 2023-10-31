@@ -6,7 +6,7 @@ import Css exposing (alignItems, backgroundColor, bold, bolder, border, border3,
 import CssHelpers exposing (black, col, delaGothicOne, error, gap, padX, padY, primary, publicSans, row, secondary, textColor, white)
 import DataTypes exposing (Label, Note)
 import Dog exposing (dog2Svg)
-import Helpers exposing (listFirst, maybeToBool, sameId)
+import Helpers exposing (exclude, listFirst, maybeToBool, sameId)
 import Html.Styled exposing (Html, button, div, input, li, p, strong, text, textarea, ul)
 import Html.Styled.Attributes exposing (autofocus, class, css, disabled, placeholder, title, value)
 import Html.Styled.Events exposing (onClick, onInput)
@@ -98,6 +98,8 @@ type Msg
     | CreateNewLabel Posix
     | ReceivedRandomValues (List Int)
     | ChangeLabelSearchQuery String
+    | AddLabel SyncableID
+    | RemoveLabel SyncableID
 
 
 type Signal
@@ -285,6 +287,28 @@ update msg model =
                     changeEditingState
                         (\data searchQuery ->
                             ( data, Just newQuery )
+                        )
+                        |> pureNoSignal
+
+                AddLabel id ->
+                    changeNoteData
+                        (\e ->
+                            { e
+                                | labels =
+                                    case e.labels of
+                                        [] ->
+                                            [ id ]
+
+                                        labels ->
+                                            id :: labels
+                            }
+                        )
+                        |> pureNoSignal
+
+                RemoveLabel id ->
+                    changeNoteData
+                        (\e ->
+                            { e | labels = e.labels |> exclude (sameId id) }
                         )
                         |> pureNoSignal
 
@@ -580,17 +604,63 @@ labelsCard note labelsSearchQuery labels =
                         ]
 
                 allLabels ->
-                    col [ css [ padding (px 12), gap 12 ] ]
-                        [ col [ css [ gap 8 ] ]
-                            [ p [ css [ publicSans, fontSize (px 18) ] ] [ text ("All labels (" ++ (List.length labels |> String.fromInt) ++ "):") ]
-                            , searchQueryInput
-                            ]
-                        , ul [ css [ displayFlex, flexWrap wrap, gap 10 ] ]
-                            (List.map
-                                (\e ->
-                                    li [ css [ cursor pointer, hover [ backgroundColor black, color white, border3 (px 1) solid white ], backgroundColor primary, padding (px 3), publicSans, border3 (px 1) solid black ] ] [ text e.name ]
-                                )
+                    col [ css [ padding (px 12), gap 32 ] ]
+                        [ let
+                            selectedLabels =
                                 allLabels
+                                    -- exclude unselected labels
+                                    |> List.filter (\e -> List.any (\e2 -> sameId e.id e2) note.labels)
+                          in
+                          case selectedLabels of
+                            [] ->
+                                text ""
+
+                            hasSelectedLabel ->
+                                col [ css [ gap 12 ] ]
+                                    [ p [ css [ publicSans, fontSize (px 18) ] ] [ text ("Selected (" ++ (List.length selectedLabels |> String.fromInt) ++ "):") ]
+                                    , ul [ css [ displayFlex, flexWrap wrap, gap 10 ] ]
+                                        (List.map
+                                            (\e ->
+                                                li
+                                                    []
+                                                    [ button
+                                                        [ css [ fontSize (px 16), cursor pointer, hover [ backgroundColor black, color white, border3 (px 1) solid white ], backgroundColor primary, padding (px 3), publicSans, border3 (px 1) solid black ]
+                                                        , onClick (RemoveLabel e.id)
+                                                        ]
+                                                        [ text e.name ]
+                                                    ]
+                                            )
+                                            selectedLabels
+                                        )
+                                    ]
+                        , col [ css [ gap 12 ] ]
+                            (let
+                                filteredAllLabels =
+                                    allLabels
+                                        -- exclude selected labels
+                                        |> exclude (\e -> List.any (\e2 -> sameId e.id e2) note.labels)
+                                        -- exclude labels that don't match the search query
+                                        |> List.filter (\e -> (e.name |> String.toLower) |> String.contains (labelsSearchQuery |> String.toLower |> String.trim))
+                             in
+                             [ col [ css [ gap 8 ] ]
+                                [ p [ css [ publicSans, fontSize (px 18) ] ] [ text ("All labels (" ++ (List.length filteredAllLabels |> String.fromInt) ++ "):") ]
+                                , searchQueryInput
+                                ]
+                             , ul [ css [ displayFlex, flexWrap wrap, gap 10 ] ]
+                                (List.map
+                                    (\e ->
+                                        li
+                                            []
+                                            [ button
+                                                [ css [ fontSize (px 16), cursor pointer, hover [ backgroundColor black, color white, border3 (px 1) solid white ], backgroundColor primary, padding (px 3), publicSans, border3 (px 1) solid black ]
+                                                , onClick (AddLabel e.id)
+                                                ]
+                                                [ text e.name ]
+                                            ]
+                                    )
+                                    filteredAllLabels
+                                )
+                             ]
                             )
                         ]
 
