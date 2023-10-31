@@ -532,6 +532,7 @@ update topMsg topModel =
                                             EditLabels (updatePageModel editLabelsModel)
 
                                         EditNote editNoteModel ->
+                                            -- TODO: if note that was being edited is deleted, show message
                                             EditNote (updatePageModel editNoteModel)
 
                                 ( labels, notes ) =
