@@ -94,6 +94,7 @@ type Msg
     | ChangeLabelSearchQuery String
     | AddLabel SyncableID
     | RemoveLabel SyncableID
+    | ClearSelectedLabels
 
 
 type Signal
@@ -344,6 +345,13 @@ update msg model =
                     changeNoteData
                         (\e ->
                             { e | labels = e.labels |> exclude (sameId id) }
+                        )
+                        |> pureNoSignal
+
+                ClearSelectedLabels ->
+                    changeNoteData
+                        (\e ->
+                            { e | labels = [] }
                         )
                         |> pureNoSignal
 
@@ -673,7 +681,14 @@ labelsCard note labelsSearchQuery labels =
 
                             hasSelectedLabel ->
                                 col [ css [ gap 12 ] ]
-                                    [ p [ css [ publicSans, fontSize (px 18) ] ] [ text ("Selected (" ++ (List.length selectedLabels |> String.fromInt) ++ "):") ]
+                                    [ row [ css [ alignItems center, justifyContent spaceBetween ] ]
+                                        [ p [ css [ publicSans, fontSize (px 18) ] ] [ text ("Selected (" ++ (List.length selectedLabels |> String.fromInt) ++ "):") ]
+                                        , button
+                                            [ css [ fontSize (px 16), backgroundColor error, hover [ backgroundColor black ], color white, publicSans, padY (px 3), padX (px 3), border3 (px 1) solid black, cursor pointer ]
+                                            , onClick ClearSelectedLabels
+                                            ]
+                                            [ text "CLEAR" ]
+                                        ]
                                     , ul [ css [ displayFlex, flexWrap wrap, gap 10 ] ]
                                         (List.map
                                             (\e ->
