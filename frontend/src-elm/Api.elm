@@ -409,7 +409,7 @@ type Operation
     | CreateLabels (List { offlineId : String, name : String })
     | CreateNotes
         (List
-            { offlineId : String
+            { id : String
             , title : Maybe String
             , content : String
             , pinned : Bool
@@ -476,7 +476,7 @@ operationEncoder operation =
                   , JE.list
                         (\n ->
                             JE.object
-                                ([ ( "offlineId", JE.string n.offlineId )
+                                ([ ( "offlineId", JE.string n.id )
                                  , ( "content", JE.string n.content )
                                  , ( "pinned", JE.bool n.pinned )
                                  , ( "labels", JE.list offlineFirstEncoder n.labels )

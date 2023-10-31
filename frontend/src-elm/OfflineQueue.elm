@@ -37,7 +37,7 @@ type alias OQDeleteLabel =
 
 
 type alias OQCreateNote =
-    { offlineId : String
+    { id : String
     , title : Maybe String
     , content : String
     , pinned : Bool
@@ -200,14 +200,14 @@ qEditNote data queue =
     let
         ( toCreateNote, restCreateNotes ) =
             queue.createNotes
-                |> partitionFirst (\l -> sameId (OfflineID l.offlineId) data.id)
+                |> partitionFirst (\l -> sameId (OfflineID l.id) data.id)
     in
     case toCreateNote of
         Just createData ->
             -- hasn't even been created so just combine edit as create
             { queue
                 | createNotes =
-                    { offlineId = createData.offlineId
+                    { id = createData.id
                     , title = data.title |> or createData.title
                     , content = Maybe.withDefault createData.content data.content
                     , pinned = Maybe.withDefault createData.pinned data.pinned
@@ -267,7 +267,7 @@ qDeleteNote noteId queue =
     let
         ( toCreateNoteInQueue, restCreateNotes ) =
             queue.createNotes
-                |> partitionFirst (\l -> sameId (OfflineID l.offlineId) noteId)
+                |> partitionFirst (\l -> sameId (OfflineID l.id) noteId)
     in
     case toCreateNoteInQueue of
         -- hasn't created note yet
