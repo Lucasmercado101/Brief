@@ -341,46 +341,6 @@ update msg model =
                         Nothing ->
                             model |> pureNoSignal
 
-                -- (case model.noteData of
-                --     Just noteState ->
-                --         case noteState of
-                --             ConfirmDeletion noteData ->
-                --                 Nothing
-                --             Editing noteData labelsSearchQuery ->
-                --                 case labelsSearchQuery of
-                --                     Just query ->
-                --                         Just query
-                --                     Nothing ->
-                --                         Nothing
-                --     Nothing ->
-                --         Nothing
-                -- )
-                --     |> (\v ->
-                --             case v of
-                --                 Just searchQuery ->
-                --                     let
-                --                         offlineId : String
-                --                         offlineId =
-                --                             generateUID model.seeds |> Tuple.first
-                --                         newLabel : Label
-                --                         newLabel =
-                --                             { createdAt = timeNow
-                --                             , updatedAt = timeNow
-                --                             , id = OfflineID offlineId
-                --                             , name = searchQuery
-                --                             }
-                --                     in
-                --                     if String.length searchQuery /= 0 then
-                --                         ( { model | labels = newLabel :: model.labels }
-                --                         , requestRandomValues ()
-                --                           -- TODO:
-                --                         , Nothing
-                --                         )
-                --                     else
-                --                         model |> pureNoSignal
-                --                 Nothing ->
-                --                     model |> pureNoSignal
-                --        )
                 ReceivedRandomValues values ->
                     { model | seeds = List.map Random.initialSeed values }
                         |> pureNoSignal
@@ -629,7 +589,7 @@ labelsCard note labelsSearchQuery labels =
                         , ul [ css [ displayFlex, flexWrap wrap, gap 10 ] ]
                             (List.map
                                 (\e ->
-                                    li [ css [ backgroundColor primary, padding (px 3), publicSans, border3 (px 1) solid black ] ] [ text e.name ]
+                                    li [ css [ cursor pointer, hover [ backgroundColor black, color white, border3 (px 1) solid white ], backgroundColor primary, padding (px 3), publicSans, border3 (px 1) solid black ] ] [ text e.name ]
                                 )
                                 allLabels
                             )
