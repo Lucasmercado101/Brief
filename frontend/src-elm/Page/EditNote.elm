@@ -328,8 +328,7 @@ update msg model =
                                                         Just (Editing noteData (Just ""))
                                                   }
                                                 , requestRandomValues ()
-                                                  -- TODO:
-                                                , Nothing
+                                                , Just (OfflineQueueAction (QNewLabel { offlineId = offlineId, name = labelName }))
                                                 )
 
                                             else
@@ -538,7 +537,7 @@ labelsCard : Note -> String -> List Label -> Html Msg
 labelsCard note labelsSearchQuery labels =
     let
         labelExists =
-            labelsSearchQuery
+            (labelsSearchQuery |> String.trim)
                 == ""
                 || (case labels of
                         [] ->
