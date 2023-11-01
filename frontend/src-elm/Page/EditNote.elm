@@ -40,13 +40,13 @@ subscriptions model =
 
 type alias Model =
     { noteId : SyncableID
+    , noteData : Maybe EditingState
 
     -- global data
     , key : Nav.Key
     , seeds : List Random.Seed
     , notes : List Note
     , labels : List Label
-    , noteData : Maybe EditingState
     }
 
 
