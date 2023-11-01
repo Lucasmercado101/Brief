@@ -132,3 +132,8 @@ getCurrentTime : (Posix -> msg) -> Cmd msg
 getCurrentTime msg =
     Time.now
         |> Task.perform msg
+
+
+elIsIn : List a -> (c -> a -> Bool) -> c -> Bool
+elIsIn list pred el =
+    List.any (pred el) list
