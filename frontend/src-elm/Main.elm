@@ -612,6 +612,7 @@ update topMsg topModel =
                                                         Nothing ->
                                                             deleteLabelId
                                                 )
+                                            |> exclude (\en -> List.any (\failedId -> en == OfflineID failedId) failedToCreate)
                                     , deleteNotes =
                                         loggedInModel.offlineQueue.deleteNotes
                                             |> List.map
@@ -627,6 +628,7 @@ update topMsg topModel =
                                                         Nothing ->
                                                             deleteNoteId
                                                 )
+                                            |> exclude (\en -> List.any (\failedId -> en == OfflineID failedId) failedToCreate)
                                     , editNotes =
                                         loggedInModel.offlineQueue.editNotes
                                             |> List.map
@@ -642,6 +644,7 @@ update topMsg topModel =
                                                         Nothing ->
                                                             editNote
                                                 )
+                                            |> exclude (\en -> List.any (\failedId -> en.id == OfflineID failedId) failedToCreate)
                                     , changeLabelNames =
                                         loggedInModel.offlineQueue.changeLabelNames
                                             |> List.map
@@ -657,6 +660,7 @@ update topMsg topModel =
                                                         Nothing ->
                                                             changeLabelName
                                                 )
+                                            |> exclude (\en -> List.any (\failedId -> en.id == OfflineID failedId) failedToCreate)
                                     }
                             in
                             ( LoggedIn
