@@ -8,7 +8,7 @@ import Css exposing (backgroundColor, backgroundImage, backgroundRepeat, backgro
 import DataTypes exposing (Label, Note)
 import Dog exposing (dogSvg)
 import Either exposing (Either(..))
-import Helpers exposing (elIsIn, exclude, labelIDsSplitter, listFirst, maybeToBool, sameId)
+import Helpers exposing (elIsIn, exclude, labelIDsSplitter, listFirst, mapToWithDefault, maybeToBool, sameId)
 import Html
 import Html.Styled exposing (Html, br, button, div, form, img, input, label, li, nav, p, span, strong, text, textarea, ul)
 import Html.Styled.Attributes exposing (class, css, for, id, placeholder, src, style, title, type_, value)
@@ -482,19 +482,18 @@ update topMsg topModel =
                                                 -- update just created
                                                 |> List.map
                                                     (\l ->
-                                                        case listFirst (\( _, offlineId ) -> sameId l.id (OfflineID offlineId)) justCreatedData.notes of
-                                                            Just ( v, _ ) ->
-                                                                { id = DatabaseID v.id
-                                                                , title = v.title
-                                                                , content = v.content
-                                                                , pinned = v.pinned
-                                                                , createdAt = v.createdAt
-                                                                , updatedAt = v.updatedAt
-                                                                , labels = v.labels |> List.map DatabaseID
-                                                                }
-
-                                                            Nothing ->
-                                                                l
+                                                        (justCreatedData.notes |> listFirst (\( _, offlineId ) -> sameId l.id (OfflineID offlineId)))
+                                                            |> mapToWithDefault l
+                                                                (\( v, _ ) ->
+                                                                    { id = DatabaseID v.id
+                                                                    , title = v.title
+                                                                    , content = v.content
+                                                                    , pinned = v.pinned
+                                                                    , createdAt = v.createdAt
+                                                                    , updatedAt = v.updatedAt
+                                                                    , labels = v.labels |> List.map DatabaseID
+                                                                    }
+                                                                )
                                                     )
                                                 |> (++) updatedNotes
                                         , labels =
@@ -523,16 +522,15 @@ update topMsg topModel =
                                                 -- update just created
                                                 |> List.map
                                                     (\l ->
-                                                        case listFirst (\( _, offlineId ) -> sameId l.id (OfflineID offlineId)) justCreatedData.labels of
-                                                            Just ( v, _ ) ->
-                                                                { id = DatabaseID v.id
-                                                                , name = v.name
-                                                                , createdAt = v.createdAt
-                                                                , updatedAt = v.updatedAt
-                                                                }
-
-                                                            Nothing ->
-                                                                l
+                                                        (justCreatedData.labels |> listFirst (\( _, offlineId ) -> sameId l.id (OfflineID offlineId)))
+                                                            |> mapToWithDefault l
+                                                                (\( v, _ ) ->
+                                                                    { id = DatabaseID v.id
+                                                                    , name = v.name
+                                                                    , createdAt = v.createdAt
+                                                                    , updatedAt = v.updatedAt
+                                                                    }
+                                                                )
                                                     )
                                                 |> (++) updatedLabels
                                     }
