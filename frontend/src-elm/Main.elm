@@ -565,6 +565,8 @@ update topMsg topModel =
                                         EditNote editNoteModel ->
                                             case editNoteModel.noteId of
                                                 OfflineID offlineId ->
+                                                    -- NOTE: what i'm doing here is changing the editing from editing an offlineID note
+                                                    -- to the one that was just created using a DatabaseID now
                                                     let
                                                         justCreatedTheNote =
                                                             listFirst (\( onlineId, prevOfflineId ) -> prevOfflineId == offlineId) justCreatedData.notes
