@@ -476,9 +476,9 @@ update topMsg topModel =
                                             in
                                             notOutdatedNotes
                                                 -- remove the ones that were failed to create
-                                                |> exclude (\l -> List.any (\e -> sameId l.id (OfflineID e)) failedToCreate)
+                                                |> exclude (elIsIn failedToCreate (\a b -> sameId a.id (OfflineID b)))
                                                 -- remove the ones that don't exist in DB
-                                                |> exclude (\l -> List.any (\e -> sameId l.id (DatabaseID e)) deleted.notes)
+                                                |> exclude (elIsIn deleted.notes (\a b -> sameId a.id (DatabaseID b)))
                                                 -- update just created
                                                 |> List.map
                                                     (\l ->
@@ -517,9 +517,9 @@ update topMsg topModel =
                                             in
                                             notOutdatedLabels
                                                 -- remove the ones that were failed to create
-                                                |> exclude (\l -> List.any (\e -> sameId l.id (OfflineID e)) failedToCreate)
+                                                |> exclude (elIsIn failedToCreate (\a b -> sameId a.id (OfflineID b)))
                                                 -- remove the ones that don't exist in DB
-                                                |> exclude (\l -> List.any (\e -> sameId l.id (DatabaseID e)) deleted.labels)
+                                                |> exclude (elIsIn deleted.labels (\a b -> sameId a.id (DatabaseID b)))
                                                 -- update just created
                                                 |> List.map
                                                     (\l ->
