@@ -8,7 +8,7 @@ import Css exposing (backgroundColor, backgroundImage, backgroundRepeat, backgro
 import DataTypes exposing (Label, Note)
 import Dog exposing (dogSvg)
 import Either exposing (Either(..))
-import Helpers exposing (exclude, labelIDsSplitter, listFirst, maybeToBool, sameId)
+import Helpers exposing (elIsIn, exclude, labelIDsSplitter, listFirst, maybeToBool, sameId)
 import Html
 import Html.Styled exposing (Html, br, button, div, form, img, input, label, li, nav, p, span, strong, text, textarea, ul)
 import Html.Styled.Attributes exposing (class, css, for, id, placeholder, src, style, title, type_, value)
@@ -456,9 +456,8 @@ update topMsg topModel =
                                         | notes =
                                             let
                                                 ( _, notOutdatedNotes ) =
-                                                    List.partition
-                                                        (\e -> List.any (\l -> sameId (DatabaseID l.id) e.id) downSyncedData.notes)
-                                                        m.notes
+                                                    m.notes
+                                                        |> List.partition (elIsIn downSyncedData.notes (\a b -> sameId a.id (DatabaseID b.id)))
 
                                                 updatedNotes : List Note
                                                 updatedNotes =
@@ -501,9 +500,8 @@ update topMsg topModel =
                                         , labels =
                                             let
                                                 ( _, notOutdatedLabels ) =
-                                                    List.partition
-                                                        (\e -> List.any (\l -> sameId (DatabaseID l.id) e.id) downSyncedData.labels)
-                                                        m.labels
+                                                    m.labels
+                                                        |> List.partition (elIsIn downSyncedData.labels (\a b -> sameId a.id (DatabaseID b.id)))
 
                                                 updatedLabels : List Label
                                                 updatedLabels =
