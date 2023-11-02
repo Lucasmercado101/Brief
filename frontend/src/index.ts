@@ -74,6 +74,12 @@ window.addEventListener("offline", () => {
   app.ports.goneOffline.send(null);
 });
 
+window.addEventListener("resize", () => {
+  const width = window.innerWidth;
+  const height = window.innerHeight;
+  app.ports.windowResized.send({ width, height });
+});
+
 app.ports.requestRandomValues.subscribe(function () {
   app.ports.receiveRandomValues.send(
     Array.from(self.crypto.getRandomValues(new Uint32Array(4)))

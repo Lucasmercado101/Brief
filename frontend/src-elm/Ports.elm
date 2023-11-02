@@ -24,3 +24,6 @@ isNowOffline msg =
 
 
 port goneOffline : (() -> msg) -> Sub msg
+
+
+port windowResized : ({ width : Int, height : Int } -> msg) -> Sub msg
