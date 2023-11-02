@@ -23,7 +23,8 @@ function generateNote(currNote: number): omitDBGenerated<Note> {
   return {
     content: faker.lorem.sentences({ min: 1, max: 5 }),
     pinned: false,
-    title: currNote % 4 == 0 ? null : faker.lorem.words({ min: 1, max: 5 })
+    title: currNote % 4 == 0 ? null : faker.lorem.words({ min: 1, max: 5 }),
+    order: currNote
   };
 }
 
