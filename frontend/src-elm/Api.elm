@@ -2,7 +2,8 @@ module Api exposing (..)
 
 import Either exposing (Either(..))
 import Http exposing (riskyRequest)
-import Json.Decode as JD exposing (Decoder, bool, field, int, list, map2, map4, map5, map6, map7, map8, maybe, oneOf, string)
+import Json.Decode as JD exposing (Decoder, bool, field, int, list, map2, map4, map5, map6, map7, map8, maybe, oneOf, string, succeed)
+import Json.Decode.Field as JDF
 import Json.Encode as JE
 import Time exposing (Posix, millisToPosix, posixToMillis)
 
@@ -122,6 +123,7 @@ type alias Note =
     , title : Maybe String
     , content : String
     , pinned : Bool
+    , order : Int
     , createdAt : Posix
     , updatedAt : Posix
     , labels : List DbID
@@ -138,11 +140,12 @@ type alias Label =
 
 noteDecoder : Decoder Note
 noteDecoder =
-    map7 Note
+    map8 Note
         (field "id" int)
         (field "title" (maybe string))
         (field "content" string)
         (field "pinned" bool)
+        (field "order" int)
         (field "createdAt" posixTime)
         (field "updatedAt" posixTime)
         (field "labels" (list int))
@@ -188,6 +191,7 @@ type Operation
             , content : String
             , pinned : Bool
             , labels : List SyncableID
+            , order : Maybe Int
             }
         )
     | EditNote
@@ -196,6 +200,7 @@ type Operation
         , content : Maybe String
         , pinned : Maybe Bool
         , labels : Maybe (List SyncableID)
+        , order : Maybe Int
         }
     | ChangeLabelName
         { name : String
@@ -316,6 +321,16 @@ operationEncoder operation =
                             Nothing ->
                                 []
                        )
+                    ++ (case data.order of
+                            Just t ->
+                                [ ( "order"
+                                  , JE.int t
+                                  )
+                                ]
+
+                            Nothing ->
+                                []
+                       )
                 )
 
         ChangeLabelName data ->
@@ -367,6 +382,12 @@ type alias ChangesResponse =
     }
 
 
+type alias Person =
+    { name : String
+    , age : Int
+    }
+
+
 changesResponseDecoder : Decoder ChangesResponse
 changesResponseDecoder =
     let
@@ -387,43 +408,39 @@ changesResponseDecoder =
         --     map2 (\a b -> { notes = a, labels = b })
         --         (field "notes" (list offlineFirstDecoder))
         --         (field "labels" (list offlineFirstDecoder))
+
         downSyncNoteDecoder : Decoder (Either ( Note, OfflineId ) Note)
         downSyncNoteDecoder =
-            map8
-                (\a b c d e f g h ->
-                    case h of
-                        Just offlineId ->
-                            Left
-                                ( { id = a
-                                  , title = b
-                                  , content = c
-                                  , pinned = d
-                                  , createdAt = e
-                                  , updatedAt = f
-                                  , labels = g
-                                  }
-                                , offlineId
-                                )
+            JDF.require "id" int <| \id ->
+            JDF.attempt "title" string <| \maybeTitle ->
+            JDF.require "content" string <| \content ->
+            JDF.require "pinned" bool <| \pinned ->
+            JDF.require "order" int <| \order ->
+            JDF.require "createdAt" posixTime <| \createdAt ->
+            JDF.require "updatedAt" posixTime <| \updatedAt ->
+            JDF.require "labels" (list int) <| \labels ->
+            JDF.optional "offlineId" string <| \maybeOfflineId ->
+            (let
+                note : Note
+                note =
+                    { id = id
+                    , title = maybeTitle
+                    , content = content
+                    , pinned = pinned
+                    , createdAt = createdAt
+                    , updatedAt = updatedAt
+                    , labels = labels
+                    , order = order
+                    }
+                in
+                case maybeOfflineId of
+                Just offlineId ->
+                    Left ( note, offlineId )
 
-                        Nothing ->
-                            Right
-                                { id = a
-                                , title = b
-                                , content = c
-                                , pinned = d
-                                , createdAt = e
-                                , updatedAt = f
-                                , labels = g
-                                }
-                )
-                (field "id" int)
-                (field "title" (maybe string))
-                (field "content" string)
-                (field "pinned" bool)
-                (field "createdAt" posixTime)
-                (field "updatedAt" posixTime)
-                (field "labels" (list int))
-                (maybe (field "offlineId" string))
+                Nothing ->
+                    Right note
+            )
+                |> JD.succeed
 
         downSyncLabelDecoder : Decoder (Either ( Label, OfflineId ) Label)
         downSyncLabelDecoder =

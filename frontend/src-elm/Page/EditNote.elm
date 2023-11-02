@@ -236,6 +236,9 @@ update msg model =
 
                                                                 else
                                                                     Nothing
+
+                                                            -- TODO: let user edit order
+                                                            , order = Nothing
                                                             }
                                                         )
                                                     )

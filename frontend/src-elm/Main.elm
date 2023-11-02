@@ -443,6 +443,7 @@ update topMsg topModel =
                                                     , labels = List.map DatabaseID l.labels
                                                     , createdAt = l.createdAt
                                                     , updatedAt = l.updatedAt
+                                                    , order = l.order
                                                     }
                                                 )
                                                 notes
@@ -496,6 +497,7 @@ update topMsg topModel =
                                                                 , createdAt = e.createdAt
                                                                 , updatedAt = e.updatedAt
                                                                 , labels = e.labels |> List.map DatabaseID
+                                                                , order = e.order
                                                                 }
                                                             )
                                             in
@@ -517,6 +519,7 @@ update topMsg topModel =
                                                                     , createdAt = v.createdAt
                                                                     , updatedAt = v.updatedAt
                                                                     , labels = v.labels |> List.map DatabaseID
+                                                                    , order = v.order
                                                                     }
                                                                 )
                                                     )

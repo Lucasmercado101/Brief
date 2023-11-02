@@ -4,6 +4,7 @@ import Api exposing (Operation(..), SyncableID(..))
 import DataTypes exposing (Label, Note)
 import Helpers exposing (exclude, labelIDsSplitter, or, partitionFirst, sameId)
 import Http
+import Svg.Attributes exposing (order)
 import Time exposing (Posix)
 
 
@@ -42,6 +43,7 @@ type alias OQCreateNote =
     , content : String
     , pinned : Bool
     , labels : List SyncableID
+    , order : Maybe Int
     }
 
 
@@ -55,6 +57,7 @@ type alias OQEditNote =
     , content : Maybe String
     , pinned : Maybe Bool
     , labels : Maybe (List SyncableID)
+    , order : Maybe Int
     }
 
 
@@ -212,6 +215,7 @@ qEditNote data queue =
                     , content = Maybe.withDefault createData.content data.content
                     , pinned = Maybe.withDefault createData.pinned data.pinned
                     , labels = Maybe.withDefault createData.labels data.labels
+                    , order = data.order |> or createData.order
                     }
                         :: restCreateNotes
             }
@@ -232,6 +236,7 @@ qEditNote data queue =
                             , content = data.content |> or prevEdit.content
                             , pinned = data.pinned |> or prevEdit.pinned
                             , labels = data.labels |> or prevEdit.labels
+                            , order = data.order |> or prevEdit.order
                             }
                                 :: restEditNotes
                     }
@@ -248,6 +253,7 @@ qEditNoteLabels id labels =
         , content = Nothing
         , pinned = Nothing
         , labels = labels
+        , order = Nothing
         }
 
 
@@ -259,6 +265,7 @@ qToggleNotePin id newPinnedVal =
         , content = Nothing
         , pinned = Just newPinnedVal
         , labels = Nothing
+        , order = Nothing
         }
 
 

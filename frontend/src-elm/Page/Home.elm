@@ -1,9 +1,10 @@
 module Page.Home exposing (..)
 
 import Api exposing (SyncableID(..))
+import Browser.Events exposing (onKeyDown)
 import Browser.Navigation as Nav
 import Cmd.Extra exposing (pure)
-import Css exposing (alignItems, auto, backgroundColor, bold, bolder, border, border3, borderBottom3, borderLeft3, borderRight3, boxShadow4, center, color, column, cursor, displayFlex, ellipsis, flexDirection, flexStart, flexWrap, fontSize, fontWeight, height, hex, hidden, hover, inherit, int, justifyContent, margin, margin2, marginBottom, marginLeft, marginRight, marginTop, maxWidth, minHeight, minWidth, noWrap, overflow, overflowY, padding, padding2, paddingLeft, paddingRight, paddingTop, pct, pointer, position, property, px, rgb, solid, spaceBetween, start, sticky, textAlign, textOverflow, top, transparent, whiteSpace, width, wrap)
+import Css exposing (alignItems, auto, backgroundColor, bold, bolder, border, border3, borderBottom3, borderLeft3, borderRight3, borderTop3, boxShadow4, center, color, column, cursor, displayFlex, ellipsis, flexDirection, flexStart, flexWrap, fontSize, fontWeight, height, hex, hidden, hover, inherit, int, justifyContent, margin, margin2, marginBottom, marginLeft, marginRight, marginTop, maxWidth, minHeight, minWidth, noWrap, overflow, overflowY, padding, padding2, paddingLeft, paddingRight, paddingTop, pct, pointer, position, property, px, rgb, solid, spaceBetween, start, sticky, textAlign, textOverflow, top, transparent, whiteSpace, width, wrap)
 import CssHelpers exposing (black, col, delaGothicOne, displayGrid, error, fullWidth, gap, mx, padX, padY, primary, publicSans, row, secondary, textColor, userSelectNone, white)
 import DataTypes exposing (Label, Note)
 import Helpers exposing (exclude, getCurrentTime, idDiff, labelIDsSplitter, listFirst, or, partitionFirst, sameId)
@@ -11,11 +12,12 @@ import Html.Styled exposing (Html, br, button, div, form, img, input, label, li,
 import Html.Styled.Attributes exposing (class, css, for, id, placeholder, src, style, title, type_, value)
 import Html.Styled.Events exposing (onClick, onInput, onSubmit, stopPropagationOn)
 import Http
-import Json.Decode
+import Json.Decode as JD
 import Material.Icons as Filled
 import Material.Icons.Outlined as Outlined
 import Material.Icons.Types exposing (Coloring(..))
 import OfflineQueue exposing (Action(..), OQCreateLabel, OQCreateNote, OQDeleteNote, OQEditNote, OfflineQueueOps, emptyOfflineQueue, offlineQueueIsEmpty, qCreateNewNote, qDeleteNote, qEditNoteLabels, qNewLabel, qToggleNotePin, queueToOperations)
+import Platform.Sub as Sub
 import Ports exposing (receiveRandomValues, requestRandomValues, updateLastSyncedAt)
 import Random
 import Route
@@ -23,6 +25,10 @@ import Svg.Styled
 import Task
 import Time exposing (Posix)
 import UID exposing (generateUID)
+
+
+
+-- SUBSCRIPTIONS
 
 
 pureNoSignal : Model -> ( Model, Cmd msg, Maybe Signal )
@@ -35,9 +41,37 @@ pureWithSignal s m =
     ( m, Cmd.none, Just s )
 
 
+selectedNoteHotkeys : SyncableID -> String -> Msg
+selectedNoteHotkeys noteId string =
+    case string of
+        "ArrowLeft" ->
+            IncreaseNoteOrder noteId
+
+        "ArrowRight" ->
+            DecreaseNoteOrder noteId
+
+        "Escape" ->
+            DeselectNote
+
+        _ ->
+            NoOp
+
+
 subscriptions : Model -> Sub Msg
-subscriptions _ =
-    receiveRandomValues ReceivedRandomValues
+subscriptions model =
+    Sub.batch
+        [ receiveRandomValues ReceivedRandomValues
+        , case model.selectedNote of
+            Just n ->
+                onKeyDown (JD.map (selectedNoteHotkeys n) (JD.field "key" JD.string))
+
+            Nothing ->
+                Sub.none
+        ]
+
+
+
+--
 
 
 type alias LabelsColumnMenu =
@@ -92,10 +126,13 @@ type Msg
     | ReceivedRandomValues (List Int)
     | RemoveLabelFromNote { noteID : SyncableID, labelID : SyncableID }
     | SelectedNote SyncableID
+    | DeselectNote
     | ClickedMouse
     | EditNote SyncableID
     | RequestTimeForNewNoteCreation
     | CreateAndEditNote Posix
+    | IncreaseNoteOrder SyncableID
+    | DecreaseNoteOrder SyncableID
       -- Labels menu
     | SelectLabelToFilterBy SyncableID
     | OpenLabelsMenu
@@ -129,6 +166,7 @@ update msg model =
                     , content = "Hello world!"
                     , pinned = False
                     , labels = []
+                    , order = Nothing
                     }
             in
             -- TODO: handle case where note could not be created but i'm in note editing page
@@ -142,6 +180,7 @@ update msg model =
                     , createdAt = currentTime
                     , updatedAt = currentTime
                     , labels = []
+                    , order = List.length model.notes + 1
                     }
                         :: model.notes
               }
@@ -151,6 +190,14 @@ update msg model =
 
         EditNote id ->
             ( model, Route.replaceUrl model.key (Route.EditNote id), Nothing )
+
+        DeselectNote ->
+            case model.selectedNote of
+                Just _ ->
+                    ( { model | selectedNote = Nothing }, Cmd.none, Nothing )
+
+                Nothing ->
+                    model |> pureNoSignal
 
         ClickedMouse ->
             case model.selectedNote of
@@ -174,6 +221,106 @@ update msg model =
                         model.notes
             }
                 |> pureWithSignal (OfflineQueueAction (QToggleNotePin uid newPinnedVal))
+
+        IncreaseNoteOrder uid ->
+            case listFirst (\e -> sameId e.id uid) model.notes of
+                Nothing ->
+                    model |> pureNoSignal
+
+                Just noteExists ->
+                    let
+                        biggerOrderNote =
+                            List.foldl
+                                (\next acc ->
+                                    case acc of
+                                        Nothing ->
+                                            if next.order > noteExists.order then
+                                                Just next
+
+                                            else
+                                                Nothing
+
+                                        Just accVal ->
+                                            if next.order < accVal.order && next.order > noteExists.order then
+                                                Just next
+
+                                            else
+                                                Just accVal
+                                )
+                                Nothing
+                                model.notes
+                    in
+                    case biggerOrderNote of
+                        Just biggerOrderNoteExists ->
+                            { model
+                                | notes =
+                                    List.map
+                                        (\n ->
+                                            if n.id == noteExists.id then
+                                                { n | order = biggerOrderNoteExists.order }
+
+                                            else if n.id == biggerOrderNoteExists.id then
+                                                { n | order = noteExists.order }
+
+                                            else
+                                                n
+                                        )
+                                        model.notes
+                            }
+                                |> pureNoSignal
+
+                        Nothing ->
+                            model |> pureNoSignal
+
+        DecreaseNoteOrder uid ->
+            case listFirst (\e -> sameId e.id uid) model.notes of
+                Nothing ->
+                    model |> pureNoSignal
+
+                Just noteExists ->
+                    let
+                        smallerOrderNote =
+                            List.foldl
+                                (\next acc ->
+                                    case acc of
+                                        Nothing ->
+                                            if next.order < noteExists.order then
+                                                Just next
+
+                                            else
+                                                Nothing
+
+                                        Just accVal ->
+                                            if next.order > accVal.order && next.order < noteExists.order then
+                                                Just next
+
+                                            else
+                                                Just accVal
+                                )
+                                Nothing
+                                model.notes
+                    in
+                    case smallerOrderNote of
+                        Just smallerOrderNoteExists ->
+                            { model
+                                | notes =
+                                    List.map
+                                        (\n ->
+                                            if n.id == noteExists.id then
+                                                { n | order = smallerOrderNoteExists.order }
+
+                                            else if n.id == smallerOrderNoteExists.id then
+                                                { n | order = noteExists.order }
+
+                                            else
+                                                n
+                                        )
+                                        model.notes
+                            }
+                                |> pureNoSignal
+
+                        Nothing ->
+                            model |> pureNoSignal
 
         RemoveLabelFromNote { noteID, labelID } ->
             let
@@ -272,7 +419,7 @@ alwaysStopPropagation x =
 
 clickedOnSelectedNote : Svg.Styled.Attribute Msg
 clickedOnSelectedNote =
-    stopPropagationOn "click" (Json.Decode.succeed ( NoOp, True ))
+    stopPropagationOn "click" (JD.succeed ( NoOp, True ))
 
 
 view : Model -> Bool -> Html Msg
@@ -579,7 +726,6 @@ labelsMenuColumn { labels, filters, labelsMenu } =
 
 notesGrid : Model -> Html Msg
 notesGrid model =
-    -- TODO: add sorting of notes, add an order prop in back
     let
         header =
             div
@@ -618,7 +764,9 @@ notesGrid model =
                     ]
                 ]
     in
-    div [ css [ width (pct 100), overflowY auto ] ]
+    div
+        [ css [ width (pct 100), overflowY auto ]
+        ]
         [ col
             [ css
                 [ paddingTop (px 28)
@@ -646,6 +794,7 @@ notesGrid model =
                         ]
                         (List.map (note model)
                             (model.notes
+                                |> List.sortWith flippedComparison
                                 |> prioritizePinned
                                 |> (\e ->
                                         case model.filters.label of
@@ -655,9 +804,10 @@ notesGrid model =
                                             Nothing ->
                                                 e
                                    )
-                                |> List.map
-                                    (\e ->
+                                |> List.indexedMap
+                                    (\i e ->
                                         ( e
+                                        , i
                                         , case model.selectedNote of
                                             Nothing ->
                                                 False
@@ -681,8 +831,21 @@ notesGrid model =
         ]
 
 
-note : Model -> ( Note, Bool ) -> Html Msg
-note model ( data, selected ) =
+flippedComparison : { a | order : comparable } -> { b | order : comparable } -> Order
+flippedComparison a b =
+    case compare a.order b.order of
+        LT ->
+            GT
+
+        EQ ->
+            EQ
+
+        GT ->
+            LT
+
+
+note : Model -> ( Note, Int, Bool ) -> Html Msg
+note model ( data, order, selected ) =
     let
         noteTitle =
             case data.title of
@@ -777,7 +940,7 @@ note model ( data, selected ) =
                                             ]
                                         , type_ "button"
                                         , stopPropagationOn "click"
-                                            (Json.Decode.succeed
+                                            (JD.succeed
                                                 ( RemoveLabelFromNote
                                                     { noteID = data.id
                                                     , labelID = l.id
@@ -816,6 +979,10 @@ note model ( data, selected ) =
                                 )
                             , borderRight3 (px 3) solid black
                             , cursor pointer
+                            , padding (px 4)
+                            , displayFlex
+                            , alignItems center
+                            , justifyContent center
                             ]
                         , onClick (ChangeNotePinned ( data.id, not data.pinned ))
                         ]
@@ -828,10 +995,75 @@ note model ( data, selected ) =
                                 ]
                             , borderLeft3 (px 3) solid black
                             , cursor pointer
+                            , padding (px 4)
+                            , displayFlex
+                            , alignItems center
+                            , justifyContent center
                             ]
                         , onClick (EditNote data.id)
                         ]
                         [ Filled.edit 32 Inherit |> Svg.Styled.fromUnstyled ]
+                    ]
+
+        bottomActions =
+            if not selected then
+                text ""
+
+            else
+                row
+                    [ css [ backgroundColor white, justifyContent spaceBetween, borderTop3 (px 3) solid black, alignItems center, paddingRight (px 8) ]
+                    ]
+                    [ row []
+                        [ div
+                            [ css
+                                [ if data.pinned then
+                                    backgroundColor black
+
+                                  else
+                                    hover [ backgroundColor black, color white ]
+                                , color
+                                    (if data.pinned then
+                                        white
+
+                                     else
+                                        black
+                                    )
+                                , borderRight3 (px 3) solid black
+                                , cursor pointer
+                                , padding (px 4)
+                                , displayFlex
+                                , alignItems center
+                                , justifyContent center
+                                ]
+                            , onClick (IncreaseNoteOrder data.id)
+                            ]
+                            [ Filled.chevron_left 32 Inherit |> Svg.Styled.fromUnstyled ]
+                        , div
+                            [ css
+                                [ if data.pinned then
+                                    backgroundColor black
+
+                                  else
+                                    hover [ backgroundColor black, color white ]
+                                , color
+                                    (if data.pinned then
+                                        white
+
+                                     else
+                                        black
+                                    )
+                                , borderRight3 (px 3) solid black
+                                , cursor pointer
+                                , padding (px 4)
+                                , displayFlex
+                                , alignItems center
+                                , justifyContent center
+                                ]
+                            , onClick (DecreaseNoteOrder data.id)
+                            ]
+                            [ Filled.chevron_right 32 Inherit |> Svg.Styled.fromUnstyled ]
+                        ]
+                    , p [ css [ publicSans, fontWeight bold ] ] [ text ("#" ++ String.fromInt (order + 1)) ]
                     ]
     in
     div
@@ -866,7 +1098,7 @@ note model ( data, selected ) =
                     []
 
                 else
-                    [ stopPropagationOn "click" (Json.Decode.succeed ( SelectedNote data.id, True ))
+                    [ stopPropagationOn "click" (JD.succeed ( SelectedNote data.id, True ))
                     ]
                 -- TODO: unselect on click outside of note
                )
@@ -875,6 +1107,7 @@ note model ( data, selected ) =
         , noteTitle
         , content
         , labelsFooter
+        , bottomActions
         ]
 
 
