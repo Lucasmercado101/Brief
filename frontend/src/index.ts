@@ -59,11 +59,19 @@ let lastSyncedAt = localStorage.getItem("lastSyncedAt");
 // @ts-ignore
 const app = Elm.Main.init({
   flags: {
+    online: window.navigator.onLine,
     seeds: Array.from(self.crypto.getRandomValues(new Uint32Array(4))),
     hasSessionCookie: !!hasSessionCookie,
     lastSyncedAt: lastSyncedAt ? Number(lastSyncedAt) : 1
   },
   node: document.getElementById("root")
+});
+
+window.addEventListener("online", function () {
+  app.ports.backOnline.send(null);
+});
+window.addEventListener("offline", () => {
+  app.ports.goneOffline.send(null);
 });
 
 app.ports.requestRandomValues.subscribe(function () {

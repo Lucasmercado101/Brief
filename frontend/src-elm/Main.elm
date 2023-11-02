@@ -20,7 +20,7 @@ import Page.EditLabels as EditLabels
 import Page.EditNote as EditNote
 import Page.Home as Home exposing (Signal(..))
 import Page.LogIn as LogIn
-import Ports exposing (requestRandomValues, updateLastSyncedAt)
+import Ports exposing (isNowOffline, isNowOnline, requestRandomValues, updateLastSyncedAt)
 import Random
 import Random.Char
 import Random.Extra
@@ -40,22 +40,26 @@ subscriptions model =
             Sub.none
 
         LoggedIn { page } ->
-            let
-                map msg =
-                    Sub.map (\e -> GotPageMsg (msg e))
-            in
-            case page of
-                Home homeModel ->
-                    Home.subscriptions homeModel
-                        |> map GotHomeMsg
+            Sub.batch
+                [ isNowOffline IsOffline
+                , isNowOnline IsOnline
+                , let
+                    map msg =
+                        Sub.map (\e -> GotPageMsg (msg e))
+                  in
+                  case page of
+                    Home homeModel ->
+                        Home.subscriptions homeModel
+                            |> map GotHomeMsg
 
-                EditLabels editLabelsModel ->
-                    EditLabels.subscriptions editLabelsModel
-                        |> map GotEditLabelsMsg
+                    EditLabels editLabelsModel ->
+                        EditLabels.subscriptions editLabelsModel
+                            |> map GotEditLabelsMsg
 
-                EditNote editNoteModel ->
-                    EditNote.subscriptions editNoteModel
-                        |> map GotEditNoteMsg
+                    EditNote editNoteModel ->
+                        EditNote.subscriptions editNoteModel
+                            |> map GotEditNoteMsg
+                ]
 
 
 
@@ -70,6 +74,7 @@ type Page
 
 type alias LoggedInModel =
     { page : Page
+    , isOnline : Bool
 
     -- sync stuff
     , offlineQueue : OfflineQueueOps
@@ -102,6 +107,8 @@ type Msg
     | GotPageMsg PageMsg
     | FullSyncResp (Result Http.Error Api.FullSyncResponse)
     | ReceivedChangesResp (Result Http.Error Api.ChangesResponse)
+    | IsOffline
+    | IsOnline
 
 
 
@@ -109,7 +116,7 @@ type Msg
 
 
 type alias Flags =
-    { seeds : List Int, hasSessionCookie : Bool, lastSyncedAt : Int }
+    { seeds : List Int, online : Bool, hasSessionCookie : Bool, lastSyncedAt : Int }
 
 
 init : Flags -> Url -> Nav.Key -> ( Model, Cmd Msg )
@@ -118,7 +125,7 @@ init flags url navKey =
         seeds =
             List.map Random.initialSeed flags.seeds
     in
-    if flags.hasSessionCookie then
+    if not flags.hasSessionCookie then
         ( LoggedOff (LogIn.init navKey seeds), Cmd.none )
 
     else
@@ -126,6 +133,7 @@ init flags url navKey =
             { offlineQueue = emptyOfflineQueue
             , runningQueueOn = Nothing
             , lastSyncedAt = Time.millisToPosix flags.lastSyncedAt
+            , isOnline = flags.online
             , page =
                 case Route.fromUrl url of
                     -- TODO: notes and labels should be combined into
@@ -178,6 +186,22 @@ main =
 update : Msg -> Model -> ( Model, Cmd Msg )
 update topMsg topModel =
     case topMsg of
+        IsOffline ->
+            case topModel of
+                LoggedIn m ->
+                    LoggedIn { m | isOnline = False } |> pure
+
+                LoggedOff _ ->
+                    topModel |> pure
+
+        IsOnline ->
+            case topModel of
+                LoggedIn m ->
+                    LoggedIn { m | isOnline = True } |> pure
+
+                LoggedOff _ ->
+                    topModel |> pure
+
         -- TODO: fix this
         ClickedLink _ ->
             -- TODO:
@@ -203,6 +227,7 @@ update topMsg topModel =
                                 , offlineQueue = emptyOfflineQueue
                                 , runningQueueOn = Nothing
                                 , lastSyncedAt = Time.millisToPosix 1
+                                , isOnline = True
                                 }
                             , Cmd.batch [ Api.fullSync FullSyncResp, requestRandomValues () ]
                             )
@@ -664,6 +689,7 @@ update topMsg topModel =
                             ( LoggedIn
                                 { page = updatedPageModel
                                 , offlineQueue = emptyOfflineQueue
+                                , isOnline = loggedInModel.isOnline
                                 , runningQueueOn =
                                     if offlineQueueIsEmpty updatedOfflineQueue then
                                         Nothing
