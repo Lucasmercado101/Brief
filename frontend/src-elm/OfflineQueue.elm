@@ -77,6 +77,7 @@ type Action
     | QDeleteLabel OQDeleteLabel
     | QEditLabelName OQChangeLabelName
     | QDeleteLabels (List OQDeleteLabel)
+    | QSwitchNoteOrders ( SyncableID, Int ) ( SyncableID, Int )
 
 
 actionMapToFn : Action -> OfflineQueueOps -> OfflineQueueOps
@@ -108,6 +109,9 @@ actionMapToFn action =
 
         QDeleteLabels labels ->
             qDeleteLabels labels
+
+        QSwitchNoteOrders note1 note2 ->
+            qSwitchNoteOrders note1 note2
 
 
 queueToOperations : OfflineQueueOps -> List Operation
@@ -267,6 +271,26 @@ qToggleNotePin id newPinnedVal =
         , labels = Nothing
         , order = Nothing
         }
+
+
+qSwitchNoteOrders : ( SyncableID, Int ) -> ( SyncableID, Int ) -> OfflineQueueOps -> OfflineQueueOps
+qSwitchNoteOrders ( id1, order1 ) ( id2, order2 ) =
+    qEditNote
+        { id = id1
+        , title = Nothing
+        , content = Nothing
+        , pinned = Nothing
+        , labels = Nothing
+        , order = Just order2
+        }
+        >> qEditNote
+            { id = id2
+            , title = Nothing
+            , content = Nothing
+            , pinned = Nothing
+            , labels = Nothing
+            , order = Just order1
+            }
 
 
 qDeleteNote : OQDeleteNote -> OfflineQueueOps -> OfflineQueueOps
