@@ -1,6 +1,7 @@
 module Page.Home exposing (..)
 
 import Api exposing (SyncableID(..))
+import Browser.Events exposing (onKeyDown)
 import Browser.Navigation as Nav
 import Cmd.Extra exposing (pure)
 import Css exposing (alignItems, auto, backgroundColor, bold, bolder, border, border3, borderBottom3, borderLeft3, borderRight3, borderTop3, boxShadow4, center, color, column, cursor, displayFlex, ellipsis, flexDirection, flexStart, flexWrap, fontSize, fontWeight, height, hex, hidden, hover, inherit, int, justifyContent, margin, margin2, marginBottom, marginLeft, marginRight, marginTop, maxWidth, minHeight, minWidth, noWrap, overflow, overflowY, padding, padding2, paddingLeft, paddingRight, paddingTop, pct, pointer, position, property, px, rgb, solid, spaceBetween, start, sticky, textAlign, textOverflow, top, transparent, whiteSpace, width, wrap)
@@ -11,11 +12,12 @@ import Html.Styled exposing (Html, br, button, div, form, img, input, label, li,
 import Html.Styled.Attributes exposing (class, css, for, id, placeholder, src, style, title, type_, value)
 import Html.Styled.Events exposing (onClick, onInput, onSubmit, stopPropagationOn)
 import Http
-import Json.Decode
+import Json.Decode as JD
 import Material.Icons as Filled
 import Material.Icons.Outlined as Outlined
 import Material.Icons.Types exposing (Coloring(..))
 import OfflineQueue exposing (Action(..), OQCreateLabel, OQCreateNote, OQDeleteNote, OQEditNote, OfflineQueueOps, emptyOfflineQueue, offlineQueueIsEmpty, qCreateNewNote, qDeleteNote, qEditNoteLabels, qNewLabel, qToggleNotePin, queueToOperations)
+import Platform.Sub as Sub
 import Ports exposing (receiveRandomValues, requestRandomValues, updateLastSyncedAt)
 import Random
 import Route
@@ -23,6 +25,10 @@ import Svg.Styled
 import Task
 import Time exposing (Posix)
 import UID exposing (generateUID)
+
+
+
+-- SUBSCRIPTIONS
 
 
 pureNoSignal : Model -> ( Model, Cmd msg, Maybe Signal )
@@ -35,9 +41,37 @@ pureWithSignal s m =
     ( m, Cmd.none, Just s )
 
 
+selectedNoteHotkeys : SyncableID -> String -> Msg
+selectedNoteHotkeys noteId string =
+    case string of
+        "ArrowLeft" ->
+            IncreaseNoteOrder noteId
+
+        "ArrowRight" ->
+            DecreaseNoteOrder noteId
+
+        "Escape" ->
+            DeselectNote
+
+        _ ->
+            NoOp
+
+
 subscriptions : Model -> Sub Msg
-subscriptions _ =
-    receiveRandomValues ReceivedRandomValues
+subscriptions model =
+    Sub.batch
+        [ receiveRandomValues ReceivedRandomValues
+        , case model.selectedNote of
+            Just n ->
+                onKeyDown (JD.map (selectedNoteHotkeys n) (JD.field "key" JD.string))
+
+            Nothing ->
+                Sub.none
+        ]
+
+
+
+--
 
 
 type alias LabelsColumnMenu =
@@ -92,6 +126,7 @@ type Msg
     | ReceivedRandomValues (List Int)
     | RemoveLabelFromNote { noteID : SyncableID, labelID : SyncableID }
     | SelectedNote SyncableID
+    | DeselectNote
     | ClickedMouse
     | EditNote SyncableID
     | RequestTimeForNewNoteCreation
@@ -155,6 +190,14 @@ update msg model =
 
         EditNote id ->
             ( model, Route.replaceUrl model.key (Route.EditNote id), Nothing )
+
+        DeselectNote ->
+            case model.selectedNote of
+                Just _ ->
+                    ( { model | selectedNote = Nothing }, Cmd.none, Nothing )
+
+                Nothing ->
+                    model |> pureNoSignal
 
         ClickedMouse ->
             case model.selectedNote of
@@ -376,7 +419,7 @@ alwaysStopPropagation x =
 
 clickedOnSelectedNote : Svg.Styled.Attribute Msg
 clickedOnSelectedNote =
-    stopPropagationOn "click" (Json.Decode.succeed ( NoOp, True ))
+    stopPropagationOn "click" (JD.succeed ( NoOp, True ))
 
 
 view : Model -> Bool -> Html Msg
@@ -683,7 +726,6 @@ labelsMenuColumn { labels, filters, labelsMenu } =
 
 notesGrid : Model -> Html Msg
 notesGrid model =
-    -- TODO: add sorting of notes, add an order prop in back
     let
         header =
             div
@@ -722,7 +764,9 @@ notesGrid model =
                     ]
                 ]
     in
-    div [ css [ width (pct 100), overflowY auto ] ]
+    div
+        [ css [ width (pct 100), overflowY auto ]
+        ]
         [ col
             [ css
                 [ paddingTop (px 28)
@@ -787,6 +831,7 @@ notesGrid model =
         ]
 
 
+flippedComparison : { a | order : comparable } -> { b | order : comparable } -> Order
 flippedComparison a b =
     case compare a.order b.order of
         LT ->
@@ -895,7 +940,7 @@ note model ( data, order, selected ) =
                                             ]
                                         , type_ "button"
                                         , stopPropagationOn "click"
-                                            (Json.Decode.succeed
+                                            (JD.succeed
                                                 ( RemoveLabelFromNote
                                                     { noteID = data.id
                                                     , labelID = l.id
@@ -1053,7 +1098,7 @@ note model ( data, order, selected ) =
                     []
 
                 else
-                    [ stopPropagationOn "click" (Json.Decode.succeed ( SelectedNote data.id, True ))
+                    [ stopPropagationOn "click" (JD.succeed ( SelectedNote data.id, True ))
                     ]
                 -- TODO: unselect on click outside of note
                )
@@ -1062,9 +1107,6 @@ note model ( data, order, selected ) =
         , noteTitle
         , content
         , labelsFooter
-
-        -- TODO: DEV
-        , p [ css [ publicSans, padding (px 4) ] ] [ text (data.order |> String.fromInt) ]
         , bottomActions
         ]
 
