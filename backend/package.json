@@ -7,6 +7,7 @@
     "db:push": "prisma db push"
   },
   "dependencies": {
+    "@faker-js/faker": "8.2.0",
     "@prisma/client": "5.3.1",
     "elysia": "latest"
   },
