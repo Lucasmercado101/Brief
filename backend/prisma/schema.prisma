@@ -33,8 +33,6 @@ model Note {
   labels    Label[]
   User      User     @relation(fields: [userId], references: [id])
   userId    Int
-
-  @@unique([order, userId])
 }
 
 model User {
