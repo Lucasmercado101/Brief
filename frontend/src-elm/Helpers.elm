@@ -132,3 +132,18 @@ getCurrentTime : (Posix -> msg) -> Cmd msg
 getCurrentTime msg =
     Time.now
         |> Task.perform msg
+
+
+elIsIn : List a -> (c -> a -> Bool) -> c -> Bool
+elIsIn list pred el =
+    List.any (pred el) list
+
+
+mapToWithDefault : b -> (a -> b) -> Maybe a -> b
+mapToWithDefault default fn maybe =
+    case maybe of
+        Just v ->
+            fn v
+
+        Nothing ->
+            default

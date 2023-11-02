@@ -8,7 +8,7 @@ import Css exposing (backgroundColor, backgroundImage, backgroundRepeat, backgro
 import DataTypes exposing (Label, Note)
 import Dog exposing (dogSvg)
 import Either exposing (Either(..))
-import Helpers exposing (exclude, labelIDsSplitter, listFirst, maybeToBool, sameId)
+import Helpers exposing (elIsIn, exclude, labelIDsSplitter, listFirst, mapToWithDefault, maybeToBool, sameId)
 import Html
 import Html.Styled exposing (Html, br, button, div, form, img, input, label, li, nav, p, span, strong, text, textarea, ul)
 import Html.Styled.Attributes exposing (class, css, for, id, placeholder, src, style, title, type_, value)
@@ -20,7 +20,7 @@ import Page.EditLabels as EditLabels
 import Page.EditNote as EditNote
 import Page.Home as Home exposing (Signal(..))
 import Page.LogIn as LogIn
-import Ports exposing (requestRandomValues, updateLastSyncedAt)
+import Ports exposing (isNowOffline, isNowOnline, requestRandomValues, updateLastSyncedAt)
 import Random
 import Random.Char
 import Random.Extra
@@ -40,22 +40,26 @@ subscriptions model =
             Sub.none
 
         LoggedIn { page } ->
-            let
-                map msg =
-                    Sub.map (\e -> GotPageMsg (msg e))
-            in
-            case page of
-                Home homeModel ->
-                    Home.subscriptions homeModel
-                        |> map GotHomeMsg
+            Sub.batch
+                [ isNowOffline IsOffline
+                , isNowOnline IsOnline
+                , let
+                    map msg =
+                        Sub.map (\e -> GotPageMsg (msg e))
+                  in
+                  case page of
+                    Home homeModel ->
+                        Home.subscriptions homeModel
+                            |> map GotHomeMsg
 
-                EditLabels editLabelsModel ->
-                    EditLabels.subscriptions editLabelsModel
-                        |> map GotEditLabelsMsg
+                    EditLabels editLabelsModel ->
+                        EditLabels.subscriptions editLabelsModel
+                            |> map GotEditLabelsMsg
 
-                EditNote editNoteModel ->
-                    EditNote.subscriptions editNoteModel
-                        |> map GotEditNoteMsg
+                    EditNote editNoteModel ->
+                        EditNote.subscriptions editNoteModel
+                            |> map GotEditNoteMsg
+                ]
 
 
 
@@ -70,6 +74,7 @@ type Page
 
 type alias LoggedInModel =
     { page : Page
+    , isOnline : Bool
 
     -- sync stuff
     , offlineQueue : OfflineQueueOps
@@ -102,6 +107,8 @@ type Msg
     | GotPageMsg PageMsg
     | FullSyncResp (Result Http.Error Api.FullSyncResponse)
     | ReceivedChangesResp (Result Http.Error Api.ChangesResponse)
+    | IsOffline
+    | IsOnline
 
 
 
@@ -109,7 +116,7 @@ type Msg
 
 
 type alias Flags =
-    { seeds : List Int, hasSessionCookie : Bool, lastSyncedAt : Int }
+    { seeds : List Int, online : Bool, hasSessionCookie : Bool, lastSyncedAt : Int }
 
 
 init : Flags -> Url -> Nav.Key -> ( Model, Cmd Msg )
@@ -118,7 +125,7 @@ init flags url navKey =
         seeds =
             List.map Random.initialSeed flags.seeds
     in
-    if flags.hasSessionCookie then
+    if not flags.hasSessionCookie then
         ( LoggedOff (LogIn.init navKey seeds), Cmd.none )
 
     else
@@ -126,6 +133,7 @@ init flags url navKey =
             { offlineQueue = emptyOfflineQueue
             , runningQueueOn = Nothing
             , lastSyncedAt = Time.millisToPosix flags.lastSyncedAt
+            , isOnline = flags.online
             , page =
                 case Route.fromUrl url of
                     -- TODO: notes and labels should be combined into
@@ -178,6 +186,22 @@ main =
 update : Msg -> Model -> ( Model, Cmd Msg )
 update topMsg topModel =
     case topMsg of
+        IsOffline ->
+            case topModel of
+                LoggedIn m ->
+                    LoggedIn { m | isOnline = False } |> pure
+
+                LoggedOff _ ->
+                    topModel |> pure
+
+        IsOnline ->
+            case topModel of
+                LoggedIn m ->
+                    LoggedIn { m | isOnline = True } |> pure
+
+                LoggedOff _ ->
+                    topModel |> pure
+
         -- TODO: fix this
         ClickedLink _ ->
             -- TODO:
@@ -203,6 +227,7 @@ update topMsg topModel =
                                 , offlineQueue = emptyOfflineQueue
                                 , runningQueueOn = Nothing
                                 , lastSyncedAt = Time.millisToPosix 1
+                                , isOnline = True
                                 }
                             , Cmd.batch [ Api.fullSync FullSyncResp, requestRandomValues () ]
                             )
@@ -456,9 +481,8 @@ update topMsg topModel =
                                         | notes =
                                             let
                                                 ( _, notOutdatedNotes ) =
-                                                    List.partition
-                                                        (\e -> List.any (\l -> sameId (DatabaseID l.id) e.id) downSyncedData.notes)
-                                                        m.notes
+                                                    m.notes
+                                                        |> List.partition (elIsIn downSyncedData.notes (\a b -> sameId a.id (DatabaseID b.id)))
 
                                                 updatedNotes : List Note
                                                 updatedNotes =
@@ -477,33 +501,31 @@ update topMsg topModel =
                                             in
                                             notOutdatedNotes
                                                 -- remove the ones that were failed to create
-                                                |> exclude (\l -> List.any (\e -> sameId l.id (OfflineID e)) failedToCreate)
+                                                |> exclude (elIsIn failedToCreate (\a b -> sameId a.id (OfflineID b)))
                                                 -- remove the ones that don't exist in DB
-                                                |> exclude (\l -> List.any (\e -> sameId l.id (DatabaseID e)) deleted.notes)
+                                                |> exclude (elIsIn deleted.notes (\a b -> sameId a.id (DatabaseID b)))
                                                 -- update just created
                                                 |> List.map
                                                     (\l ->
-                                                        case listFirst (\( _, offlineId ) -> sameId l.id (OfflineID offlineId)) justCreatedData.notes of
-                                                            Just ( v, _ ) ->
-                                                                { id = DatabaseID v.id
-                                                                , title = v.title
-                                                                , content = v.content
-                                                                , pinned = v.pinned
-                                                                , createdAt = v.createdAt
-                                                                , updatedAt = v.updatedAt
-                                                                , labels = v.labels |> List.map DatabaseID
-                                                                }
-
-                                                            Nothing ->
-                                                                l
+                                                        (justCreatedData.notes |> listFirst (\( _, offlineId ) -> sameId l.id (OfflineID offlineId)))
+                                                            |> mapToWithDefault l
+                                                                (\( v, _ ) ->
+                                                                    { id = DatabaseID v.id
+                                                                    , title = v.title
+                                                                    , content = v.content
+                                                                    , pinned = v.pinned
+                                                                    , createdAt = v.createdAt
+                                                                    , updatedAt = v.updatedAt
+                                                                    , labels = v.labels |> List.map DatabaseID
+                                                                    }
+                                                                )
                                                     )
                                                 |> (++) updatedNotes
                                         , labels =
                                             let
                                                 ( _, notOutdatedLabels ) =
-                                                    List.partition
-                                                        (\e -> List.any (\l -> sameId (DatabaseID l.id) e.id) downSyncedData.labels)
-                                                        m.labels
+                                                    m.labels
+                                                        |> List.partition (elIsIn downSyncedData.labels (\a b -> sameId a.id (DatabaseID b.id)))
 
                                                 updatedLabels : List Label
                                                 updatedLabels =
@@ -519,22 +541,21 @@ update topMsg topModel =
                                             in
                                             notOutdatedLabels
                                                 -- remove the ones that were failed to create
-                                                |> exclude (\l -> List.any (\e -> sameId l.id (OfflineID e)) failedToCreate)
+                                                |> exclude (elIsIn failedToCreate (\a b -> sameId a.id (OfflineID b)))
                                                 -- remove the ones that don't exist in DB
-                                                |> exclude (\l -> List.any (\e -> sameId l.id (DatabaseID e)) deleted.labels)
+                                                |> exclude (elIsIn deleted.labels (\a b -> sameId a.id (DatabaseID b)))
                                                 -- update just created
                                                 |> List.map
                                                     (\l ->
-                                                        case listFirst (\( _, offlineId ) -> sameId l.id (OfflineID offlineId)) justCreatedData.labels of
-                                                            Just ( v, _ ) ->
-                                                                { id = DatabaseID v.id
-                                                                , name = v.name
-                                                                , createdAt = v.createdAt
-                                                                , updatedAt = v.updatedAt
-                                                                }
-
-                                                            Nothing ->
-                                                                l
+                                                        (justCreatedData.labels |> listFirst (\( _, offlineId ) -> sameId l.id (OfflineID offlineId)))
+                                                            |> mapToWithDefault l
+                                                                (\( v, _ ) ->
+                                                                    { id = DatabaseID v.id
+                                                                    , name = v.name
+                                                                    , createdAt = v.createdAt
+                                                                    , updatedAt = v.updatedAt
+                                                                    }
+                                                                )
                                                     )
                                                 |> (++) updatedLabels
                                     }
@@ -569,6 +590,8 @@ update topMsg topModel =
                                         EditNote editNoteModel ->
                                             case editNoteModel.noteId of
                                                 OfflineID offlineId ->
+                                                    -- NOTE: what i'm doing here is changing the editing from editing an offlineID note
+                                                    -- to the one that was just created using a DatabaseID now
                                                     let
                                                         justCreatedTheNote =
                                                             listFirst (\( onlineId, prevOfflineId ) -> prevOfflineId == offlineId) justCreatedData.notes
@@ -612,6 +635,7 @@ update topMsg topModel =
                                                         Nothing ->
                                                             deleteLabelId
                                                 )
+                                            |> exclude (\en -> List.any (\failedId -> en == OfflineID failedId) failedToCreate)
                                     , deleteNotes =
                                         loggedInModel.offlineQueue.deleteNotes
                                             |> List.map
@@ -627,6 +651,7 @@ update topMsg topModel =
                                                         Nothing ->
                                                             deleteNoteId
                                                 )
+                                            |> exclude (\en -> List.any (\failedId -> en == OfflineID failedId) failedToCreate)
                                     , editNotes =
                                         loggedInModel.offlineQueue.editNotes
                                             |> List.map
@@ -642,6 +667,7 @@ update topMsg topModel =
                                                         Nothing ->
                                                             editNote
                                                 )
+                                            |> exclude (\en -> List.any (\failedId -> en.id == OfflineID failedId) failedToCreate)
                                     , changeLabelNames =
                                         loggedInModel.offlineQueue.changeLabelNames
                                             |> List.map
@@ -657,11 +683,13 @@ update topMsg topModel =
                                                         Nothing ->
                                                             changeLabelName
                                                 )
+                                            |> exclude (\en -> List.any (\failedId -> en.id == OfflineID failedId) failedToCreate)
                                     }
                             in
                             ( LoggedIn
                                 { page = updatedPageModel
                                 , offlineQueue = emptyOfflineQueue
+                                , isOnline = loggedInModel.isOnline
                                 , runningQueueOn =
                                     if offlineQueueIsEmpty updatedOfflineQueue then
                                         Nothing

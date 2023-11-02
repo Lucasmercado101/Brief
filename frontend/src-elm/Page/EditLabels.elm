@@ -61,15 +61,15 @@ type EditLabelKind
 
 
 type alias Model =
-    { key : Nav.Key
-    , seeds : List Random.Seed
-    , selected : List EditLabelKind
+    { selected : List EditLabelKind
     , searchQuery : String
     , confirmDeleteAllSelectedLabels : Bool
 
     -- global data
-    , labels : List Label
+    , key : Nav.Key
+    , seeds : List Random.Seed
     , notes : List Note
+    , labels : List Label
     }
 
 
