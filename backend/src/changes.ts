@@ -109,6 +109,7 @@ export default () =>
           title: string | null;
           content: string;
           pinned: boolean;
+          order: number | null;
           createdAt: Date;
           updatedAt: Date;
           userId: number;
@@ -120,6 +121,7 @@ export default () =>
           title: string | null;
           content: string;
           pinned: boolean;
+          order: number | null;
           createdAt: Date;
           updatedAt: Date;
           userId: number;
@@ -229,14 +231,22 @@ export default () =>
         }
 
         if (createNotes.length > 0) {
+          let currentNotesAmount =
+            (await prisma.note.count({
+              where: {
+                userId: userId
+              }
+            })) + 1;
+
           const newNotesPromises = createNotes.map(
-            ({ title, content, pinned, labels, offlineId }) => {
+            ({ title, content, pinned, labels, offlineId, order }) => {
               const newNote = prisma.note.create({
                 data: {
                   title,
                   content,
                   pinned,
                   userId,
+                  order: order ?? currentNotesAmount++,
                   labels: {
                     // if some label failed to create or just got given
                     // offline id then just ignore it and don't connect it
@@ -300,6 +310,7 @@ export default () =>
                     title: true,
                     content: true,
                     pinned: true,
+                    order: true,
                     createdAt: true,
                     updatedAt: true,
                     userId: true,
@@ -518,6 +529,7 @@ type NewNote = {
   title?: string;
   content: string;
   pinned: boolean;
+  order?: number;
   labels?: (string | number)[];
 };
 
@@ -534,6 +546,7 @@ type EditNote = {
   title: string;
   content: string;
   pinned: boolean;
+  order: number;
   labels: ID[];
 };
 

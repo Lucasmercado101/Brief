@@ -29,9 +29,12 @@ model Note {
   pinned    Boolean  @default(false)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  order     Int
   labels    Label[]
   User      User     @relation(fields: [userId], references: [id])
   userId    Int
+
+  @@unique([order, userId])
 }
 
 model User {
