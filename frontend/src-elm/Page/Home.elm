@@ -267,7 +267,13 @@ update msg model =
                                         )
                                         model.notes
                             }
-                                |> pureNoSignal
+                                |> pureWithSignal
+                                    (OfflineQueueAction
+                                        (QSwitchNoteOrders
+                                            ( noteExists.id, noteExists.order )
+                                            ( biggerOrderNoteExists.id, biggerOrderNoteExists.order )
+                                        )
+                                    )
 
                         Nothing ->
                             model |> pureNoSignal
@@ -317,7 +323,13 @@ update msg model =
                                         )
                                         model.notes
                             }
-                                |> pureNoSignal
+                                |> pureWithSignal
+                                    (OfflineQueueAction
+                                        (QSwitchNoteOrders
+                                            ( noteExists.id, noteExists.order )
+                                            ( smallerOrderNoteExists.id, smallerOrderNoteExists.order )
+                                        )
+                                    )
 
                         Nothing ->
                             model |> pureNoSignal
