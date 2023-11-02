@@ -290,7 +290,7 @@ export default () =>
         if (editNotes.length > 0) {
           const editNotesPromises = editNotes
             .filter((e) => typeof e.id === "number")
-            .map(({ id, title, content, pinned, labels }) => {
+            .map(({ id, title, content, pinned, labels, order }) => {
               // if some label failed to create or just got given
               // offline id then just ignore it and don't connect it
               const labelsIds = labels
@@ -322,6 +322,7 @@ export default () =>
                     title,
                     content,
                     pinned,
+                    order,
                     ...(labels !== undefined && {
                       labels: {
                         set: labelsIds
