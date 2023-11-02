@@ -490,6 +490,11 @@ update topMsg topModel =
                                                     downSyncedData.notes
                                                         |> List.map
                                                             (\e ->
+                                                                let
+                                                                    oldNote : Maybe Note
+                                                                    oldNote =
+                                                                        listFirst (\l -> sameId (DatabaseID e.id) l.id) m.notes
+                                                                in
                                                                 { id = DatabaseID e.id
                                                                 , title = e.title
                                                                 , content = e.content
@@ -497,7 +502,19 @@ update topMsg topModel =
                                                                 , createdAt = e.createdAt
                                                                 , updatedAt = e.updatedAt
                                                                 , labels = e.labels |> List.map DatabaseID
-                                                                , order = e.order
+                                                                , order =
+                                                                    -- NOTE: workaround to backend not having unique userID & noteOrder constraint
+                                                                    -- essentially order can get mixed up and 2 notes can have the same order
+                                                                    -- if i don't do this, as i could change notes order and backend could reply late
+                                                                    -- with note data and if order gets replaced with backend new data then multiple notes
+                                                                    -- could end up with the same order number.
+                                                                    -- this case happens when moving notes around faster than backend replies in between
+                                                                    case oldNote of
+                                                                        Just v ->
+                                                                            v.order
+
+                                                                        Nothing ->
+                                                                            e.order
                                                                 }
                                                             )
                                             in
