@@ -129,6 +129,7 @@ update msg model =
                     , content = "Hello world!"
                     , pinned = False
                     , labels = []
+                    , order = Nothing
                     }
             in
             -- TODO: handle case where note could not be created but i'm in note editing page
@@ -142,6 +143,7 @@ update msg model =
                     , createdAt = currentTime
                     , updatedAt = currentTime
                     , labels = []
+                    , order = List.length model.notes + 1
                     }
                         :: model.notes
               }
@@ -646,6 +648,7 @@ notesGrid model =
                         ]
                         (List.map (note model)
                             (model.notes
+                                |> List.sortWith flippedComparison
                                 |> prioritizePinned
                                 |> (\e ->
                                         case model.filters.label of
@@ -679,6 +682,18 @@ notesGrid model =
                         )
             ]
         ]
+
+
+flippedComparison a b =
+    case compare a.order b.order of
+        LT ->
+            GT
+
+        EQ ->
+            EQ
+
+        GT ->
+            LT
 
 
 note : Model -> ( Note, Bool ) -> Html Msg

@@ -16,6 +16,7 @@ type alias Note =
     , createdAt : Posix
     , updatedAt : Posix
     , labels : List SyncableID
+    , order : Int
     }
 
 
