@@ -2,6 +2,7 @@
   display: none;
 }
 .note-label:hover .note-label-remove-button {
+  /* TODO: fix it going over to the next line on hover and preventing me from deleting it */
   display: block;
 }
 
