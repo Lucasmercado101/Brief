@@ -288,6 +288,10 @@ export default () =>
         }
 
         if (editNotes.length > 0) {
+          // NOTE: It IS possible to mess up order
+          // as i removed the unique order number per userId restraint
+          // on the schema, so call changes endpoint with care
+
           const editNotesPromises = editNotes
             .filter((e) => typeof e.id === "number")
             .map(({ id, title, content, pinned, labels, order }) => {
