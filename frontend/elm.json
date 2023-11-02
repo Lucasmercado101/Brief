@@ -20,7 +20,8 @@
             "elm-community/random-extra": "3.2.0",
             "icidasset/elm-material-icons": "11.0.0",
             "rtfeldman/elm-css": "18.0.0",
-            "toastal/either": "3.6.3"
+            "toastal/either": "3.6.3",
+            "webbhuset/elm-json-decode": "1.2.0"
         },
         "indirect": {
             "elm/bytes": "1.0.8",
