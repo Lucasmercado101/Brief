@@ -846,6 +846,7 @@ notesGrid model windowRes =
                                 , flexWrap wrap
                                 , marginLeft (px sidesMargin)
                                 , gap noteCardGridGapSize
+                                , alignItems flexStart
                                 ]
                             ]
                             (List.map (noteCard model)
