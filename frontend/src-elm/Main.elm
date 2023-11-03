@@ -209,7 +209,7 @@ update topMsg topModel =
                     if offlineQueueIsEmpty loggedInModel.offlineQueue then
                         -- TODO: call fullRespSync to see if we're outdated?
                         -- or just leave it to the changes endpoint to retreat all new stuff?
-                        topModel |> pure
+                        LoggedIn { loggedInModel | isOnline = True } |> pure
 
                     else
                         let
@@ -976,10 +976,19 @@ view model =
             LoggedOff logInModel ->
                 Html.Styled.map GotLogInMsg (LogIn.logInView logInModel)
 
-            LoggedIn { page, runningQueueOn, windowRes } ->
+            LoggedIn { page, runningQueueOn, windowRes, isOnline } ->
                 case page of
                     Home homeModel ->
-                        Html.Styled.map GotHomeMsg (Home.view homeModel windowRes (maybeToBool runningQueueOn))
+                        Html.Styled.map GotHomeMsg
+                            (Home.view homeModel
+                                windowRes
+                                (if isOnline then
+                                    Just (maybeToBool runningQueueOn)
+
+                                 else
+                                    Nothing
+                                )
+                            )
 
                     EditLabels editLabelsModel ->
                         Html.Styled.map GotEditLabelsMsg (EditLabels.view editLabelsModel)
