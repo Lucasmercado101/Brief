@@ -440,8 +440,37 @@ clickedOnSelectedNote =
     stopPropagationOn "click" (JD.succeed ( NoOp, True ))
 
 
-view : Model -> { width : Int, height : Int } -> Bool -> Html Msg
-view model windowRes isSyncing =
+view : Model -> { width : Int, height : Int } -> Maybe Bool -> Html Msg
+view model windowRes isOnline =
+    let
+        labelsMenuBtn =
+            let
+                labelsCount =
+                    model.labels |> List.length |> String.fromInt
+            in
+            case model.labelsMenu of
+                Just _ ->
+                    openLabelsMenuBtn labelsCount
+
+                Nothing ->
+                    closedLabelsMenuBtn labelsCount
+
+        syncIcon =
+            (case isOnline of
+                Just isSyncing ->
+                    if isSyncing then
+                        Outlined.sync
+
+                    else
+                        Outlined.cloud
+
+                Nothing ->
+                    Outlined.wifi_off
+            )
+                28
+                Inherit
+                |> Svg.Styled.fromUnstyled
+    in
     div
         [ case model.selectedNote of
             Just val ->
@@ -464,31 +493,16 @@ view model windowRes isSyncing =
                 , justifyContent spaceBetween
                 ]
             ]
-            [ let
-                labelsCount =
-                    model.labels |> List.length |> String.fromInt
-              in
-              case model.labelsMenu of
-                Just _ ->
-                    openLabelsMenuBtn labelsCount
-
-                Nothing ->
-                    closedLabelsMenuBtn labelsCount
-            , p
-                [ css
-                    [ fontSize (px 25)
+            [ labelsMenuBtn
+            , row [ css [ padding (px 12), justifyContent spaceBetween, width (pct 100) ] ]
+                [ p
+                    [ css
+                        [ fontSize (px 25)
+                        ]
                     ]
+                    [ text "Notes" ]
+                , syncIcon
                 ]
-                [ text "Notes" ]
-            , (if isSyncing then
-                Outlined.sync
-
-               else
-                Outlined.cloud
-              )
-                28
-                Inherit
-                |> Svg.Styled.fromUnstyled
             ]
         , div [ css [ displayFlex, height (pct 100), overflow hidden ] ]
             [ case model.labelsMenu of
