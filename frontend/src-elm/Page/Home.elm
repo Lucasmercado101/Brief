@@ -848,7 +848,7 @@ notesGrid model windowRes =
                                 , gap noteCardGridGapSize
                                 ]
                             ]
-                            (List.map (note model)
+                            (List.map (noteCard model)
                                 (model.notes
                                     |> List.sortWith flippedComparison
                                     |> prioritizePinned
@@ -901,8 +901,8 @@ flippedComparison a b =
             LT
 
 
-note : Model -> ( Note, Int, Bool ) -> Html Msg
-note model ( data, order, selected ) =
+noteCard : Model -> ( Note, Int, Bool ) -> Html Msg
+noteCard model ( data, order, selected ) =
     let
         noteTitle =
             case data.title of
@@ -921,7 +921,7 @@ note model ( data, order, selected ) =
 
         content =
             p
-                [ css [ publicSans, padding (px 10) ]
+                [ css [ publicSans, padding (px 10), height (pct 100) ]
                 ]
                 (let
                     -- NOTE: \n doesn't break into a newline so I do this
