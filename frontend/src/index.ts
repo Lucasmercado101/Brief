@@ -59,6 +59,7 @@ let lastSyncedAt = localStorage.getItem("lastSyncedAt");
 // @ts-ignore
 const app = Elm.Main.init({
   flags: {
+    windowSize: { width: window.innerWidth, height: window.innerHeight },
     online: window.navigator.onLine,
     seeds: Array.from(self.crypto.getRandomValues(new Uint32Array(4))),
     hasSessionCookie: !!hasSessionCookie,
@@ -75,6 +76,12 @@ window.addEventListener("offline", () => {
 });
 
 window.addEventListener("resize", () => {
+  const width = window.innerWidth;
+  const height = window.innerHeight;
+  app.ports.windowResized.send({ width, height });
+});
+
+app.ports.reqWindowSize.subscribe(function () {
   const width = window.innerWidth;
   const height = window.innerHeight;
   app.ports.windowResized.send({ width, height });

@@ -20,7 +20,7 @@ import Page.EditLabels as EditLabels
 import Page.EditNote as EditNote
 import Page.Home as Home exposing (Signal(..))
 import Page.LogIn as LogIn
-import Ports exposing (isNowOffline, isNowOnline, requestRandomValues, updateLastSyncedAt)
+import Ports exposing (getWindowSize, isNowOffline, isNowOnline, requestRandomValues, updateLastSyncedAt, windowResized)
 import Random
 import Random.Char
 import Random.Extra
@@ -43,6 +43,7 @@ subscriptions model =
             Sub.batch
                 [ isNowOffline IsOffline
                 , isNowOnline IsOnline
+                , windowResized WindowResized
                 , let
                     map msg =
                         Sub.map (\e -> GotPageMsg (msg e))
@@ -75,6 +76,7 @@ type Page
 type alias LoggedInModel =
     { page : Page
     , isOnline : Bool
+    , windowRes : { width : Int, height : Int }
 
     -- sync stuff
     , offlineQueue : OfflineQueueOps
@@ -109,6 +111,7 @@ type Msg
     | ReceivedChangesResp (Result Http.Error Api.ChangesResponse)
     | IsOffline
     | IsOnline
+    | WindowResized { width : Int, height : Int }
 
 
 
@@ -116,7 +119,12 @@ type Msg
 
 
 type alias Flags =
-    { seeds : List Int, online : Bool, hasSessionCookie : Bool, lastSyncedAt : Int }
+    { seeds : List Int
+    , online : Bool
+    , hasSessionCookie : Bool
+    , lastSyncedAt : Int
+    , windowSize : { width : Int, height : Int }
+    }
 
 
 init : Flags -> Url -> Nav.Key -> ( Model, Cmd Msg )
@@ -134,6 +142,7 @@ init flags url navKey =
             , runningQueueOn = Nothing
             , lastSyncedAt = Time.millisToPosix flags.lastSyncedAt
             , isOnline = flags.online
+            , windowRes = flags.windowSize
             , page =
                 case Route.fromUrl url of
                     -- TODO: notes and labels should be combined into
@@ -207,6 +216,14 @@ update topMsg topModel =
             -- TODO:
             topModel |> pure
 
+        WindowResized dimensions ->
+            case topModel of
+                LoggedOff _ ->
+                    topModel |> pure
+
+                LoggedIn loggedInModel ->
+                    LoggedIn { loggedInModel | windowRes = dimensions } |> pure
+
         ChangedUrl newUrl ->
             (-- TODO: double check or change Route model
              case topModel of
@@ -228,8 +245,13 @@ update topMsg topModel =
                                 , runningQueueOn = Nothing
                                 , lastSyncedAt = Time.millisToPosix 1
                                 , isOnline = True
+                                , windowRes = { width = 0, height = 0 }
                                 }
-                            , Cmd.batch [ Api.fullSync FullSyncResp, requestRandomValues () ]
+                            , Cmd.batch
+                                [ getWindowSize WindowResized
+                                , Api.fullSync FullSyncResp
+                                , requestRandomValues ()
+                                ]
                             )
 
                         Route.EditLabels ->
@@ -307,7 +329,7 @@ update topMsg topModel =
                                         |> pure
 
                                 Route.Home ->
-                                    LoggedIn
+                                    ( LoggedIn
                                         { loggedInModel
                                             | page =
                                                 Home
@@ -319,7 +341,8 @@ update topMsg topModel =
                                                         }
                                                     )
                                         }
-                                        |> pure
+                                    , getWindowSize WindowResized
+                                    )
 
                                 Route.EditLabels ->
                                     topModel |> pure
@@ -330,7 +353,7 @@ update topMsg topModel =
                         EditNote pageData ->
                             case Route.fromUrl newUrl of
                                 Route.Home ->
-                                    LoggedIn
+                                    ( LoggedIn
                                         { loggedInModel
                                             | page =
                                                 Home
@@ -342,10 +365,11 @@ update topMsg topModel =
                                                         }
                                                     )
                                         }
-                                        |> pure
+                                    , getWindowSize WindowResized
+                                    )
 
                                 Route.EditLabels ->
-                                    LoggedIn
+                                    ( LoggedIn
                                         { loggedInModel
                                             | page =
                                                 Home
@@ -357,7 +381,8 @@ update topMsg topModel =
                                                         }
                                                     )
                                         }
-                                        |> pure
+                                    , getWindowSize WindowResized
+                                    )
 
                                 Route.EditNote noteIdToEdit ->
                                     LoggedIn
@@ -717,6 +742,7 @@ update topMsg topModel =
                                     else
                                         Just updatedOfflineQueue
                                 , lastSyncedAt = justSyncedAt
+                                , windowRes = loggedInModel.windowRes
                                 }
                             , Cmd.batch
                                 [ cmd1
@@ -908,10 +934,10 @@ view model =
             LoggedOff logInModel ->
                 Html.Styled.map GotLogInMsg (LogIn.logInView logInModel)
 
-            LoggedIn { page, runningQueueOn } ->
+            LoggedIn { page, runningQueueOn, windowRes } ->
                 case page of
                     Home homeModel ->
-                        Html.Styled.map GotHomeMsg (Home.view homeModel (maybeToBool runningQueueOn))
+                        Html.Styled.map GotHomeMsg (Home.view homeModel windowRes (maybeToBool runningQueueOn))
 
                     EditLabels editLabelsModel ->
                         Html.Styled.map GotEditLabelsMsg (EditLabels.view editLabelsModel)

@@ -27,3 +27,10 @@ port goneOffline : (() -> msg) -> Sub msg
 
 
 port windowResized : ({ width : Int, height : Int } -> msg) -> Sub msg
+
+
+port reqWindowSize : () -> Cmd msg
+
+
+getWindowSize msg =
+    reqWindowSize ()

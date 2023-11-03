@@ -4,10 +4,10 @@ import Api exposing (SyncableID(..))
 import Browser.Events exposing (onKeyDown)
 import Browser.Navigation as Nav
 import Cmd.Extra exposing (pure)
-import Css exposing (alignItems, auto, backgroundColor, bold, bolder, border, border3, borderBottom3, borderLeft3, borderRight3, borderTop3, boxShadow4, center, color, column, cursor, displayFlex, ellipsis, flexDirection, flexStart, flexWrap, fontSize, fontWeight, height, hex, hidden, hover, inherit, int, justifyContent, margin, margin2, marginBottom, marginLeft, marginRight, marginTop, maxWidth, minHeight, minWidth, noWrap, overflow, overflowY, padding, padding2, paddingLeft, paddingRight, paddingTop, pct, pointer, position, property, px, rgb, solid, spaceBetween, start, sticky, textAlign, textOverflow, top, transparent, whiteSpace, width, wrap)
+import Css exposing (alignItems, auto, backgroundColor, bold, bolder, border, border3, borderBottom3, borderLeft3, borderRight3, borderTop3, boxShadow4, center, color, column, cursor, displayFlex, ellipsis, flexDirection, flexStart, flexWrap, fontSize, fontWeight, height, hex, hidden, hover, inherit, int, justifyContent, margin, margin2, marginBottom, marginLeft, marginRight, marginTop, maxWidth, minHeight, minWidth, noWrap, overflow, overflowY, padding, padding2, paddingBottom, paddingLeft, paddingRight, paddingTop, pct, pointer, position, property, px, rgb, solid, spaceBetween, start, sticky, textAlign, textOverflow, top, transparent, whiteSpace, width, wrap)
 import CssHelpers exposing (black, col, delaGothicOne, displayGrid, error, fullWidth, gap, mx, padX, padY, primary, publicSans, row, secondary, textColor, userSelectNone, white)
 import DataTypes exposing (Label, Note)
-import Helpers exposing (exclude, getCurrentTime, idDiff, labelIDsSplitter, listFirst, or, partitionFirst, sameId)
+import Helpers exposing (exclude, getCurrentTime, idDiff, labelIDsSplitter, listFirst, maybeToBool, or, partitionFirst, sameId)
 import Html.Styled exposing (Html, br, button, div, form, img, input, label, li, nav, p, span, strong, text, textarea, ul)
 import Html.Styled.Attributes exposing (class, css, for, id, placeholder, src, style, title, type_, value)
 import Html.Styled.Events exposing (onClick, onInput, onSubmit, stopPropagationOn)
@@ -18,7 +18,7 @@ import Material.Icons.Outlined as Outlined
 import Material.Icons.Types exposing (Coloring(..))
 import OfflineQueue exposing (Action(..), OQCreateLabel, OQCreateNote, OQDeleteNote, OQEditNote, OfflineQueueOps, emptyOfflineQueue, offlineQueueIsEmpty, qCreateNewNote, qDeleteNote, qEditNoteLabels, qNewLabel, qToggleNotePin, queueToOperations)
 import Platform.Sub as Sub
-import Ports exposing (receiveRandomValues, requestRandomValues, updateLastSyncedAt)
+import Ports exposing (receiveRandomValues, requestRandomValues, updateLastSyncedAt, windowResized)
 import Random
 import Route
 import Svg.Styled
@@ -95,7 +95,13 @@ type alias Model =
     }
 
 
-init : { key : Nav.Key, seeds : List Random.Seed, labels : List Label, notes : List Note } -> Model
+init :
+    { key : Nav.Key
+    , seeds : List Random.Seed
+    , labels : List Label
+    , notes : List Note
+    }
+    -> Model
 init { key, seeds, labels, notes } =
     ({ key = key
      , seeds = seeds
@@ -434,8 +440,8 @@ clickedOnSelectedNote =
     stopPropagationOn "click" (JD.succeed ( NoOp, True ))
 
 
-view : Model -> Bool -> Html Msg
-view model isSyncing =
+view : Model -> { width : Int, height : Int } -> Bool -> Html Msg
+view model windowRes isSyncing =
     div
         [ case model.selectedNote of
             Just val ->
@@ -491,7 +497,7 @@ view model isSyncing =
 
                 Nothing ->
                     text ""
-            , notesGrid model
+            , notesGrid model windowRes
             ]
         ]
 
@@ -736,9 +742,45 @@ labelsMenuColumn { labels, filters, labelsMenu } =
         ]
 
 
-notesGrid : Model -> Html Msg
-notesGrid model =
+noteCardWidth =
+    240
+
+
+noteCardGridGapSize : number
+noteCardGridGapSize =
+    10
+
+
+notesGrid : Model -> { width : Int, height : Int } -> Html Msg
+notesGrid model windowRes =
     let
+        scrollbarWidth : number
+        scrollbarWidth =
+            -- more or less
+            50
+
+        menuWidth =
+            if maybeToBool model.labelsMenu then
+                labelsMenuWidth
+
+            else
+                0
+
+        notesPerRowRec : Float -> Float
+        notesPerRowRec total =
+            if total + noteCardWidth + noteCardGridGapSize + scrollbarWidth + menuWidth >= toFloat windowRes.width then
+                total - noteCardGridGapSize
+
+            else
+                notesPerRowRec (total + noteCardWidth + noteCardGridGapSize)
+
+        gridWidth : Float
+        gridWidth =
+            notesPerRowRec 0
+
+        sidesMargin =
+            (toFloat windowRes.width - gridWidth - menuWidth) / 2
+
         header =
             div
                 [ css
@@ -746,6 +788,9 @@ notesGrid model =
                     , justifyContent spaceBetween
                     , marginBottom (px 32)
                     , alignItems start
+                    , width (px gridWidth)
+                    , marginLeft (px sidesMargin)
+                    , paddingTop (px 28)
                     ]
                 ]
                 [ p
@@ -766,9 +811,7 @@ notesGrid model =
                         , cursor pointer
                         , textAlign center
                         , fontSize (px 18)
-
-                        -- 2 notes size + padding
-                        , width (px 505)
+                        , width (px (2 * noteCardWidth + noteCardGridGapSize))
                         ]
                     , onClick RequestTimeForNewNoteCreation
                     ]
@@ -780,12 +823,7 @@ notesGrid model =
         [ css [ width (pct 100), overflowY auto ]
         ]
         [ col
-            [ css
-                [ paddingTop (px 28)
-                , paddingRight (px 32)
-                , paddingLeft (px 32)
-                ]
-            ]
+            []
             [ header
             , case model.notes of
                 [] ->
@@ -793,41 +831,48 @@ notesGrid model =
                     div [] []
 
                 _ ->
-                    row
+                    div
                         [ -- TODO: give the tiled effect of google keep
                           -- using translate and transitions
                           css
-                            [ flexWrap wrap
-                            , marginTop (px 30)
+                            [ marginTop (px 30)
                             , alignItems flexStart
-                            , gap 10
-                            , margin2 (px 0) auto
+                            , paddingBottom (px 188)
                             ]
                         ]
-                        (List.map (note model)
-                            (model.notes
-                                |> List.sortWith flippedComparison
-                                |> prioritizePinned
-                                |> (\e ->
-                                        case model.filters.label of
-                                            Just label ->
-                                                e |> List.filter (\l -> List.any (\j -> j == label) l.labels)
+                        [ row
+                            [ css
+                                [ width (px gridWidth)
+                                , flexWrap wrap
+                                , marginLeft (px sidesMargin)
+                                , gap noteCardGridGapSize
+                                ]
+                            ]
+                            (List.map (note model)
+                                (model.notes
+                                    |> List.sortWith flippedComparison
+                                    |> prioritizePinned
+                                    |> (\e ->
+                                            case model.filters.label of
+                                                Just label ->
+                                                    e |> List.filter (\l -> List.any (\j -> j == label) l.labels)
 
-                                            Nothing ->
-                                                e
-                                   )
-                                |> List.indexedMap
-                                    (\i e ->
-                                        ( e
-                                        , i
-                                        , case model.selectedNote of
-                                            Nothing ->
-                                                False
+                                                Nothing ->
+                                                    e
+                                       )
+                                    |> List.indexedMap
+                                        (\i e ->
+                                            ( e
+                                            , i
+                                            , case model.selectedNote of
+                                                Nothing ->
+                                                    False
 
-                                            Just selId ->
-                                                sameId e.id selId
+                                                Just selId ->
+                                                    sameId e.id selId
+                                            )
                                         )
-                                    )
+                                )
                              -- TODO: for when multiple can be selected
                              -- |> List.map
                              --     (\e ->
@@ -838,7 +883,7 @@ notesGrid model =
                              --                 ( e, False )
                              --     )
                             )
-                        )
+                        ]
             ]
         ]
 
@@ -1083,8 +1128,8 @@ note model ( data, order, selected ) =
             ([ border3 (px 3) solid (rgb 0 0 0)
              , displayFlex
              , flexDirection column
-             , maxWidth (px 240)
-             , minWidth (px 240)
+             , maxWidth (px noteCardWidth)
+             , minWidth (px noteCardWidth)
              , minHeight (px 120)
              , backgroundColor (rgb 255 203 127)
              , hover [ boxShadow4 (px 6) (px 6) (px 0) (rgb 0 0 0) ]
