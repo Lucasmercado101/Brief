@@ -205,8 +205,43 @@ update topMsg topModel =
 
         IsOnline ->
             case topModel of
-                LoggedIn m ->
-                    LoggedIn { m | isOnline = True } |> pure
+                LoggedIn loggedInModel ->
+                    if offlineQueueIsEmpty loggedInModel.offlineQueue then
+                        -- TODO: call fullRespSync to see if we're outdated?
+                        -- or just leave it to the changes endpoint to retreat all new stuff?
+                        topModel |> pure
+
+                    else
+                        let
+                            ( labelsIds, notesIds ) =
+                                (case loggedInModel.page of
+                                    Home model ->
+                                        ( model.labels, model.notes )
+
+                                    EditNote model ->
+                                        ( model.labels, model.notes )
+
+                                    EditLabels model ->
+                                        ( model.labels, model.notes )
+                                )
+                                    |> (\( l, n ) -> ( l |> List.map .id |> labelIDsSplitter |> Tuple.second, n |> List.map .id |> labelIDsSplitter |> Tuple.second ))
+                        in
+                        ( LoggedIn
+                            { loggedInModel
+                                | offlineQueue = emptyOfflineQueue
+                                , runningQueueOn = Just loggedInModel.offlineQueue
+                                , isOnline = True
+                            }
+                        , Api.sendChanges
+                            { operations = queueToOperations loggedInModel.offlineQueue
+                            , lastSyncedAt = loggedInModel.lastSyncedAt
+                            , currentData =
+                                { notes = notesIds
+                                , labels = labelsIds
+                                }
+                            }
+                            ReceivedChangesResp
+                        )
 
                 LoggedOff _ ->
                     topModel |> pure
@@ -805,6 +840,7 @@ updateHomeWithSignal toPageModel toPageMsg topModel ( m, c, maybeSignal ) =
                     )
                     noteIds
                     labelIds
+                    topModel.isOnline
     )
         |> (\( m1, c1 ) -> ( LoggedIn m1, c1 ))
 
@@ -842,6 +878,7 @@ updateEditLabelsWithSignal toPageModel toPageMsg topModel ( m, c, maybeSignal ) 
                     )
                     noteIds
                     labelIds
+                    topModel.isOnline
     )
         |> (\( m1, c1 ) -> ( LoggedIn m1, c1 ))
 
@@ -879,35 +916,40 @@ updateEditNoteWithSignal toPageModel toPageMsg topModel ( m, c, maybeSignal ) =
                     )
                     noteIds
                     labelIds
+                    topModel.isOnline
     )
         |> (\( m1, c1 ) -> ( LoggedIn m1, c1 ))
 
 
-addToQueue : (OfflineQueueOps -> OfflineQueueOps) -> List Api.DbID -> List Api.DbID -> ( LoggedInModel, Cmd Msg ) -> ( LoggedInModel, Cmd Msg )
-addToQueue operation notesIds labelsIds ( model, cmds ) =
+addToQueue : (OfflineQueueOps -> OfflineQueueOps) -> List Api.DbID -> List Api.DbID -> Bool -> ( LoggedInModel, Cmd Msg ) -> ( LoggedInModel, Cmd Msg )
+addToQueue operation notesIds labelsIds isOnline ( model, cmds ) =
     let
         currentOperations =
             model.offlineQueue |> operation
     in
     case model.runningQueueOn of
         Nothing ->
-            ( { model
-                | offlineQueue = emptyOfflineQueue
-                , runningQueueOn = Just currentOperations
-              }
-            , Cmd.batch
-                [ Api.sendChanges
-                    { operations = queueToOperations currentOperations
-                    , lastSyncedAt = model.lastSyncedAt
-                    , currentData =
-                        { notes = notesIds
-                        , labels = labelsIds
+            if isOnline then
+                ( { model
+                    | offlineQueue = emptyOfflineQueue
+                    , runningQueueOn = Just currentOperations
+                  }
+                , Cmd.batch
+                    [ Api.sendChanges
+                        { operations = queueToOperations currentOperations
+                        , lastSyncedAt = model.lastSyncedAt
+                        , currentData =
+                            { notes = notesIds
+                            , labels = labelsIds
+                            }
                         }
-                    }
-                    ReceivedChangesResp
-                , cmds
-                ]
-            )
+                        ReceivedChangesResp
+                    , cmds
+                    ]
+                )
+
+            else
+                ( { model | offlineQueue = currentOperations }, cmds )
 
         Just _ ->
             ( { model | offlineQueue = currentOperations }, cmds )
