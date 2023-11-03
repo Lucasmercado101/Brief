@@ -18,12 +18,12 @@ isNowOnline msg =
     backOnline (always msg)
 
 
+port goneOffline : (() -> msg) -> Sub msg
+
+
 isNowOffline : msg -> Sub msg
 isNowOffline msg =
-    backOnline (always msg)
-
-
-port goneOffline : (() -> msg) -> Sub msg
+    goneOffline (always msg)
 
 
 port windowResized : ({ width : Int, height : Int } -> msg) -> Sub msg
