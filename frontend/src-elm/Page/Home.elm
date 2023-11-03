@@ -7,7 +7,7 @@ import Cmd.Extra exposing (pure)
 import Css exposing (alignItems, auto, backgroundColor, bold, bolder, border, border3, borderBottom3, borderLeft3, borderRight3, borderTop3, boxShadow4, center, color, column, cursor, displayFlex, ellipsis, flexDirection, flexStart, flexWrap, fontSize, fontWeight, height, hex, hidden, hover, inherit, int, justifyContent, margin, margin2, marginBottom, marginLeft, marginRight, marginTop, maxWidth, minHeight, minWidth, noWrap, overflow, overflowY, padding, padding2, paddingBottom, paddingLeft, paddingRight, paddingTop, pct, pointer, position, property, px, rgb, solid, spaceBetween, start, sticky, textAlign, textOverflow, top, transparent, whiteSpace, width, wrap)
 import CssHelpers exposing (black, col, delaGothicOne, displayGrid, error, fullWidth, gap, mx, padX, padY, primary, publicSans, row, secondary, textColor, userSelectNone, white)
 import DataTypes exposing (Label, Note)
-import Helpers exposing (exclude, getCurrentTime, idDiff, labelIDsSplitter, listFirst, maybeToBool, or, partitionFirst, sameId)
+import Helpers exposing (elIsIn, exclude, getCurrentTime, idDiff, labelIDsSplitter, listFirst, maybeToBool, or, partitionFirst, sameId)
 import Html.Styled exposing (Html, br, button, div, form, img, input, label, li, nav, p, span, strong, text, textarea, ul)
 import Html.Styled.Attributes exposing (class, css, for, id, placeholder, src, style, title, type_, value)
 import Html.Styled.Events exposing (onClick, onInput, onSubmit, stopPropagationOn)
@@ -139,6 +139,7 @@ type Msg
     | CreateAndEditNote Posix
     | IncreaseNoteOrder SyncableID
     | DecreaseNoteOrder SyncableID
+    | ClearLabelFilter
       -- Labels menu
     | SelectLabelToFilterBy SyncableID
     | OpenLabelsMenu
@@ -200,7 +201,7 @@ update msg model =
         DeselectNote ->
             case model.selectedNote of
                 Just _ ->
-                    ( { model | selectedNote = Nothing }, Cmd.none, Nothing )
+                    { model | selectedNote = Nothing } |> pureNoSignal
 
                 Nothing ->
                     model |> pureNoSignal
@@ -208,10 +209,13 @@ update msg model =
         ClickedMouse ->
             case model.selectedNote of
                 Just _ ->
-                    ( { model | selectedNote = Nothing }, Cmd.none, Nothing )
+                    { model | selectedNote = Nothing } |> pureNoSignal
 
                 Nothing ->
                     model |> pureNoSignal
+
+        ClearLabelFilter ->
+            { model | filters = { content = model.filters.content, label = Nothing } } |> pureNoSignal
 
         ChangeNotePinned ( uid, newPinnedVal ) ->
             { model
@@ -832,13 +836,90 @@ notesGrid model windowRes =
                     [ text "CREATE NEW NOTE"
                     ]
                 ]
+
+        filteredByLabelHeader filterLabel =
+            let
+                amount =
+                    model.notes
+                        |> List.filter (\e -> List.any (\r -> r == filterLabel.id) e.labels)
+                        |> List.length
+            in
+            row
+                [ css
+                    [ displayFlex
+                    , justifyContent spaceBetween
+                    , marginBottom (px 32)
+                    , alignItems start
+                    , width (px gridWidth)
+                    , marginLeft (px sidesMargin)
+                    , paddingTop (px 28)
+                    ]
+                ]
+                [ col [ css [ paddingRight (px 50) ] ]
+                    [ p [ css [ publicSans, fontSize (px 22), textColor white ] ]
+                        (case amount of
+                            0 ->
+                                [ text "There are no notes with the label:" ]
+
+                            1 ->
+                                [ text "There is "
+                                , strong [] [ text "1" ]
+                                , text " note with the label:"
+                                ]
+
+                            _ ->
+                                [ text "There are "
+                                , strong [] [ text (String.fromInt amount) ]
+                                , text " notes with the label:"
+                                ]
+                        )
+                    , p
+                        [ css
+                            [ delaGothicOne
+                            , fontSize (px 42)
+                            , textColor white
+                            ]
+                        ]
+                        [ text filterLabel.name ]
+                    ]
+                , button
+                    [ css
+                        [ publicSans
+                        , fontWeight (int 800)
+                        , padY (px 18)
+                        , backgroundColor error
+                        , border3 (px 5) solid black
+                        , cursor pointer
+                        , textColor white
+                        , textAlign center
+                        , fontSize (px 18)
+                        , minWidth (px noteCardWidth)
+                        , maxWidth (px noteCardWidth)
+                        , hover [ backgroundColor black ]
+                        ]
+                    , onClick ClearLabelFilter
+                    ]
+                    [ text "CLEAR FILTERS"
+                    ]
+                ]
     in
     div
         [ css [ width (pct 100), overflowY auto ]
         ]
         [ col
             []
-            [ header
+            [ case model.filters.label of
+                Just filterLabel ->
+                    case listFirst (.id >> sameId filterLabel) model.labels of
+                        Just l ->
+                            filteredByLabelHeader l
+
+                        Nothing ->
+                            -- TODO: what now?
+                            header
+
+                Nothing ->
+                    header
             , case model.notes of
                 [] ->
                     -- TODO: add no notes empty state design
