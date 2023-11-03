@@ -1074,18 +1074,8 @@ noteCard model ( data, order, selected ) =
                     [ row []
                         [ div
                             [ css
-                                [ if data.pinned then
-                                    backgroundColor black
-
-                                  else
-                                    hover [ backgroundColor black, color white ]
-                                , color
-                                    (if data.pinned then
-                                        white
-
-                                     else
-                                        black
-                                    )
+                                [ hover [ backgroundColor black, color white ]
+                                , color black
                                 , borderRight3 (px 3) solid black
                                 , cursor pointer
                                 , padding (px 4)
@@ -1098,18 +1088,8 @@ noteCard model ( data, order, selected ) =
                             [ Filled.chevron_left 32 Inherit |> Svg.Styled.fromUnstyled ]
                         , div
                             [ css
-                                [ if data.pinned then
-                                    backgroundColor black
-
-                                  else
-                                    hover [ backgroundColor black, color white ]
-                                , color
-                                    (if data.pinned then
-                                        white
-
-                                     else
-                                        black
-                                    )
+                                [ hover [ backgroundColor black, color white ]
+                                , color black
                                 , borderRight3 (px 3) solid black
                                 , cursor pointer
                                 , padding (px 4)
