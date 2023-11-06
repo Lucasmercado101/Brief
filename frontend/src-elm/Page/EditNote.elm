@@ -304,6 +304,17 @@ update msg model =
                                         else
                                             e
                                     )
+                        , noteData =
+                            Maybe.map
+                                (\noteState ->
+                                    case noteState of
+                                        ConfirmDeletion noteData ->
+                                            ConfirmDeletion noteData
+
+                                        Editing noteData isEditingLabels ->
+                                            Editing { noteData | pinned = newVal } isEditingLabels
+                                )
+                                model.noteData
                       }
                     , Cmd.none
                     , Just (OfflineQueueAction (QToggleNotePin originalNote.id newVal))
