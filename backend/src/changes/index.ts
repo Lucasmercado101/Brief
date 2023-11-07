@@ -29,6 +29,7 @@ export default () =>
       switch (code) {
         case "VALIDATION":
           set.status = 400;
+          // TODO: maybe human readable error?
           return error.message;
         case "NOT_FOUND":
           set.status = 404;
