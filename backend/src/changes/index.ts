@@ -115,6 +115,7 @@ export default () =>
         // Strings will not make it to deleteLabelIds or deleteNoteIds
         // strings here means the client has not replaced the offline id
         // that was created in a previous request
+        // TODO: numbers only
         if (deleteLabelIds.length > 0) {
           const ids = deleteLabelIds.filter(
             (e) => typeof e === "number"
