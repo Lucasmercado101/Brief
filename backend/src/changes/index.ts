@@ -88,6 +88,7 @@ export default () =>
         // strings here means the client has not replaced the offline id
         // that was created in a previous request
         // TODO: numbers only
+        // * delete labels
         if (deleteLabelIds.length > 0) {
           const ids = deleteLabelIds.filter(
             (e) => typeof e === "number"
@@ -98,6 +99,7 @@ export default () =>
           });
         }
 
+        // * delete notes
         if (deleteNoteIds.length > 0) {
           const ids = deleteNoteIds.filter(
             (e) => typeof e === "number"
@@ -108,6 +110,7 @@ export default () =>
           });
         }
 
+        // * create labels
         if (createLabelsOp.length > 0) {
           await prisma.label.createMany({
             skipDuplicates: true,
@@ -163,6 +166,7 @@ export default () =>
           );
         }
 
+        // * create notes
         if (createNotes.length > 0) {
           let currentNotesAmount =
             (await prisma.note.count({
@@ -220,6 +224,7 @@ export default () =>
           );
         }
 
+        // * edit notes
         if (editNotes.length > 0) {
           // NOTE: It IS possible to mess up order
           // as i removed the unique order number per userId restraint
@@ -284,6 +289,7 @@ export default () =>
           );
         }
 
+        // * change labels names
         if (changeLabelsName.length > 0) {
           const changeLabelsNamePromises = changeLabelsName
             .filter((e) => typeof e.id === "number")
