@@ -55,7 +55,7 @@ export default () =>
     })
     .post(
       "/changes",
-      async ({ body, set, cookie: { session } }) => {
+      async ({ body, cookie: { session } }) => {
         const userId = session.value;
 
         let {
@@ -137,22 +137,18 @@ export default () =>
 
           createNotes = createNotes.map((note) => ({
             ...note,
-            labels: note.labels?.map((label) => {
-              const onlineLabel = newLabels.find((l) => l.offlineId === label);
-              // replace offline label with db label
-              if (onlineLabel) return onlineLabel.id;
-              else return label;
-            })
+            labels: note.labels?.map(
+              (label) =>
+                newLabels.find((l) => l.offlineId === label)?.id ?? label
+            )
           }));
 
           editNotes = editNotes.map((note) => ({
             ...note,
-            labels: note.labels?.map((label) => {
-              const onlineLabel = newLabels.find((l) => l.offlineId === label);
-              // replace offline label with db label
-              if (onlineLabel) return onlineLabel.id;
-              else return label;
-            })
+            labels: note.labels?.map(
+              (label) =>
+                newLabels.find((l) => l.offlineId === label)?.id ?? label
+            )
           }));
 
           changeLabelsName = changeLabelsName.map((label) => ({
