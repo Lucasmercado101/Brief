@@ -1,5 +1,6 @@
 import { Elysia, t } from "elysia";
 import { prisma, requiredCookieSession } from "../index";
+import { Label, Note } from "@prisma/client";
 import {
   NewLabel,
   NewNote,
@@ -71,46 +72,17 @@ export default () =>
         let notesNotEdited: EditNoteOp[] = [];
         let labelsNameNotChanged: ChangeLabelNameOp[] = [];
 
-        let newLabels: {
-          offlineId: string | undefined;
-          id: number;
-          name: string;
-          createdAt: Date;
-          updatedAt: Date;
-          ownerId: number;
-        }[] = [];
+        let newLabels: (Label & { offlineId: string | undefined })[] = [];
 
-        let newNotes: {
+        let newNotes: (Note & {
           offlineId: string;
-          id: number;
-          title: string | null;
-          content: string;
-          pinned: boolean;
-          order: number | null;
-          createdAt: Date;
-          updatedAt: Date;
-          userId: number;
-        }[] = [];
+        })[] = [];
 
-        let editedNotes: {
+        let editedNotes: (Note & {
           offlineId: ID;
-          id: number;
-          title: string | null;
-          content: string;
-          pinned: boolean;
-          order: number | null;
-          createdAt: Date;
-          updatedAt: Date;
-          userId: number;
-        }[] = [];
+        })[] = [];
 
-        let labelsNameEdited: {
-          id: number;
-          name: string;
-          createdAt: Date;
-          updatedAt: Date;
-          ownerId: number;
-        }[] = [];
+        let labelsNameEdited: Label[] = [];
 
         // Strings will not make it to deleteLabelIds or deleteNoteIds
         // strings here means the client has not replaced the offline id
