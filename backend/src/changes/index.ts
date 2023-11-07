@@ -223,7 +223,9 @@ export default () =>
           // on the schema, so call changes endpoint with care
 
           const editNotesPromises = editNotes
-            .filter((e) => typeof e.id === "number")
+            .filter(
+              (e): e is EditNoteOp & { id: number } => typeof e.id === "number"
+            )
             .map(({ id, title, content, pinned, labels, order }) => {
               // if some label failed to create or just got given
               // offline id then just ignore it and don't connect it
@@ -233,10 +235,10 @@ export default () =>
                   id: label
                 }));
 
-              const editNote = prisma.note
+              return prisma.note
                 .update({
                   where: {
-                    id: id as number,
+                    id: id,
                     userId: userId
                   },
                   select: {
@@ -265,7 +267,6 @@ export default () =>
                   }
                 })
                 .then((e) => ({ ...e, offlineId: id }));
-              return editNote;
             });
 
           (await Promise.allSettled(editNotesPromises)).forEach((e) => {
@@ -284,19 +285,21 @@ export default () =>
         // * change labels names
         if (changeLabelsName.length > 0) {
           const changeLabelsNamePromises = changeLabelsName
-            .filter((e) => typeof e.id === "number")
-            .map(({ id, name }) => {
-              const changeLabelName = prisma.label.update({
+            .filter(
+              (e): e is ChangeLabelNameOp & { id: number } =>
+                typeof e.id === "number"
+            )
+            .map(({ id, name }) =>
+              prisma.label.update({
                 where: {
-                  id: id as number,
+                  id: id,
                   ownerId: userId
                 },
                 data: {
                   name
                 }
-              });
-              return changeLabelName;
-            });
+              })
+            );
 
           (await Promise.allSettled(changeLabelsNamePromises)).forEach((e) => {
             if (e.status === "fulfilled") {
