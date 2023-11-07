@@ -171,26 +171,29 @@ export default () =>
 
           const newNotesPromises = createNotes.map(
             ({ title, content, pinned, labels, offlineId, order }) => {
-              const newNote = prisma.note.create({
-                data: {
-                  title,
-                  content,
-                  pinned,
-                  userId,
-                  order: order ?? currentNotesAmount++,
-                  labels: {
-                    // if some label failed to create or just got given
-                    // offline id then just ignore it and don't connect it
-                    connect:
-                      labels
-                        ?.filter((e) => typeof e === "number")
-                        .map((label) => ({
-                          id: label as number
-                        })) ?? []
+              // if some label failed to create or just got given an
+              // offline id then just ignore it and don't connect it
+              const labelsData =
+                labels
+                  ?.filter((e): e is number => typeof e === "number")
+                  .map((label) => ({
+                    id: label
+                  })) ?? [];
+
+              return prisma.note
+                .create({
+                  data: {
+                    title,
+                    content,
+                    pinned,
+                    userId,
+                    order: order ?? currentNotesAmount++,
+                    labels: {
+                      connect: labelsData
+                    }
                   }
-                }
-              });
-              return newNote.then((e) => ({ ...e, offlineId }));
+                })
+                .then((e) => ({ ...e, offlineId }));
             }
           );
 
@@ -200,15 +203,10 @@ export default () =>
             }
           });
 
-          editNotes = editNotes.map((note) => {
-            const noteOnlineId = newNotes.find(
-              (n) => n.offlineId === note.id
-            )?.id;
-            return {
-              ...note,
-              id: noteOnlineId ?? note.id
-            };
-          });
+          editNotes = editNotes.map((note) => ({
+            ...note,
+            id: newNotes.find((n) => n.offlineId === note.id)?.id ?? note.id
+          }));
 
           // NOTE: don't inquire further, if it couldn't create then don't
           // retry, don't fail, just send as "not created" in response
