@@ -7,7 +7,7 @@ const ID = z.union([offlineId, databaseId]);
 
 const deleteLabelsOp = z.object({
   operation: z.literal("DELETE_LABELS"),
-  ids: z.array(ID)
+  ids: z.array(z.number())
 });
 
 //
@@ -26,7 +26,7 @@ const createLabelsOp = z.object({
 
 const deleteNotesOp = z.object({
   operation: z.literal("DELETE_NOTES"),
-  ids: z.array(ID)
+  ids: z.array(z.number())
 });
 
 //

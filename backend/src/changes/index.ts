@@ -84,29 +84,17 @@ export default () =>
 
         let labelsNameEdited: Label[] = [];
 
-        // Strings will not make it to deleteLabelIds or deleteNoteIds
-        // strings here means the client has not replaced the offline id
-        // that was created in a previous request
-        // TODO: numbers only
         // * delete labels
         if (deleteLabelIds.length > 0) {
-          const ids = deleteLabelIds.filter(
-            (e) => typeof e === "number"
-          ) as number[];
-
           await prisma.label.deleteMany({
-            where: { id: { in: ids }, ownerId: userId }
+            where: { id: { in: deleteLabelIds }, ownerId: userId }
           });
         }
 
         // * delete notes
         if (deleteNoteIds.length > 0) {
-          const ids = deleteNoteIds.filter(
-            (e) => typeof e === "number"
-          ) as number[];
-
           await prisma.note.deleteMany({
-            where: { id: { in: ids }, userId: userId }
+            where: { id: { in: deleteNoteIds }, userId: userId }
           });
         }
 
