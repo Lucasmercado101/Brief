@@ -59,7 +59,7 @@ export default () =>
 
         let {
           changeLabelsName,
-          createLabels,
+          createLabels: createLabelsOp,
           createNotes,
           deleteLabelIds,
           deleteNoteIds,
@@ -136,24 +136,10 @@ export default () =>
           });
         }
 
-        if (createLabels.length > 0) {
-          // remove labels that already exist
-          const existingLabels = await prisma.label.findMany({
-            where: {
-              name: {
-                in: createLabels.map(({ name }) => name)
-              }
-            }
-          });
-
-          createLabels = createLabels.filter(
-            ({ name }) => !existingLabels.find((label) => label.name === name)
-          );
-
-          // create new labels
+        if (createLabelsOp.length > 0) {
           await prisma.label.createMany({
             skipDuplicates: true,
-            data: createLabels.map(({ name }) => ({
+            data: createLabelsOp.map(({ name }) => ({
               name,
               ownerId: userId
             }))
@@ -163,7 +149,7 @@ export default () =>
             .findMany({
               where: {
                 name: {
-                  in: createLabels.map(({ name }) => name)
+                  in: createLabelsOp.map(({ name }) => name)
                 },
                 ownerId: userId
               }
@@ -171,8 +157,9 @@ export default () =>
             .then((labels) => {
               return labels.map((label) => ({
                 ...label,
-                offlineId: createLabels.find(({ name }) => name === label.name)
-                  ?.offlineId
+                offlineId: createLabelsOp.find(
+                  ({ name }) => name === label.name
+                )?.offlineId
               }));
             });
 
@@ -203,7 +190,7 @@ export default () =>
 
           // NOTE: don't inquire further, if it couldn't create then don't
           // retry, don't fail, just send as "not created" in response
-          labelsNotCreated = createLabels.filter(
+          labelsNotCreated = createLabelsOp.filter(
             ({ name }) => !newLabels.find((label) => label.name === name)
           );
         }
