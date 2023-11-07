@@ -167,13 +167,7 @@ export default () =>
               },
               take: 1
             })
-            .then((e) => {
-              if (e?.order) {
-                return e.order + 1;
-              } else {
-                return 1;
-              }
-            });
+            .then((e) => (e?.order ? e.order + 1 : 1));
 
           const newNotesPromises = createNotes.map(
             ({ title, content, pinned, labels, offlineId, order }) => {
