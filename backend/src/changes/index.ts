@@ -156,12 +156,24 @@ export default () =>
 
         // * create notes
         if (createNotes.length > 0) {
-          let currentNotesAmount =
-            (await prisma.note.count({
+          let currentNotesAmount = await prisma.note
+            .findFirst({
               where: {
                 userId: userId
+              },
+              select: { order: true },
+              orderBy: {
+                order: "desc"
+              },
+              take: 1
+            })
+            .then((e) => {
+              if (e?.order) {
+                return e.order + 1;
+              } else {
+                return 1;
               }
-            })) + 1;
+            });
 
           const newNotesPromises = createNotes.map(
             ({ title, content, pinned, labels, offlineId, order }) => {
