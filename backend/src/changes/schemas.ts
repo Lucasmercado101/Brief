@@ -65,6 +65,11 @@ const changeLabelNameOp = z.object({
   name: z.string()
 });
 
+export type ID = z.infer<typeof ID>;
+
+export type NewLabel = z.infer<typeof newLabel>;
+export type NewNote = z.infer<typeof newNote>;
+
 export type DeleteLabelsOp = z.infer<typeof deleteLabelsOp>;
 export type CreateLabelsOp = z.infer<typeof createLabelsOp>;
 export type DeleteNotesOp = z.infer<typeof deleteNotesOp>;
