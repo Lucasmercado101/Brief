@@ -2,6 +2,7 @@ import { z } from "zod";
 
 const offlineId = z.string();
 const databaseId = z.number();
+const POSIX = z.coerce.date();
 
 const ID = z.union([offlineId, databaseId]);
 
@@ -88,4 +89,13 @@ const operation = z.discriminatedUnion("operation", [
 
 export type Operation = z.infer<typeof operation>;
 
-export const operations = z.array(operation);
+const operations = z.array(operation).nonempty();
+
+export const body = z.object({
+  operations,
+  lastSyncedAt: POSIX.optional(),
+  currentData: z.object({
+    labels: z.array(z.number()),
+    notes: z.array(z.number())
+  })
+});
