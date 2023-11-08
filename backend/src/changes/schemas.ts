@@ -86,4 +86,6 @@ const operation = z.discriminatedUnion("operation", [
   changeLabelNameOp
 ]);
 
+export type Operation = z.infer<typeof operation>;
+
 export const operations = z.array(operation);
