@@ -4,8 +4,8 @@ import Api exposing (Operation(..), SyncableID(..))
 import Browser exposing (Document, UrlRequest)
 import Browser.Navigation as Nav
 import Cmd.Extra exposing (pure)
-import Css exposing (alignItems, auto, backgroundColor, backgroundImage, backgroundRepeat, backgroundSize, border, border3, borderBottom3, borderLeft3, borderRight3, center, color, column, contain, cursor, displayFlex, flexDirection, fontSize, fontWeight, fullWidth, height, hidden, hover, int, justifyContent, maxWidth, overflow, padding, pct, pointer, position, px, repeat, rgb, solid, spaceBetween, sticky, textAlign, top, url, width)
-import CssHelpers exposing (black, col, mx, publicSans, row, secondary, white)
+import Css exposing (alignItems, auto, backgroundColor, backgroundImage, backgroundRepeat, backgroundSize, bold, border, border3, borderBottom3, borderLeft3, borderRight3, center, color, column, contain, cursor, displayFlex, ellipsis, flexDirection, fontSize, fontWeight, fullWidth, height, hidden, hover, inherit, int, justifyContent, marginLeft, maxWidth, minWidth, noWrap, overflow, overflowY, padding, paddingLeft, paddingTop, pct, pointer, position, px, repeat, rgb, solid, spaceBetween, start, sticky, textAlign, textOverflow, top, transparent, url, whiteSpace, width)
+import CssHelpers exposing (black, col, error, mx, padX, padY, primary, publicSans, row, secondary, textColor, userSelectNone, white)
 import DataTypes exposing (Label, Note)
 import Dog exposing (dogSvg)
 import Either exposing (Either(..))
@@ -76,9 +76,22 @@ type Page
     | EditNote EditNote.Model
 
 
+type alias LabelsColumnMenu =
+    Maybe String
+
+
 type alias LoggedInModel =
     { page : Page
     , windowRes : { width : Int, height : Int }
+    , key : Nav.Key
+
+    -- Labels menu
+    , newLabelName : String
+    , labelsMenu : LabelsColumnMenu
+    , filters :
+        { label : Maybe SyncableID
+        , content : Maybe String
+        }
 
     -- sync stuff
     , lastSyncedAt : Posix
@@ -117,6 +130,12 @@ type Msg
     | IsOffline
     | IsOnline
     | WindowResized { width : Int, height : Int }
+      -- Labels menu
+    | OpenLabelsMenu
+    | CloseLabelsMenu
+    | SelectLabelToFilterBy SyncableID
+    | ChangeLabelsSearchQuery String
+    | GoToEditLabelsScreen
 
 
 
@@ -148,6 +167,17 @@ init flags url navKey =
             , lastSyncedAt = Time.millisToPosix flags.lastSyncedAt
             , isOnline = flags.online
             , windowRes = flags.windowSize
+            , key = navKey
+
+            -- Labels menu
+            , newLabelName = ""
+            , labelsMenu = Nothing
+            , filters =
+                { label = Nothing
+                , content = Nothing
+                }
+
+            -- page
             , page =
                 case Route.fromUrl url of
                     -- TODO: notes and labels should be combined into
@@ -199,6 +229,16 @@ main =
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update topMsg topModel =
+    let
+        loggedInMap : (LoggedInModel -> LoggedInModel) -> Model
+        loggedInMap fn =
+            case topModel of
+                LoggedIn loggedInModel ->
+                    LoggedIn (fn loggedInModel)
+
+                LoggedOff _ ->
+                    topModel
+    in
     case topMsg of
         IsOffline ->
             case topModel of
@@ -281,6 +321,13 @@ update topMsg topModel =
                                             , notes = []
                                             }
                                         )
+                                , newLabelName = ""
+                                , labelsMenu = Nothing
+                                , filters =
+                                    { label = Nothing
+                                    , content = Nothing
+                                    }
+                                , key = logInViewModel.key
                                 , offlineQueue = emptyOfflineQueue
                                 , runningQueueOn = Nothing
                                 , lastSyncedAt = Time.millisToPosix 1
@@ -775,6 +822,10 @@ update topMsg topModel =
                                 { page = updatedPageModel
                                 , offlineQueue = emptyOfflineQueue
                                 , isOnline = loggedInModel.isOnline
+                                , key = loggedInModel.key
+                                , newLabelName = loggedInModel.newLabelName
+                                , labelsMenu = loggedInModel.labelsMenu
+                                , filters = loggedInModel.filters
                                 , runningQueueOn =
                                     if offlineQueueIsEmpty updatedOfflineQueue then
                                         Nothing
@@ -806,6 +857,53 @@ update topMsg topModel =
                         Err _ ->
                             -- TODO: error handling here
                             topModel |> pure
+
+        -- Labels column menu
+        OpenLabelsMenu ->
+            loggedInMap (\model -> { model | labelsMenu = Just "" })
+                |> pure
+
+        CloseLabelsMenu ->
+            loggedInMap (\model -> { model | labelsMenu = Nothing })
+                |> pure
+
+        ChangeLabelsSearchQuery s ->
+            loggedInMap (\model -> { model | labelsMenu = Maybe.map (\_ -> s) model.labelsMenu })
+                |> pure
+
+        SelectLabelToFilterBy id ->
+            loggedInMap
+                (\model ->
+                    let
+                        newFilter : Maybe SyncableID
+                        newFilter =
+                            case model.filters.label of
+                                Nothing ->
+                                    Just id
+
+                                Just oldId ->
+                                    if sameId oldId id then
+                                        Nothing
+
+                                    else
+                                        Just id
+                    in
+                    { model
+                        | filters =
+                            { label = newFilter
+                            , content = model.filters.content
+                            }
+                    }
+                )
+                |> pure
+
+        GoToEditLabelsScreen ->
+            case topModel of
+                LoggedOff _ ->
+                    topModel |> pure
+
+                LoggedIn loggedInModel ->
+                    ( LoggedIn { loggedInModel | labelsMenu = Nothing }, Route.replaceUrl loggedInModel.key Route.EditLabels )
 
 
 updateWith toModel toMsg topModel ( m, c ) =
@@ -964,8 +1062,8 @@ addToQueue operation notesIds labelsIds isOnline ( model, cmds ) =
 -- VIEW
 
 
-navbar : Page -> Maybe Bool -> Html msg
-navbar page isOnline =
+navbar : Page -> Int -> Bool -> Maybe Bool -> Html Msg
+navbar page labelsAmount isLabelsMenuOpen isOnline =
     let
         btnMxn =
             Css.batch
@@ -991,8 +1089,7 @@ navbar page isOnline =
                               else
                                 Css.batch []
                             ]
-
-                        -- , onClick OpenLabelsMenu
+                        , onClick OpenLabelsMenu
                         ]
                         [ Filled.label 32 Inherit |> Svg.Styled.fromUnstyled ]
             in
@@ -1006,20 +1103,59 @@ navbar page isOnline =
                 EditLabels _ ->
                     btn False
 
-        -- let
-        --     labelsCount =
-        --         model.labels |> List.length |> String.fromInt
-        -- in
-        -- case model.labelsMenu of
-        --     Just _ ->
-        --         div [] []
-        --     -- openLabelsMenuBtn labelsCount
-        --     Nothing ->
-        --         button
-        --             [ css [ btnMxn ]
-        --             -- , onClick OpenLabelsMenu
-        --             ]
-        --             [ Filled.label 32 Inherit |> Svg.Styled.fromUnstyled ]
+        openLabelsMenuBtn : String -> Html Msg
+        openLabelsMenuBtn labelsCount =
+            div
+                [ css
+                    [ paddingLeft (px 8)
+                    , maxWidth (px labelsMenuWidth)
+                    , minWidth (px labelsMenuWidth)
+                    , backgroundColor black
+                    , textColor white
+                    , border (px 0)
+                    , borderRight3 (px 3) solid black
+                    , displayFlex
+                    , publicSans
+                    , alignItems center
+                    , justifyContent spaceBetween
+                    , fontSize (px 16)
+                    , fontWeight bold
+                    ]
+                ]
+                [ div
+                    [ css
+                        [ displayFlex
+                        , alignItems center
+                        , padY (px 8)
+                        ]
+                    ]
+                    [ Filled.label 32
+                        Inherit
+                        |> Svg.Styled.fromUnstyled
+                    , p [ css [ marginLeft (px 10) ] ] [ text "Labels" ]
+                    , p [ css [ marginLeft (px 10) ] ] [ text ("(" ++ labelsCount ++ ")") ]
+                    ]
+                , button
+                    [ css
+                        [ width (px 50)
+                        , height (pct 100)
+                        , displayFlex
+                        , justifyContent center
+                        , alignItems center
+                        , border (px 0)
+                        , backgroundColor error
+                        , cursor pointer
+                        , textColor white
+                        ]
+                    , type_ "button"
+                    , onClick CloseLabelsMenu
+                    ]
+                    [ Filled.close 32
+                        Inherit
+                        |> Svg.Styled.fromUnstyled
+                    ]
+                ]
+
         homeBtn =
             let
                 btn =
@@ -1113,7 +1249,11 @@ navbar page isOnline =
             ]
         ]
         [ row []
-            [ labelsMenuBtn
+            [ if isLabelsMenuOpen then
+                openLabelsMenuBtn (labelsAmount |> String.fromInt)
+
+              else
+                labelsMenuBtn
             , homeBtn
             ]
         , div [ css [ width (px 683), displayFlex, justifyContent center, alignItems center ] ]
@@ -1140,6 +1280,149 @@ navbar page isOnline =
         ]
 
 
+labelsMenuWidth : number
+labelsMenuWidth =
+    277
+
+
+labelsMenuColumn : { labels : List Label, filters : { c | label : Maybe SyncableID }, labelsMenu : Maybe String } -> Html Msg
+labelsMenuColumn { labels, filters, labelsMenu } =
+    div
+        [ css
+            [ maxWidth (px labelsMenuWidth)
+            , minWidth (px labelsMenuWidth)
+            , backgroundColor secondary
+            , height (pct 100)
+            , borderRight3 (px 3) solid black
+            , displayFlex
+            , flexDirection column
+            ]
+        ]
+        [ div
+            [ css
+                [ height (px 48)
+                , displayFlex
+                , alignItems center
+                , borderBottom3 (px 2) solid black
+                , backgroundColor primary
+                ]
+            ]
+            [ label
+                [ css [ padX (px 10), height (pct 100), displayFlex, alignItems center ]
+                , for "search-labels"
+                ]
+                [ Outlined.search 24 Inherit
+                    |> Svg.Styled.fromUnstyled
+                ]
+            , input
+                [ css
+                    [ fontWeight bold
+                    , publicSans
+                    , height (pct 100)
+                    , width (pct 100)
+                    , border (px 0)
+                    , fontSize (px 16)
+                    , backgroundColor transparent
+                    ]
+                , value (Maybe.withDefault "" labelsMenu)
+                , onInput ChangeLabelsSearchQuery
+                , id "search-labels"
+                , placeholder "Search labels..."
+                ]
+                []
+            , button
+                [ css
+                    [ width (px 80)
+                    , height (pct 100)
+                    , displayFlex
+                    , justifyContent center
+                    , alignItems center
+                    , border (px 0)
+                    , backgroundColor white
+                    , cursor pointer
+                    , textColor black
+                    , borderLeft3 (px 3) solid black
+                    ]
+                , type_ "button"
+                , onClick GoToEditLabelsScreen
+                ]
+                [ Filled.edit 28 Inherit
+                    |> Svg.Styled.fromUnstyled
+                ]
+            ]
+        , ul
+            [ css
+                [ fontWeight (int 600)
+                , height (pct 100)
+                , overflowY auto
+                , displayFlex
+                , flexDirection column
+                ]
+            ]
+            (List.indexedMap
+                (\i e ->
+                    button
+                        [ css
+                            ([ paddingLeft (px 10)
+                             , padY (px 5)
+                             , cursor pointer
+                             , hover [ textColor white, backgroundColor black ]
+                             , publicSans
+                             , border (px 0)
+                             , fontSize (px 16)
+                             , cursor pointer
+                             , backgroundColor transparent
+                             , fontWeight (int 600)
+                             , textColor inherit
+                             , userSelectNone
+                             ]
+                                ++ (case filters.label of
+                                        Nothing ->
+                                            []
+
+                                        Just v ->
+                                            if sameId v e.id then
+                                                [ textColor white, backgroundColor black ]
+
+                                            else
+                                                []
+                                   )
+                                ++ (if i == 0 then
+                                        [ paddingTop (px 10) ]
+
+                                    else
+                                        []
+                                   )
+                            )
+                        , type_ "button"
+                        , onClick (SelectLabelToFilterBy e.id)
+                        ]
+                        [ p
+                            [ css
+                                [ whiteSpace noWrap
+                                , textOverflow ellipsis
+                                , overflow hidden
+                                , textAlign start
+                                ]
+                            ]
+                            [ text e.name ]
+                        ]
+                )
+                (labels
+                    |> List.sortBy (.createdAt >> Time.posixToMillis)
+                    |> (\l ->
+                            case labelsMenu of
+                                Just filterQuery ->
+                                    l |> List.filter (\e -> String.contains (filterQuery |> String.toLower) (e.name |> String.toLower))
+
+                                Nothing ->
+                                    l
+                       )
+                )
+            )
+        ]
+
+
 view : Model -> Html Msg
 view model =
     div
@@ -1148,16 +1431,16 @@ view model =
             [ height (pct 100)
             , width (pct 100)
             , backgroundColor (rgb 18 104 85)
-            , backgroundImage (url "./media/bgr.png ")
+            , backgroundImage (url "/media/bgr.png ")
             , backgroundSize contain
             , backgroundRepeat repeat
             ]
         ]
-        [ (case model of
+        [ case model of
             LoggedOff logInModel ->
-                Html.Styled.map GotLogInMsg (LogIn.logInView logInModel)
+                Html.Styled.map (GotLogInMsg >> GotPageMsg) (LogIn.logInView logInModel)
 
-            LoggedIn { page, runningQueueOn, windowRes, isOnline } ->
+            LoggedIn { page, runningQueueOn, windowRes, isOnline, filters, labelsMenu } ->
                 col
                     [ css
                         [ displayFlex
@@ -1166,31 +1449,37 @@ view model =
                         , overflow auto
                         ]
                     ]
-                    [ navbar page
-                        (if isOnline then
-                            Just (maybeToBool runningQueueOn)
+                    (case page of
+                        Home homeModel ->
+                            [ navbar page
+                                (homeModel.labels |> List.length)
+                                (maybeToBool labelsMenu)
+                                (if isOnline then
+                                    Just (maybeToBool runningQueueOn)
 
-                         else
-                            Nothing
-                        )
-                    , div
-                        [ css
-                            [ displayFlex
-                            , height (pct 100)
-                            , overflow hidden
+                                 else
+                                    Nothing
+                                )
+                            , row
+                                [ css
+                                    [ displayFlex
+                                    , height (pct 100)
+                                    , overflow hidden
+                                    ]
+                                ]
+                                [ if maybeToBool labelsMenu then
+                                    labelsMenuColumn { labels = homeModel.labels, filters = filters, labelsMenu = labelsMenu }
+
+                                  else
+                                    text ""
+                                , Home.view homeModel windowRes (maybeToBool labelsMenu) |> Html.Styled.map (GotHomeMsg >> GotPageMsg)
+                                ]
                             ]
-                        ]
-                        [ case page of
-                            Home homeModel ->
-                                Home.view homeModel windowRes |> Html.Styled.map GotHomeMsg
 
-                            EditLabels editLabelsModel ->
-                                Html.Styled.map GotEditLabelsMsg (EditLabels.view editLabelsModel)
+                        EditLabels editLabelsModel ->
+                            [ Html.Styled.map (GotEditLabelsMsg >> GotPageMsg) (EditLabels.view editLabelsModel) ]
 
-                            EditNote editNoteModel ->
-                                Html.Styled.map GotEditNoteMsg (EditNote.view editNoteModel)
-                        ]
-                    ]
-          )
-            |> Html.Styled.map GotPageMsg
+                        EditNote editNoteModel ->
+                            [ Html.Styled.map (GotEditNoteMsg >> GotPageMsg) (EditNote.view editNoteModel) ]
+                    )
         ]

@@ -140,12 +140,6 @@ type Msg
     | IncreaseNoteOrder SyncableID
     | DecreaseNoteOrder SyncableID
     | ClearLabelFilter
-      -- Labels menu
-    | SelectLabelToFilterBy SyncableID
-    | OpenLabelsMenu
-    | CloseLabelsMenu
-    | ChangeLabelsSearchQuery String
-    | GoToEditLabelsScreen
 
 
 type Signal
@@ -381,57 +375,21 @@ update msg model =
             }
                 |> pureNoSignal
 
-        -- TODO: for when there's multiple selected
-        -- let
-        --     noteAlreadySelected =
-        --         List.any (sameId id) model.selectedNotes
-        -- in
-        -- { model
-        --     | selectedNotes =
-        --         if noteAlreadySelected then
-        --             model.selectedNotes |> exclude (sameId id)
-        --         else
-        --             id :: model.selectedNotes
-        -- }
-        -- |> pureNoSignal
-        -- Labels column menu
-        OpenLabelsMenu ->
-            { model | labelsMenu = Just "" }
-                |> pureNoSignal
 
-        CloseLabelsMenu ->
-            { model | labelsMenu = Nothing }
-                |> pureNoSignal
 
-        ChangeLabelsSearchQuery s ->
-            { model | labelsMenu = Maybe.map (\_ -> s) model.labelsMenu }
-                |> pureNoSignal
-
-        SelectLabelToFilterBy id ->
-            let
-                newFilter : Maybe SyncableID
-                newFilter =
-                    case model.filters.label of
-                        Nothing ->
-                            Just id
-
-                        Just oldId ->
-                            if sameId oldId id then
-                                Nothing
-
-                            else
-                                Just id
-            in
-            { model
-                | filters =
-                    { label = newFilter
-                    , content = model.filters.content
-                    }
-            }
-                |> pureNoSignal
-
-        GoToEditLabelsScreen ->
-            ( { model | labelsMenu = Nothing }, Route.replaceUrl model.key Route.EditLabels, Nothing )
+-- TODO: for when there's multiple selected
+-- let
+--     noteAlreadySelected =
+--         List.any (sameId id) model.selectedNotes
+-- in
+-- { model
+--     | selectedNotes =
+--         if noteAlreadySelected then
+--             model.selectedNotes |> exclude (sameId id)
+--         else
+--             id :: model.selectedNotes
+-- }
+-- |> pureNoSignal
 
 
 alwaysStopPropagation : a -> ( a, Bool )
@@ -444,137 +402,9 @@ clickedOnSelectedNote =
     stopPropagationOn "click" (JD.succeed ( NoOp, True ))
 
 
-navbar : Model -> Maybe Bool -> Html Msg
-navbar model isOnline =
-    let
-        btnMxn =
-            Css.batch
-                [ backgroundColor white
-                , border (px 0)
-                , padding (px 8)
-                , displayFlex
-                , justifyContent center
-                , alignItems center
-                , cursor pointer
-                , hover [ backgroundColor black, color white ]
-                ]
-
-        labelsMenuBtn =
-            let
-                labelsCount =
-                    model.labels |> List.length |> String.fromInt
-            in
-            case model.labelsMenu of
-                Just _ ->
-                    openLabelsMenuBtn labelsCount
-
-                Nothing ->
-                    button
-                        [ css [ btnMxn ], onClick OpenLabelsMenu ]
-                        [ Filled.label 32 Inherit |> Svg.Styled.fromUnstyled ]
-
-        homeBtn =
-            button
-                [ css
-                    [ btnMxn
-                    , borderLeft3 (px 3) solid black
-                    , borderRight3 (px 3) solid black
-                    ]
-                ]
-                [ Filled.home 32 Inherit |> Svg.Styled.fromUnstyled ]
-
-        changeViewBtn =
-            button
-                [ css
-                    [ btnMxn
-                    , borderLeft3 (px 3) solid black
-                    , borderRight3 (px 3) solid black
-                    ]
-                ]
-                [ Filled.view_module 32 Inherit |> Svg.Styled.fromUnstyled ]
-
-        syncBtn =
-            button
-                [ css [ btnMxn ] ]
-                [ -- TODO: add icon for when offline and yet queued "cloud_queue"
-                  (case isOnline of
-                    Just isSyncing ->
-                        if isSyncing then
-                            Outlined.cloud_upload
-
-                        else
-                            Outlined.sync
-
-                    Nothing ->
-                        Outlined.wifi_off
-                  )
-                    28
-                    Inherit
-                    |> Svg.Styled.fromUnstyled
-                ]
-    in
-    nav
-        [ css
-            [ backgroundColor secondary
-            , borderBottom3 (px 3) solid (rgb 0 0 0)
-            , position sticky
-            , top (px 0)
-            , displayFlex
-            , alignItems center
-            , justifyContent spaceBetween
-            , width (pct 100)
-            ]
-        ]
-        [ row []
-            [ labelsMenuBtn
-            , homeBtn
-            ]
-        , div [ css [ width (px 683), displayFlex, justifyContent center, alignItems center ] ]
-            [ input
-                [ css
-                    [ width (pct 100)
-                    , maxWidth (pct 100)
-                    , padding (px 6)
-                    , publicSans
-                    , fontWeight (int 400)
-                    , fontSize (px 16)
-                    , textAlign center
-                    , border3 (px 2) solid black
-                    , mx (px 16)
-                    ]
-                , placeholder "Search"
-                ]
-                []
-            ]
-        , row []
-            [ changeViewBtn
-            , syncBtn
-            ]
-        ]
-
-
-view : Model -> { width : Int, height : Int } -> Maybe Bool -> Html Msg
-view model windowRes isOnline =
-    div
-        [ case model.selectedNote of
-            Just val ->
-                onClick ClickedMouse
-
-            Nothing ->
-                css []
-        , css [ displayFlex, flexDirection column, height (pct 100), overflow auto ]
-        ]
-        [ navbar model isOnline
-        , div [ css [ displayFlex, height (pct 100), overflow hidden ] ]
-            [ case model.labelsMenu of
-                Just _ ->
-                    labelsMenuColumn model
-
-                Nothing ->
-                    text ""
-            , notesGrid model windowRes
-            ]
-        ]
+view : Model -> { width : Int, height : Int } -> Bool -> Html Msg
+view model windowRes labelsMenuIsOpen =
+    notesGrid model windowRes labelsMenuIsOpen
 
 
 labelsMenuWidth : Float
@@ -582,198 +412,7 @@ labelsMenuWidth =
     277
 
 
-openLabelsMenuBtn : String -> Html Msg
-openLabelsMenuBtn labelsCount =
-    div
-        [ css
-            [ paddingLeft (px 8)
-            , maxWidth (px labelsMenuWidth)
-            , minWidth (px labelsMenuWidth)
-            , backgroundColor black
-            , textColor white
-            , border (px 0)
-            , borderRight3 (px 3) solid black
-            , displayFlex
-            , publicSans
-            , alignItems center
-            , justifyContent spaceBetween
-            , fontSize (px 16)
-            , fontWeight bold
-            ]
-        ]
-        [ div
-            [ css
-                [ displayFlex
-                , alignItems center
-                , padY (px 8)
-                ]
-            ]
-            [ Filled.label 32
-                Inherit
-                |> Svg.Styled.fromUnstyled
-            , p [ css [ marginLeft (px 10) ] ] [ text "Labels" ]
-            , p [ css [ marginLeft (px 10) ] ] [ text ("(" ++ labelsCount ++ ")") ]
-            ]
-        , button
-            [ css
-                [ width (px 50)
-                , height (pct 100)
-                , displayFlex
-                , justifyContent center
-                , alignItems center
-                , border (px 0)
-                , backgroundColor error
-                , cursor pointer
-                , textColor white
-                ]
-            , type_ "button"
-            , onClick CloseLabelsMenu
-            ]
-            [ Filled.close 32
-                Inherit
-                |> Svg.Styled.fromUnstyled
-            ]
-        ]
-
-
-labelsMenuColumn : Model -> Html Msg
-labelsMenuColumn { labels, filters, labelsMenu } =
-    div
-        [ css
-            [ maxWidth (px labelsMenuWidth)
-            , minWidth (px labelsMenuWidth)
-            , backgroundColor secondary
-            , height (pct 100)
-            , borderRight3 (px 3) solid black
-            , displayFlex
-            , flexDirection column
-            ]
-        ]
-        [ div
-            [ css
-                [ height (px 48)
-                , displayFlex
-                , alignItems center
-                , borderBottom3 (px 2) solid black
-                , backgroundColor primary
-                ]
-            ]
-            [ label
-                [ css [ padX (px 10), height (pct 100), displayFlex, alignItems center ]
-                , for "search-labels"
-                ]
-                [ Outlined.search 24 Inherit
-                    |> Svg.Styled.fromUnstyled
-                ]
-            , input
-                [ css
-                    [ fontWeight bold
-                    , publicSans
-                    , height (pct 100)
-                    , width (pct 100)
-                    , border (px 0)
-                    , fontSize (px 16)
-                    , backgroundColor transparent
-                    ]
-                , value (Maybe.withDefault "" labelsMenu)
-                , onInput ChangeLabelsSearchQuery
-                , id "search-labels"
-                , placeholder "Search labels..."
-                ]
-                []
-            , button
-                [ css
-                    [ width (px 80)
-                    , height (pct 100)
-                    , displayFlex
-                    , justifyContent center
-                    , alignItems center
-                    , border (px 0)
-                    , backgroundColor white
-                    , cursor pointer
-                    , textColor black
-                    , borderLeft3 (px 3) solid black
-                    ]
-                , type_ "button"
-                , onClick GoToEditLabelsScreen
-                ]
-                [ Filled.edit 28 Inherit
-                    |> Svg.Styled.fromUnstyled
-                ]
-            ]
-        , ul
-            [ css
-                [ fontWeight (int 600)
-                , height (pct 100)
-                , overflowY auto
-                , displayFlex
-                , flexDirection column
-                ]
-            ]
-            (List.indexedMap
-                (\i e ->
-                    button
-                        [ css
-                            ([ paddingLeft (px 10)
-                             , padY (px 5)
-                             , cursor pointer
-                             , hover [ textColor white, backgroundColor black ]
-                             , publicSans
-                             , border (px 0)
-                             , fontSize (px 16)
-                             , cursor pointer
-                             , backgroundColor transparent
-                             , fontWeight (int 600)
-                             , textColor inherit
-                             , userSelectNone
-                             ]
-                                ++ (case filters.label of
-                                        Nothing ->
-                                            []
-
-                                        Just v ->
-                                            if sameId v e.id then
-                                                [ textColor white, backgroundColor black ]
-
-                                            else
-                                                []
-                                   )
-                                ++ (if i == 0 then
-                                        [ paddingTop (px 10) ]
-
-                                    else
-                                        []
-                                   )
-                            )
-                        , type_ "button"
-                        , onClick (SelectLabelToFilterBy e.id)
-                        ]
-                        [ p
-                            [ css
-                                [ whiteSpace noWrap
-                                , textOverflow ellipsis
-                                , overflow hidden
-                                , textAlign start
-                                ]
-                            ]
-                            [ text e.name ]
-                        ]
-                )
-                (labels
-                    |> List.sortBy (.createdAt >> Time.posixToMillis)
-                    |> (\l ->
-                            case labelsMenu of
-                                Just filterQuery ->
-                                    l |> List.filter (\e -> String.contains (filterQuery |> String.toLower) (e.name |> String.toLower))
-
-                                Nothing ->
-                                    l
-                       )
-                )
-            )
-        ]
-
-
+noteCardWidth : number
 noteCardWidth =
     240
 
@@ -783,8 +422,8 @@ noteCardGridGapSize =
     10
 
 
-notesGrid : Model -> { width : Int, height : Int } -> Html Msg
-notesGrid model windowRes =
+notesGrid : Model -> { width : Int, height : Int } -> Bool -> Html Msg
+notesGrid model windowRes labelsMenuIsOpen =
     let
         scrollbarWidth : number
         scrollbarWidth =
@@ -792,7 +431,7 @@ notesGrid model windowRes =
             50
 
         menuWidth =
-            if maybeToBool model.labelsMenu then
+            if labelsMenuIsOpen then
                 labelsMenuWidth
 
             else
