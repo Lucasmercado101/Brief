@@ -242,12 +242,8 @@ update topMsg topModel =
     in
     case topMsg of
         IsOffline ->
-            case topModel of
-                LoggedIn m ->
-                    LoggedIn { m | isOnline = False } |> pure
-
-                LoggedOff _ ->
-                    topModel |> pure
+            loggedInMap (\model -> { model | isOnline = False })
+                |> pure
 
         IsOnline ->
             case topModel of
