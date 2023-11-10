@@ -438,7 +438,7 @@ view model =
             div [] [ text "Note Not found" ]
 
         Just editingStatus ->
-            row [ css [ height (pct 100), justifyContent center, alignItems center ] ]
+            row [ css [ height (pct 100), width (pct 100), justifyContent center, alignItems center ] ]
                 [ case editingStatus of
                     ConfirmDeletion data ->
                         div
