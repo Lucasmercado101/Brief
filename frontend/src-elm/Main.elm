@@ -130,6 +130,7 @@ type Msg
     | IsOffline
     | IsOnline
     | WindowResized { width : Int, height : Int }
+    | ReturnHome
       -- Labels menu
     | OpenLabelsMenu
     | CloseLabelsMenu
@@ -858,6 +859,36 @@ update topMsg topModel =
                             -- TODO: error handling here
                             topModel |> pure
 
+        ReturnHome ->
+            loggedInMap
+                (\model ->
+                    { model
+                        | page =
+                            case model.page of
+                                Home _ ->
+                                    model.page
+
+                                EditNote editingNoteModel ->
+                                    Home.init
+                                        { seeds = editingNoteModel.seeds
+                                        , labels = editingNoteModel.labels
+                                        , notes = editingNoteModel.notes
+                                        , key = editingNoteModel.key
+                                        }
+                                        |> Home
+
+                                EditLabels editLabelsModel ->
+                                    Home.init
+                                        { seeds = editLabelsModel.seeds
+                                        , labels = editLabelsModel.labels
+                                        , notes = editLabelsModel.notes
+                                        , key = editLabelsModel.key
+                                        }
+                                        |> Home
+                    }
+                )
+                |> pure
+
         -- Labels column menu
         OpenLabelsMenu ->
             loggedInMap (\model -> { model | labelsMenu = Just "" })
@@ -1078,30 +1109,22 @@ navbar page labelsAmount isLabelsMenuOpen isOnline =
                 ]
 
         labelsMenuBtn =
-            let
-                btn hasBorderRight =
+            case page of
+                EditNote _ ->
+                    text ""
+
+                Home _ ->
                     button
                         [ css
                             [ btnMxn
-                            , if hasBorderRight then
-                                borderRight3 (px 3) solid black
-
-                              else
-                                Css.batch []
+                            , borderRight3 (px 3) solid black
                             ]
                         , onClick OpenLabelsMenu
                         ]
                         [ Filled.label 32 Inherit |> Svg.Styled.fromUnstyled ]
-            in
-            case page of
-                EditNote _ ->
-                    btn False
-
-                Home _ ->
-                    btn True
 
                 EditLabels _ ->
-                    btn False
+                    text ""
 
         openLabelsMenuBtn : String -> Html Msg
         openLabelsMenuBtn labelsCount =
@@ -1158,25 +1181,30 @@ navbar page labelsAmount isLabelsMenuOpen isOnline =
 
         homeBtn =
             let
-                btn =
+                btn hasBorderLeft =
                     button
                         [ css
                             [ btnMxn
-                            , borderLeft3 (px 3) solid black
+                            , if isLabelsMenuOpen || not hasBorderLeft then
+                                Css.batch []
+
+                              else
+                                borderLeft3 (px 3) solid black
                             , borderRight3 (px 3) solid black
                             ]
+                        , onClick ReturnHome
                         ]
                         [ Filled.home 32 Inherit |> Svg.Styled.fromUnstyled ]
             in
             case page of
                 EditNote _ ->
-                    btn
+                    btn False
 
                 Home _ ->
                     text ""
 
                 EditLabels _ ->
-                    btn
+                    btn False
 
         changeViewBtn =
             case page of
@@ -1423,6 +1451,42 @@ labelsMenuColumn { labels, filters, labelsMenu } =
         ]
 
 
+pageView : { a | labels : List Label, page : Page, labelsMenu : Maybe String, isOnline : Bool, runningQueueOn : Maybe b, filters : { c | label : Maybe SyncableID }, windowRes : g } -> Html Msg -> Html Msg
+pageView { labels, page, labelsMenu, isOnline, runningQueueOn, filters, windowRes } individualPageView =
+    col
+        [ css
+            [ displayFlex
+            , flexDirection column
+            , height (pct 100)
+            , overflow auto
+            ]
+        ]
+        [ navbar page
+            (labels |> List.length)
+            (maybeToBool labelsMenu)
+            (if isOnline then
+                Just (maybeToBool runningQueueOn)
+
+             else
+                Nothing
+            )
+        , row
+            [ css
+                [ displayFlex
+                , height (pct 100)
+                , overflow hidden
+                ]
+            ]
+            [ if maybeToBool labelsMenu then
+                labelsMenuColumn { labels = labels, filters = filters, labelsMenu = labelsMenu }
+
+              else
+                text ""
+            , individualPageView
+            ]
+        ]
+
+
 view : Model -> Html Msg
 view model =
     div
@@ -1431,7 +1495,7 @@ view model =
             [ height (pct 100)
             , width (pct 100)
             , backgroundColor (rgb 18 104 85)
-            , backgroundImage (url "/media/bgr.png ")
+            , backgroundImage (url "./media/bgr.png ")
             , backgroundSize contain
             , backgroundRepeat repeat
             ]
@@ -1441,45 +1505,16 @@ view model =
                 Html.Styled.map (GotLogInMsg >> GotPageMsg) (LogIn.logInView logInModel)
 
             LoggedIn { page, runningQueueOn, windowRes, isOnline, filters, labelsMenu } ->
-                col
-                    [ css
-                        [ displayFlex
-                        , flexDirection column
-                        , height (pct 100)
-                        , overflow auto
-                        ]
-                    ]
-                    (case page of
-                        Home homeModel ->
-                            [ navbar page
-                                (homeModel.labels |> List.length)
-                                (maybeToBool labelsMenu)
-                                (if isOnline then
-                                    Just (maybeToBool runningQueueOn)
+                case page of
+                    Home homeModel ->
+                        pageView { labels = homeModel.labels, page = page, labelsMenu = labelsMenu, isOnline = isOnline, runningQueueOn = runningQueueOn, filters = filters, windowRes = windowRes }
+                            (Home.view homeModel windowRes (maybeToBool labelsMenu) |> Html.Styled.map (GotHomeMsg >> GotPageMsg))
 
-                                 else
-                                    Nothing
-                                )
-                            , row
-                                [ css
-                                    [ displayFlex
-                                    , height (pct 100)
-                                    , overflow hidden
-                                    ]
-                                ]
-                                [ if maybeToBool labelsMenu then
-                                    labelsMenuColumn { labels = homeModel.labels, filters = filters, labelsMenu = labelsMenu }
+                    EditLabels editLabelsModel ->
+                        pageView { labels = editLabelsModel.labels, page = page, labelsMenu = labelsMenu, isOnline = isOnline, runningQueueOn = runningQueueOn, filters = filters, windowRes = windowRes }
+                            (EditLabels.view editLabelsModel |> Html.Styled.map (GotEditLabelsMsg >> GotPageMsg))
 
-                                  else
-                                    text ""
-                                , Home.view homeModel windowRes (maybeToBool labelsMenu) |> Html.Styled.map (GotHomeMsg >> GotPageMsg)
-                                ]
-                            ]
-
-                        EditLabels editLabelsModel ->
-                            [ Html.Styled.map (GotEditLabelsMsg >> GotPageMsg) (EditLabels.view editLabelsModel) ]
-
-                        EditNote editNoteModel ->
-                            [ Html.Styled.map (GotEditNoteMsg >> GotPageMsg) (EditNote.view editNoteModel) ]
-                    )
+                    EditNote editNoteModel ->
+                        pageView { labels = editNoteModel.labels, page = page, labelsMenu = labelsMenu, isOnline = isOnline, runningQueueOn = runningQueueOn, filters = filters, windowRes = windowRes }
+                            (EditNote.view editNoteModel |> Html.Styled.map (GotEditNoteMsg >> GotPageMsg))
         ]
