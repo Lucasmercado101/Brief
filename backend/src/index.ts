@@ -2,7 +2,7 @@ import { Elysia, t } from "elysia";
 import { Prisma, PrismaClient } from "@prisma/client";
 import { logger } from "./logger";
 import PrismaError from "./prismaErrorCodes";
-import changesEndpoint from "./changes";
+import changesEndpoint from "./changes/route";
 
 // in seconds
 const MINUTE = 60;
