@@ -3,7 +3,7 @@ module Page.EditNote exposing (..)
 import Api exposing (SyncableID(..))
 import Browser.Navigation as Nav
 import Css exposing (alignItems, backgroundColor, bold, bolder, border, border3, borderBottom3, borderLeft3, borderRight3, borderTop, borderTop3, center, color, column, cursor, display, displayFlex, flexDirection, flexWrap, fontSize, fontWeight, height, hover, inline, inlineBlock, int, justifyContent, marginBottom, marginTop, maxHeight, maxWidth, minWidth, none, padding, paddingBottom, paddingLeft, paddingTop, pct, pointer, px, resize, solid, spaceBetween, stretch, textAlign, transparent, vertical, width, wrap)
-import CssHelpers exposing (black, col, delaGothicOne, error, gap, padX, padY, primary, publicSans, row, secondary, textColor, white)
+import CssHelpers exposing (black, col, delaGothicOne, error, gap, mx, padX, padY, primary, publicSans, row, secondary, textColor, white)
 import DataTypes exposing (Label, Note)
 import Dog exposing (dog2Svg)
 import Helpers exposing (exclude, getCurrentTime, listFirst, maybeToBool, partitionFirst, sameId)
@@ -438,7 +438,7 @@ view model =
             div [] [ text "Note Not found" ]
 
         Just editingStatus ->
-            row [ css [ height (pct 100), width (pct 100), justifyContent center, alignItems center ] ]
+            row [ css [ height (pct 100), width (pct 100), mx (px 32), justifyContent center, alignItems center ] ]
                 [ case editingStatus of
                     ConfirmDeletion data ->
                         div
