@@ -521,48 +521,34 @@ navbar model isOnline =
             , top (px 0)
             , displayFlex
             , alignItems center
+            , justifyContent spaceBetween
+            , width (pct 100)
             ]
         ]
         [ row []
             [ labelsMenuBtn
             , homeBtn
             ]
-        , row
-            [ css
-                [ justifyContent spaceBetween
-                , width (pct 100)
-                , alignItems center
-                , paddingLeft (px 12)
-                ]
-            ]
-            [ p
+        , div [ css [ width (px 683), displayFlex, justifyContent center, alignItems center ] ]
+            [ input
                 [ css
-                    [ fontSize (px 18)
-                    , color black
-                    , delaGothicOne
+                    [ width (pct 100)
+                    , maxWidth (pct 100)
+                    , padding (px 6)
+                    , publicSans
+                    , fontWeight (int 400)
+                    , fontSize (px 16)
+                    , textAlign center
+                    , border3 (px 2) solid black
+                    , mx (px 16)
                     ]
+                , placeholder "Search"
                 ]
-                [ text "Notes" ]
-            , div [ css [ width (px 683), displayFlex, justifyContent center, alignItems center ] ]
-                [ input
-                    [ css
-                        [ width (pct 100)
-                        , maxWidth (pct 100)
-                        , padding (px 6)
-                        , publicSans
-                        , fontWeight (int 400)
-                        , fontSize (px 16)
-                        , textAlign center
-                        , border3 (px 2) solid black
-                        ]
-                    , placeholder "Search"
-                    ]
-                    []
-                ]
-            , row []
-                [ changeViewBtn
-                , syncBtn
-                ]
+                []
+            ]
+        , row []
+            [ changeViewBtn
+            , syncBtn
             ]
         ]
 
