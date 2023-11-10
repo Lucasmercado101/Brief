@@ -8,4 +8,5 @@
 
 input::placeholder {
   color: #414141;
+  user-select: none;
 }
