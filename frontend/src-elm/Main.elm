@@ -4,7 +4,8 @@ import Api exposing (Operation(..), SyncableID(..))
 import Browser exposing (Document, UrlRequest)
 import Browser.Navigation as Nav
 import Cmd.Extra exposing (pure)
-import Css exposing (backgroundColor, backgroundImage, backgroundRepeat, backgroundSize, contain, fullWidth, height, pct, repeat, rgb, url, width)
+import Css exposing (alignItems, auto, backgroundColor, backgroundImage, backgroundRepeat, backgroundSize, border, border3, borderBottom3, borderLeft3, borderRight3, center, color, column, contain, cursor, displayFlex, flexDirection, fontSize, fontWeight, fullWidth, height, hidden, hover, int, justifyContent, maxWidth, overflow, padding, pct, pointer, position, px, repeat, rgb, solid, spaceBetween, sticky, textAlign, top, url, width)
+import CssHelpers exposing (black, col, mx, publicSans, row, secondary, white)
 import DataTypes exposing (Label, Note)
 import Dog exposing (dogSvg)
 import Either exposing (Either(..))
@@ -14,6 +15,8 @@ import Html.Styled exposing (Html, br, button, div, form, img, input, label, li,
 import Html.Styled.Attributes exposing (class, css, for, id, placeholder, src, style, title, type_, value)
 import Html.Styled.Events exposing (onClick, onInput, onSubmit)
 import Http
+import Material.Icons as Filled
+import Material.Icons.Outlined as Outlined
 import Material.Icons.Types exposing (Coloring(..))
 import OfflineQueue exposing (Action(..), OfflineQueueOps, actionMapToFn, emptyOfflineQueue, offlineQueueIsEmpty, qCreateNewNote, qDeleteNote, qEditNoteLabels, qNewLabel, qToggleNotePin, queueToOperations)
 import Page.EditLabels as EditLabels
@@ -961,6 +964,182 @@ addToQueue operation notesIds labelsIds isOnline ( model, cmds ) =
 -- VIEW
 
 
+navbar : Page -> Maybe Bool -> Html msg
+navbar page isOnline =
+    let
+        btnMxn =
+            Css.batch
+                [ backgroundColor white
+                , border (px 0)
+                , padding (px 8)
+                , displayFlex
+                , justifyContent center
+                , alignItems center
+                , cursor pointer
+                , hover [ backgroundColor black, color white ]
+                ]
+
+        labelsMenuBtn =
+            let
+                btn hasBorderRight =
+                    button
+                        [ css
+                            [ btnMxn
+                            , if hasBorderRight then
+                                borderRight3 (px 3) solid black
+
+                              else
+                                Css.batch []
+                            ]
+
+                        -- , onClick OpenLabelsMenu
+                        ]
+                        [ Filled.label 32 Inherit |> Svg.Styled.fromUnstyled ]
+            in
+            case page of
+                EditNote _ ->
+                    btn False
+
+                Home _ ->
+                    btn True
+
+                EditLabels _ ->
+                    btn False
+
+        -- let
+        --     labelsCount =
+        --         model.labels |> List.length |> String.fromInt
+        -- in
+        -- case model.labelsMenu of
+        --     Just _ ->
+        --         div [] []
+        --     -- openLabelsMenuBtn labelsCount
+        --     Nothing ->
+        --         button
+        --             [ css [ btnMxn ]
+        --             -- , onClick OpenLabelsMenu
+        --             ]
+        --             [ Filled.label 32 Inherit |> Svg.Styled.fromUnstyled ]
+        homeBtn =
+            let
+                btn =
+                    button
+                        [ css
+                            [ btnMxn
+                            , borderLeft3 (px 3) solid black
+                            , borderRight3 (px 3) solid black
+                            ]
+                        ]
+                        [ Filled.home 32 Inherit |> Svg.Styled.fromUnstyled ]
+            in
+            case page of
+                EditNote _ ->
+                    btn
+
+                Home _ ->
+                    text ""
+
+                EditLabels _ ->
+                    btn
+
+        changeViewBtn =
+            case page of
+                EditNote _ ->
+                    text ""
+
+                Home _ ->
+                    button
+                        [ css
+                            [ btnMxn
+                            , borderLeft3 (px 3) solid black
+                            , borderRight3 (px 3) solid black
+                            ]
+                        ]
+                        [ Filled.view_module 32 Inherit |> Svg.Styled.fromUnstyled ]
+
+                EditLabels _ ->
+                    text ""
+
+        syncBtn =
+            let
+                btn hasBorderLeft =
+                    button
+                        [ css
+                            [ btnMxn
+                            , if hasBorderLeft then
+                                borderLeft3 (px 3) solid black
+
+                              else
+                                Css.batch []
+                            ]
+                        ]
+                        [ -- TODO: add icon for when offline and yet queued "cloud_queue"
+                          (case isOnline of
+                            Just isSyncing ->
+                                if isSyncing then
+                                    Outlined.cloud_upload
+
+                                else
+                                    Outlined.sync
+
+                            Nothing ->
+                                Outlined.wifi_off
+                          )
+                            28
+                            Inherit
+                            |> Svg.Styled.fromUnstyled
+                        ]
+            in
+            case page of
+                EditNote _ ->
+                    btn True
+
+                Home _ ->
+                    btn False
+
+                EditLabels _ ->
+                    btn True
+    in
+    nav
+        [ css
+            [ backgroundColor secondary
+            , borderBottom3 (px 3) solid (rgb 0 0 0)
+            , position sticky
+            , top (px 0)
+            , displayFlex
+            , alignItems center
+            , justifyContent spaceBetween
+            , width (pct 100)
+            ]
+        ]
+        [ row []
+            [ labelsMenuBtn
+            , homeBtn
+            ]
+        , div [ css [ width (px 683), displayFlex, justifyContent center, alignItems center ] ]
+            [ input
+                [ css
+                    [ width (pct 100)
+                    , maxWidth (pct 100)
+                    , padding (px 6)
+                    , publicSans
+                    , fontWeight (int 400)
+                    , fontSize (px 16)
+                    , textAlign center
+                    , border3 (px 2) solid black
+                    , mx (px 16)
+                    ]
+                , placeholder "Search"
+                ]
+                []
+            ]
+        , row [ css [ height (pct 100) ] ]
+            [ changeViewBtn
+            , syncBtn
+            ]
+        ]
+
+
 view : Model -> Html Msg
 view model =
     div
@@ -979,24 +1158,39 @@ view model =
                 Html.Styled.map GotLogInMsg (LogIn.logInView logInModel)
 
             LoggedIn { page, runningQueueOn, windowRes, isOnline } ->
-                case page of
-                    Home homeModel ->
-                        Html.Styled.map GotHomeMsg
-                            (Home.view homeModel
-                                windowRes
-                                (if isOnline then
-                                    Just (maybeToBool runningQueueOn)
+                col
+                    [ css
+                        [ displayFlex
+                        , flexDirection column
+                        , height (pct 100)
+                        , overflow auto
+                        ]
+                    ]
+                    [ navbar page
+                        (if isOnline then
+                            Just (maybeToBool runningQueueOn)
 
-                                 else
-                                    Nothing
-                                )
-                            )
+                         else
+                            Nothing
+                        )
+                    , div
+                        [ css
+                            [ displayFlex
+                            , height (pct 100)
+                            , overflow hidden
+                            ]
+                        ]
+                        [ case page of
+                            Home homeModel ->
+                                Home.view homeModel windowRes |> Html.Styled.map GotHomeMsg
 
-                    EditLabels editLabelsModel ->
-                        Html.Styled.map GotEditLabelsMsg (EditLabels.view editLabelsModel)
+                            EditLabels editLabelsModel ->
+                                Html.Styled.map GotEditLabelsMsg (EditLabels.view editLabelsModel)
 
-                    EditNote editNoteModel ->
-                        Html.Styled.map GotEditNoteMsg (EditNote.view editNoteModel)
+                            EditNote editNoteModel ->
+                                Html.Styled.map GotEditNoteMsg (EditNote.view editNoteModel)
+                        ]
+                    ]
           )
             |> Html.Styled.map GotPageMsg
         ]
