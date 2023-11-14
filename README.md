@@ -86,7 +86,10 @@ Brief implements a Command API pattern to intelligently manage your actions—li
 
   
 
-To set up your local environment for Brief, you will need Docker and Bun (a JavaScript runtime).
+To set up your local environment for Brief, you will need:
+- [Docker](https://www.docker.com/)
+- [Bun](https://bun.sh/) (a JavaScript runtime)
+- [Elm](https://elm-lang.org/)
 
   
 
