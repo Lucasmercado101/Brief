@@ -30,8 +30,6 @@ export const requiredCookieSession = t.Cookie(
   cookieSecret
 );
 
-// TODO: seed database endpoint for testing
-
 new Elysia()
   .use(changesEndpoint)
   .use(logger())
