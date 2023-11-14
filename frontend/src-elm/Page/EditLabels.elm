@@ -3,8 +3,8 @@ module Page.EditLabels exposing (..)
 import Api exposing (SyncableID(..))
 import Browser.Navigation as Nav
 import Cmd.Extra exposing (pure)
-import Css exposing (alignItems, auto, backgroundColor, bold, border, border3, borderBottom3, borderLeft3, borderRight3, borderTop3, center, column, cursor, display, displayFlex, ellipsis, flexStart, fontSize, fontWeight, height, hidden, hover, inherit, inline, inlineBlock, int, justifyContent, marginBottom, marginLeft, marginRight, marginTop, maxWidth, minWidth, noWrap, overflow, overflowY, padding, paddingBottom, paddingLeft, paddingRight, paddingTop, pct, pointer, px, solid, spaceBetween, start, textAlign, textDecoration, textOverflow, transparent, underline, whiteSpace, width)
-import CssHelpers exposing (black, col, delaGothicOne, error, padX, padY, publicSans, row, secondary, textColor, white)
+import Css exposing (alignItems, auto, backgroundColor, bold, border, border3, borderBottom3, borderLeft3, borderRight3, borderTop3, center, column, cursor, display, displayFlex, ellipsis, flexDirection, flexGrow, flexStart, fontSize, fontWeight, height, hidden, hover, inherit, inline, inlineBlock, int, justifyContent, margin, marginBottom, marginLeft, marginRight, marginTop, maxWidth, minWidth, noWrap, overflow, overflowY, padding, paddingBottom, paddingLeft, paddingRight, paddingTop, pct, pointer, px, solid, spaceAround, spaceBetween, start, textAlign, textDecoration, textOverflow, transparent, underline, whiteSpace, width)
+import CssHelpers exposing (black, col, delaGothicOne, error, gap, padX, padY, primary, publicSans, row, secondary, textColor, white)
 import DataTypes exposing (Label, Note)
 import Dog exposing (dogSvg)
 import Helpers exposing (exclude, labelIDsSplitter, listFirst, partitionFirst, sameId)
@@ -439,6 +439,8 @@ view ({ selected, searchQuery, confirmDeleteAllSelectedLabels } as model) =
                     [ displayFlex
                     , justifyContent spaceBetween
                     , alignItems flexStart
+                    , backgroundColor secondary
+                    , border3 (px 5) solid black
                     ]
                 ]
                 [ col
@@ -475,7 +477,6 @@ view ({ selected, searchQuery, confirmDeleteAllSelectedLabels } as model) =
                     , backgroundColor white
                     , alignItems center
                     , borderBottom3 (px 3) solid black
-                    , borderTop3 (px 3) solid black
                     ]
                 ]
                 [ label [ for "labels-edit-searchBar", css [ displayFlex, justifyContent center, alignItems center, paddingLeft (px 12), paddingRight (px 6) ] ] [ Outlined.search 18 Inherit |> Svg.Styled.fromUnstyled ]
@@ -498,7 +499,7 @@ view ({ selected, searchQuery, confirmDeleteAllSelectedLabels } as model) =
                 ]
 
         itemsList =
-            ul [ css [ overflow auto, height (pct 100) ] ]
+            ul [ css [ height (pct 100), overflow auto ] ]
                 (List.map
                     (\label ->
                         li
@@ -555,12 +556,92 @@ view ({ selected, searchQuery, confirmDeleteAllSelectedLabels } as model) =
                     )
                 )
 
+        selectedCard =
+            let
+                someSelectedCard amount =
+                    col [ css [ border3 (px 5) solid black ] ]
+                        [ p [ css [ backgroundColor primary, publicSans, fontSize (px 32), displayFlex, alignItems center, gap 32, width (pct 100), justifyContent center, padY (px 24) ] ]
+                            [ strong [ css [ fontSize (px 42) ] ] [ text (amount |> String.fromInt) ]
+                            , text "Selected"
+                            ]
+                        , row [ css [ borderTop3 (px 3) solid black, height (px 50) ] ]
+                            [ button
+                                [ css [ backgroundColor error, publicSans, fontSize (px 22), textColor white, cursor pointer, fontWeight (int 800), border (px 0), borderRight3 (px 3) solid black, flexGrow (int 1) ]
+                                , onClick RequestConfirmDeleteMultipleLabels
+                                ]
+                                [ text "DELETE" ]
+                            , button
+                                [ css [ backgroundColor white, publicSans, fontSize (px 22), cursor pointer, fontWeight (int 800), border (px 0), flexGrow (int 2) ]
+                                , onClick ClearLabelsSelections
+                                ]
+                                [ text "DESELECT" ]
+                            ]
+                        ]
+
+                noneSelectedCard =
+                    div [ css [ backgroundColor primary, border3 (px 5) solid black ] ]
+                        [ p
+                            [ css [ publicSans, fontSize (px 32), displayFlex, alignItems center, gap 32, width (pct 100), justifyContent center, padY (px 24) ]
+                            ]
+                            [ text "None Selected"
+                            ]
+                        ]
+
+                confirmDeleteSelectedCard amount =
+                    col [ css [ border3 (px 5) solid black ] ]
+                        [ p
+                            [ css
+                                [ displayFlex
+                                , flexDirection column
+                                , backgroundColor primary
+                                , publicSans
+                                , fontSize (px 32)
+                                , displayFlex
+                                , alignItems center
+                                , gap 22
+                                , width (pct 100)
+                                , justifyContent center
+                                , padY (px 24)
+                                ]
+                            ]
+                            [ strong [ css [ fontSize (px 42) ] ] [ text "Are you sure?" ]
+                            , p [ css [ fontSize (px 28) ] ] [ text ("Delete " ++ (amount |> String.fromInt) ++ " labels?") ]
+                            ]
+                        , row [ css [ borderTop3 (px 3) solid black, height (px 50) ] ]
+                            [ button
+                                [ css [ backgroundColor white, publicSans, fontSize (px 22), cursor pointer, fontWeight (int 800), border (px 0), borderRight3 (px 3) solid black, flexGrow (int 1) ]
+                                , onClick CancelDeleteMultipleLabels
+                                ]
+                                [ text "CANCEL" ]
+                            , button
+                                [ css [ backgroundColor error, publicSans, fontSize (px 22), textColor white, cursor pointer, fontWeight (int 800), border (px 0), flexGrow (int 1) ]
+                                , onClick ConfirmDeleteMultipleLabels
+                                ]
+                                [ text "CONFIRM" ]
+                            ]
+                        ]
+            in
+            case selected of
+                [] ->
+                    noneSelectedCard
+
+                selectedItems ->
+                    if confirmDeleteAllSelectedLabels then
+                        confirmDeleteSelectedCard (List.length selectedItems)
+
+                    else
+                        someSelectedCard (List.length selectedItems)
+
         newLabelBtn =
-            button
-                [ css [ cursor pointer, fontWeight (int 800), publicSans, fontSize (px 16), backgroundColor white, padY (px 12), border (px 0), borderTop3 (px 3) solid black ]
-                , onClick RequestTimeForCreateNewLabel
-                ]
-                [ text "CREATE NEW LABEL" ]
+            if (searchQuery /= "") && (List.filter (.name >> String.toLower >> (==) (String.toLower searchQuery)) model.labels |> List.isEmpty) then
+                button
+                    [ css [ cursor pointer, fontWeight (int 800), publicSans, fontSize (px 16), backgroundColor white, padY (px 12), border (px 0), borderTop3 (px 3) solid black ]
+                    , onClick RequestTimeForCreateNewLabel
+                    ]
+                    [ text "CREATE NEW LABEL" ]
+
+            else
+                text ""
 
         labelCard { name, id } isFirst =
             col
@@ -722,111 +803,16 @@ view ({ selected, searchQuery, confirmDeleteAllSelectedLabels } as model) =
                         [ text "Confirm" ]
                     ]
                 ]
-
-        someLabelSelected =
-            List.length selected /= 0
-
-        selectedActions amount =
-            let
-                selectedAmountActions =
-                    [ button
-                        [ css
-                            [ width (px 64)
-                            , border (px 0)
-                            , textColor inherit
-                            , borderRight3 (px 3) solid white
-                            , displayFlex
-                            , justifyContent center
-                            , alignItems center
-                            , backgroundColor transparent
-                            , hover [ backgroundColor black, textColor white ]
-                            , cursor pointer
-                            ]
-                        , title "Delete selected labels"
-                        , onClick RequestConfirmDeleteMultipleLabels
-                        ]
-                        [ Filled.delete 32 Inherit |> Svg.Styled.fromUnstyled ]
-                    , div [ css [ width (pct 100), padY (px 16) ] ]
-                        [ p [ css [ publicSans, fontSize (px 42), fontWeight bold ] ] [ text amount ]
-                        , p [ css [ publicSans, fontSize (px 42) ] ] [ text "Selected" ]
-                        ]
-                    , button
-                        [ css
-                            [ width (px 64)
-                            , border (px 0)
-                            , textColor inherit
-                            , borderLeft3 (px 3) solid white
-                            , displayFlex
-                            , justifyContent center
-                            , alignItems center
-                            , backgroundColor transparent
-                            , hover [ backgroundColor error, textColor white ]
-                            , cursor pointer
-                            ]
-                        , title "Clear selected labels"
-                        , onClick ClearLabelsSelections
-                        ]
-                        [ Filled.close 32 Inherit |> Svg.Styled.fromUnstyled ]
-                    ]
-
-                confirmDeleteMultiple =
-                    [ button
-                        [ css
-                            [ width (px 64)
-                            , border (px 0)
-                            , textColor inherit
-                            , borderRight3 (px 3) solid white
-                            , displayFlex
-                            , justifyContent center
-                            , alignItems center
-                            , backgroundColor transparent
-                            , hover [ backgroundColor black, textColor white ]
-                            , cursor pointer
-                            ]
-                        , onClick CancelDeleteMultipleLabels
-                        ]
-                        [ Filled.close 32 Inherit |> Svg.Styled.fromUnstyled ]
-                    , div [ css [ width (pct 100), padY (px 16) ] ]
-                        [ p [ css [ publicSans, fontSize (px 42) ] ] [ text "Delete" ]
-                        , strong [ css [ publicSans, fontSize (px 42), display inline ] ] [ text amount ]
-                        , p [ css [ display inline, publicSans, fontSize (px 42) ] ] [ text " labels?" ]
-                        ]
-                    , button
-                        [ css
-                            [ width (px 64)
-                            , border (px 0)
-                            , textColor inherit
-                            , borderLeft3 (px 3) solid white
-                            , displayFlex
-                            , justifyContent center
-                            , alignItems center
-                            , backgroundColor transparent
-                            , hover [ backgroundColor error, textColor white ]
-                            , cursor pointer
-                            ]
-                        , onClick ConfirmDeleteMultipleLabels
-                        ]
-                        [ Filled.check 32 Inherit |> Svg.Styled.fromUnstyled ]
-                    ]
-            in
-            div [ css [ displayFlex, marginBottom (px 32), textAlign center, textColor white, border3 (px 3) solid white ] ]
-                (if confirmDeleteAllSelectedLabels then
-                    confirmDeleteMultiple
-
-                 else
-                    selectedAmountActions
-                )
     in
-    row [ css [ height (pct 100) ] ]
+    row [ css [ height (pct 100), width (pct 100) ] ]
         [ div [ css [ displayFlex, padY (px 45), height (pct 100) ] ]
             [ col
                 [ css
-                    [ backgroundColor secondary
-                    , border3 (px 5) solid black
-                    , maxWidth (px 345)
+                    [ maxWidth (px 345)
                     , minWidth (px 345)
                     , width (px 345)
                     , overflow hidden
+                    , gap 36
 
                     -- TODO: more consistent spacing between them
                     , marginRight (px 200)
@@ -834,29 +820,23 @@ view ({ selected, searchQuery, confirmDeleteAllSelectedLabels } as model) =
                     ]
                 ]
                 [ header
-                , searchBar
-                , itemsList
-                , if (searchQuery /= "") && (List.filter (.name >> String.toLower >> (==) (String.toLower searchQuery)) model.labels |> List.isEmpty) then
-                    newLabelBtn
-
-                  else
-                    text ""
+                , col
+                    [ css
+                        [ backgroundColor secondary
+                        , border3 (px 5) solid black
+                        , height (pct 100)
+                        , overflow hidden
+                        ]
+                    ]
+                    [ searchBar
+                    , itemsList
+                    , newLabelBtn
+                    ]
+                , selectedCard
                 ]
             ]
         , div [ css [ overflowY auto, height (pct 100), padY (px 45), padX (px 32) ] ]
-            [ if someLabelSelected then
-                selectedActions (selected |> List.length |> String.fromInt)
-
-              else
-                col [ css [ alignItems center, justifyContent center, height (pct 80) ] ]
-                    [ dogSvg |> Svg.Styled.fromUnstyled
-                    , p [ css [ publicSans, fontSize (px 42), fontWeight (int 300), textAlign center, textColor white ] ]
-                        [ text "Select a label to edit"
-                        , br [] []
-                        , text "and it will appear here"
-                        ]
-                    ]
-            , ul []
+            [ ul []
                 (List.indexedMap
                     (\i ( label, labelKind ) ->
                         case labelKind of
