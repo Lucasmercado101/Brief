@@ -3,8 +3,8 @@ module Page.EditLabels exposing (..)
 import Api exposing (SyncableID(..))
 import Browser.Navigation as Nav
 import Cmd.Extra exposing (pure)
-import Css exposing (..)
-import CssHelpers exposing (black, delaGothicOne, error, padX, padY, publicSans, secondary, textColor, white)
+import Css exposing (alignItems, auto, backgroundColor, bold, border, border3, borderBottom3, borderLeft3, borderRight3, borderTop3, center, column, cursor, display, displayFlex, ellipsis, flexStart, fontSize, fontWeight, height, hidden, hover, inherit, inline, inlineBlock, int, justifyContent, marginBottom, marginLeft, marginRight, marginTop, maxWidth, minWidth, noWrap, overflow, overflowY, padding, paddingBottom, paddingLeft, paddingRight, paddingTop, pct, pointer, px, solid, spaceBetween, start, textAlign, textDecoration, textOverflow, transparent, underline, whiteSpace, width)
+import CssHelpers exposing (black, col, delaGothicOne, error, padX, padY, publicSans, row, secondary, textColor, white)
 import DataTypes exposing (Label, Note)
 import Dog exposing (dogSvg)
 import Helpers exposing (exclude, labelIDsSplitter, listFirst, partitionFirst, sameId)
@@ -434,20 +434,18 @@ view : Model -> Html Msg
 view ({ selected, searchQuery, confirmDeleteAllSelectedLabels } as model) =
     let
         header =
-            div
+            row
                 [ css
                     [ displayFlex
                     , justifyContent spaceBetween
                     , alignItems flexStart
-                    , marginBottom (px 18)
                     ]
                 ]
-                [ div
+                [ col
                     [ css
                         [ paddingLeft (px 25)
-                        , displayFlex
-                        , flexDirection column
                         , paddingTop (px 12)
+                        , paddingBottom (px 18)
                         ]
                     ]
                     [ p [ css [ delaGothicOne, fontSize (px 45) ] ] [ text "Labels" ]
@@ -456,13 +454,15 @@ view ({ selected, searchQuery, confirmDeleteAllSelectedLabels } as model) =
                 , button
                     [ css
                         [ padding (px 12)
-                        , backgroundColor transparent
+                        , backgroundColor white
                         , border (px 0)
                         , cursor pointer
+                        , borderLeft3 (px 5) solid black
+                        , height (pct 100)
                         ]
                     , onClick GoHome
                     ]
-                    [ Filled.close 32
+                    [ Filled.home 38
                         Inherit
                         |> Svg.Styled.fromUnstyled
                     ]
@@ -563,12 +563,10 @@ view ({ selected, searchQuery, confirmDeleteAllSelectedLabels } as model) =
                 [ text "CREATE NEW LABEL" ]
 
         labelCard { name, id } isFirst =
-            div
+            col
                 [ css
                     [ backgroundColor secondary
                     , border3 (px 5) solid black
-                    , displayFlex
-                    , flexDirection column
                     , maxWidth (px 480)
                     , marginTop
                         (px
@@ -642,12 +640,10 @@ view ({ selected, searchQuery, confirmDeleteAllSelectedLabels } as model) =
                 ]
 
         confirmDeleteCard { name, id } isFirst =
-            div
+            col
                 [ css
                     [ backgroundColor secondary
                     , border3 (px 5) solid black
-                    , displayFlex
-                    , flexDirection column
                     , maxWidth (px 480)
                     , minWidth (px 480)
                     , marginTop
@@ -684,12 +680,10 @@ view ({ selected, searchQuery, confirmDeleteAllSelectedLabels } as model) =
                 ]
 
         editLabelCard { name, id } isFirst newName =
-            div
+            col
                 [ css
                     [ backgroundColor secondary
                     , border3 (px 5) solid black
-                    , displayFlex
-                    , flexDirection column
                     , maxWidth (px 480)
                     , minWidth (px 480)
                     , marginTop
@@ -823,14 +817,12 @@ view ({ selected, searchQuery, confirmDeleteAllSelectedLabels } as model) =
                     selectedAmountActions
                 )
     in
-    div [ css [ displayFlex, flexDirection row, height (pct 100) ] ]
+    row [ css [ height (pct 100) ] ]
         [ div [ css [ displayFlex, padY (px 45), height (pct 100) ] ]
-            [ div
+            [ col
                 [ css
                     [ backgroundColor secondary
                     , border3 (px 5) solid black
-                    , displayFlex
-                    , flexDirection column
                     , maxWidth (px 345)
                     , minWidth (px 345)
                     , width (px 345)
@@ -856,7 +848,7 @@ view ({ selected, searchQuery, confirmDeleteAllSelectedLabels } as model) =
                 selectedActions (selected |> List.length |> String.fromInt)
 
               else
-                div [ css [ displayFlex, alignItems center, flexDirection column, justifyContent center, height (pct 80) ] ]
+                col [ css [ alignItems center, justifyContent center, height (pct 80) ] ]
                     [ dogSvg |> Svg.Styled.fromUnstyled
                     , p [ css [ publicSans, fontSize (px 42), fontWeight (int 300), textAlign center, textColor white ] ]
                         [ text "Select a label to edit"
