@@ -856,34 +856,38 @@ update topMsg topModel =
                             topModel |> pure
 
         ReturnHome ->
-            loggedInMap
-                (\model ->
-                    { model
-                        | page =
-                            case model.page of
-                                Home _ ->
-                                    model.page
+            case topModel of
+                LoggedOff _ ->
+                    topModel |> pure
 
-                                EditNote editingNoteModel ->
-                                    Home.init
-                                        { seeds = editingNoteModel.seeds
-                                        , labels = editingNoteModel.labels
-                                        , notes = editingNoteModel.notes
-                                        , key = editingNoteModel.key
-                                        }
-                                        |> Home
+                LoggedIn model ->
+                    ( LoggedIn
+                        { model
+                            | page =
+                                case model.page of
+                                    Home _ ->
+                                        model.page
 
-                                EditLabels editLabelsModel ->
-                                    Home.init
-                                        { seeds = editLabelsModel.seeds
-                                        , labels = editLabelsModel.labels
-                                        , notes = editLabelsModel.notes
-                                        , key = editLabelsModel.key
-                                        }
-                                        |> Home
-                    }
-                )
-                |> pure
+                                    EditNote editingNoteModel ->
+                                        Home.init
+                                            { seeds = editingNoteModel.seeds
+                                            , labels = editingNoteModel.labels
+                                            , notes = editingNoteModel.notes
+                                            , key = editingNoteModel.key
+                                            }
+                                            |> Home
+
+                                    EditLabels editLabelsModel ->
+                                        Home.init
+                                            { seeds = editLabelsModel.seeds
+                                            , labels = editLabelsModel.labels
+                                            , notes = editLabelsModel.notes
+                                            , key = editLabelsModel.key
+                                            }
+                                            |> Home
+                        }
+                    , Route.replaceUrl model.key Route.Home
+                    )
 
         -- Labels column menu
         OpenLabelsMenu ->
@@ -1491,7 +1495,7 @@ view model =
             [ height (pct 100)
             , width (pct 100)
             , backgroundColor (rgb 18 104 85)
-            , backgroundImage (url "./media/bgr.png ")
+            , backgroundImage (url "/media/bgr.png ")
             , backgroundSize contain
             , backgroundRepeat repeat
             ]
