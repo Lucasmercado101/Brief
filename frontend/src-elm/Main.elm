@@ -75,13 +75,15 @@ type Page
 
 type alias LoggedInModel =
     { page : Page
-    , isOnline : Bool
     , windowRes : { width : Int, height : Int }
 
     -- sync stuff
+    , lastSyncedAt : Posix
+
+    -- TODO:refactor this into a type
+    , isOnline : Bool
     , offlineQueue : OfflineQueueOps
     , runningQueueOn : Maybe OfflineQueueOps
-    , lastSyncedAt : Posix
     }
 
 

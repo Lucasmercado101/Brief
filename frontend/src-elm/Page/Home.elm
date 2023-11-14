@@ -444,9 +444,21 @@ clickedOnSelectedNote =
     stopPropagationOn "click" (JD.succeed ( NoOp, True ))
 
 
-view : Model -> { width : Int, height : Int } -> Maybe Bool -> Html Msg
-view model windowRes isOnline =
+navbar : Model -> Maybe Bool -> Html Msg
+navbar model isOnline =
     let
+        btnMxn =
+            Css.batch
+                [ backgroundColor white
+                , border (px 0)
+                , padding (px 8)
+                , displayFlex
+                , justifyContent center
+                , alignItems center
+                , cursor pointer
+                , hover [ backgroundColor black, color white ]
+                ]
+
         labelsMenuBtn =
             let
                 labelsCount =
@@ -457,24 +469,92 @@ view model windowRes isOnline =
                     openLabelsMenuBtn labelsCount
 
                 Nothing ->
-                    closedLabelsMenuBtn labelsCount
+                    button
+                        [ css [ btnMxn ], onClick OpenLabelsMenu ]
+                        [ Filled.label 32 Inherit |> Svg.Styled.fromUnstyled ]
 
-        syncIcon =
-            (case isOnline of
-                Just isSyncing ->
-                    if isSyncing then
-                        Outlined.sync
+        homeBtn =
+            button
+                [ css
+                    [ btnMxn
+                    , borderLeft3 (px 3) solid black
+                    , borderRight3 (px 3) solid black
+                    ]
+                ]
+                [ Filled.home 32 Inherit |> Svg.Styled.fromUnstyled ]
 
-                    else
-                        Outlined.cloud
+        changeViewBtn =
+            button
+                [ css
+                    [ btnMxn
+                    , borderLeft3 (px 3) solid black
+                    , borderRight3 (px 3) solid black
+                    ]
+                ]
+                [ Filled.view_module 32 Inherit |> Svg.Styled.fromUnstyled ]
 
-                Nothing ->
-                    Outlined.wifi_off
-            )
-                28
-                Inherit
-                |> Svg.Styled.fromUnstyled
+        syncBtn =
+            button
+                [ css [ btnMxn ] ]
+                [ -- TODO: add icon for when offline and yet queued "cloud_queue"
+                  (case isOnline of
+                    Just isSyncing ->
+                        if isSyncing then
+                            Outlined.cloud_upload
+
+                        else
+                            Outlined.sync
+
+                    Nothing ->
+                        Outlined.wifi_off
+                  )
+                    28
+                    Inherit
+                    |> Svg.Styled.fromUnstyled
+                ]
     in
+    nav
+        [ css
+            [ backgroundColor secondary
+            , borderBottom3 (px 3) solid (rgb 0 0 0)
+            , position sticky
+            , top (px 0)
+            , displayFlex
+            , alignItems center
+            , justifyContent spaceBetween
+            , width (pct 100)
+            ]
+        ]
+        [ row []
+            [ labelsMenuBtn
+            , homeBtn
+            ]
+        , div [ css [ width (px 683), displayFlex, justifyContent center, alignItems center ] ]
+            [ input
+                [ css
+                    [ width (pct 100)
+                    , maxWidth (pct 100)
+                    , padding (px 6)
+                    , publicSans
+                    , fontWeight (int 400)
+                    , fontSize (px 16)
+                    , textAlign center
+                    , border3 (px 2) solid black
+                    , mx (px 16)
+                    ]
+                , placeholder "Search"
+                ]
+                []
+            ]
+        , row []
+            [ changeViewBtn
+            , syncBtn
+            ]
+        ]
+
+
+view : Model -> { width : Int, height : Int } -> Maybe Bool -> Html Msg
+view model windowRes isOnline =
     div
         [ case model.selectedNote of
             Just val ->
@@ -484,30 +564,7 @@ view model windowRes isOnline =
                 css []
         , css [ displayFlex, flexDirection column, height (pct 100), overflow auto ]
         ]
-        [ nav
-            [ css
-                [ backgroundColor (rgb 140 20 254)
-                , color (rgb 255 255 255)
-                , publicSans
-                , fontWeight bolder
-                , borderBottom3 (px 3) solid (rgb 0 0 0)
-                , position sticky
-                , top (px 0)
-                , displayFlex
-                , justifyContent spaceBetween
-                ]
-            ]
-            [ labelsMenuBtn
-            , row [ css [ padding (px 12), justifyContent spaceBetween, width (pct 100) ] ]
-                [ p
-                    [ css
-                        [ fontSize (px 25)
-                        ]
-                    ]
-                    [ text "Notes" ]
-                , syncIcon
-                ]
-            ]
+        [ navbar model isOnline
         , div [ css [ displayFlex, height (pct 100), overflow hidden ] ]
             [ case model.labelsMenu of
                 Just _ ->
@@ -523,49 +580,6 @@ view model windowRes isOnline =
 labelsMenuWidth : Float
 labelsMenuWidth =
     277
-
-
-closedLabelsMenuBtn : String -> Html Msg
-closedLabelsMenuBtn labelsCount =
-    button
-        [ css
-            [ padY (px 8)
-            , paddingLeft (px 8)
-            , maxWidth (px labelsMenuWidth)
-            , minWidth (px labelsMenuWidth)
-            , backgroundColor white
-            , textColor black
-            , border (px 0)
-            , borderRight3 (px 3) solid black
-            , displayFlex
-            , publicSans
-            , alignItems center
-            , justifyContent spaceBetween
-            , cursor pointer
-            , fontSize (px 16)
-            , fontWeight bold
-            ]
-        , type_ "button"
-        , onClick OpenLabelsMenu
-        ]
-        [ div
-            [ css
-                [ displayFlex
-                , alignItems center
-                ]
-            ]
-            [ Filled.label 32
-                Inherit
-                |> Svg.Styled.fromUnstyled
-            , p [ css [ marginLeft (px 10) ] ] [ text "Labels" ]
-            , p [ css [ marginLeft (px 10) ] ] [ text ("(" ++ labelsCount ++ ")") ]
-            ]
-        , div [ css [ width (px 50), height (px 32), displayFlex, justifyContent center, alignItems center ] ]
-            [ Filled.arrow_drop_down 32
-                Inherit
-                |> Svg.Styled.fromUnstyled
-            ]
-        ]
 
 
 openLabelsMenuBtn : String -> Html Msg
