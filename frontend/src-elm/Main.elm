@@ -205,18 +205,10 @@ main =
     Browser.application
         { init = init
         , view =
-            \e ->
-                let
-                    -- TODO: make this nicer
-                    bca : Html.Html Msg
-                    bca =
-                        (view >> Html.Styled.toUnstyled) e
-
-                    abc : Document Msg
-                    abc =
-                        { title = "test", body = [ bca ] }
-                in
-                abc
+            \model ->
+                { title = "Brief notes app"
+                , body = [ view model |> Html.Styled.toUnstyled ]
+                }
         , update = update
         , subscriptions = subscriptions
         , onUrlRequest = ClickedLink
