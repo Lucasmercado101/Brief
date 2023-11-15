@@ -70,11 +70,12 @@ subscriptions : Model -> Sub Msg
 subscriptions model =
     Sub.batch
         [ receiveRandomValues ReceivedRandomValues
-        , Browser.Events.onClick clickedDocDecoder
-        , Browser.Events.onClick (JD.succeed DeselectNote)
         , case model.selectedNote of
             Just n ->
-                onKeyDown (JD.map (selectedNoteHotkeys n) (JD.field "key" JD.string))
+                Sub.batch
+                    [ onKeyDown (JD.map (selectedNoteHotkeys n) (JD.field "key" JD.string))
+                    , Browser.Events.onClick clickedDocDecoder
+                    ]
 
             Nothing ->
                 Sub.none
