@@ -137,6 +137,7 @@ type Msg
 
 type Signal
     = OfflineQueueAction OfflineQueue.Action
+    | ClearLabelFilters
 
 
 
@@ -209,8 +210,7 @@ update msg model =
                     model |> pureNoSignal
 
         ClearLabelFilter ->
-            -- TODO: send signal to clear labels filter
-            ( model, Cmd.none, Nothing )
+            ( model, Cmd.none, Just ClearLabelFilters )
 
         ChangeNotePinned ( uid, newPinnedVal ) ->
             { model

@@ -948,15 +948,24 @@ updateHomeWithSignal topModel ( model, cmd, maybeSignal ) =
                 ( labelIds, noteIds ) =
                     ( model.labels |> List.map .id |> labelIDsSplitter |> Tuple.second, model.notes |> List.map .id |> labelIDsSplitter |> Tuple.second )
             in
-            ( mappedModel, mappedCmd )
-                |> addToQueue
-                    (case signal of
-                        Home.OfflineQueueAction action ->
-                            actionMapToFn action
+            case signal of
+                Home.OfflineQueueAction action ->
+                    ( mappedModel, mappedCmd )
+                        |> addToQueue
+                            (actionMapToFn action)
+                            noteIds
+                            labelIds
+                            topModel.isOnline
+
+                Home.ClearLabelFilters ->
+                    ( { mappedModel
+                        | filters =
+                            { label = Nothing
+                            , content = mappedModel.filters.content
+                            }
+                      }
+                    , mappedCmd
                     )
-                    noteIds
-                    labelIds
-                    topModel.isOnline
     )
         |> (\( m1, c1 ) -> ( LoggedIn m1, c1 ))
 
