@@ -499,7 +499,7 @@ update topMsg topModel =
                     case ( pageMsg, loggedInModel.page ) of
                         ( GotHomeMsg homeMsg, Home homeModel ) ->
                             Home.update homeMsg homeModel
-                                |> updateHomeWithSignal Home GotHomeMsg loggedInModel
+                                |> updateHomeWithSignal loggedInModel
 
                         ( GotEditLabelsMsg editLabelsMsg, EditLabels editLabelsModel ) ->
                             EditLabels.update editLabelsMsg editLabelsModel
@@ -933,11 +933,11 @@ updateWith toModel toMsg topModel ( m, c ) =
     ( { topModel | page = toModel m }, Cmd.map GotPageMsg (Cmd.map toMsg c) )
 
 
-updateHomeWithSignal : (a -> Page) -> (c -> PageMsg) -> LoggedInModel -> ( a, Cmd c, Maybe Home.Signal ) -> ( Model, Cmd Msg )
-updateHomeWithSignal toPageModel toPageMsg topModel ( m, c, maybeSignal ) =
+updateHomeWithSignal : LoggedInModel -> ( Home.Model, Cmd Home.Msg, Maybe Home.Signal ) -> ( Model, Cmd Msg )
+updateHomeWithSignal topModel ( model, cmd, maybeSignal ) =
     let
         ( mappedModel, mappedCmd ) =
-            ( { topModel | page = toPageModel m }, Cmd.map GotPageMsg (Cmd.map toPageMsg c) )
+            ( { topModel | page = Home model }, Cmd.map (GotHomeMsg >> GotPageMsg) cmd )
     in
     (case maybeSignal of
         Nothing ->
@@ -1500,7 +1500,7 @@ view model =
                 case page of
                     Home homeModel ->
                         pageView { labels = homeModel.labels, page = page, labelsMenu = labelsMenu, isOnline = isOnline, runningQueueOn = runningQueueOn, filters = filters, windowRes = windowRes }
-                            (Home.view homeModel windowRes (maybeToBool labelsMenu) |> Html.Styled.map (GotHomeMsg >> GotPageMsg))
+                            (Home.view homeModel windowRes filters (maybeToBool labelsMenu) |> Html.Styled.map (GotHomeMsg >> GotPageMsg))
 
                     EditLabels editLabelsModel ->
                         pageView { labels = editLabelsModel.labels, page = page, labelsMenu = labelsMenu, isOnline = isOnline, runningQueueOn = runningQueueOn, filters = filters, windowRes = windowRes }

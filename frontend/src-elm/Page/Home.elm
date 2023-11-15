@@ -92,11 +92,6 @@ type alias LabelsColumnMenu =
 
 type alias Model =
     { newLabelName : String
-    , labelsMenu : LabelsColumnMenu
-    , filters :
-        { label : Maybe SyncableID
-        , content : Maybe String
-        }
     , selectedNote : Maybe SyncableID
 
     -- global data
@@ -115,27 +110,13 @@ init :
     }
     -> Model
 init { key, seeds, labels, notes } =
-    ({ key = key
-     , seeds = seeds
-     , notes = notes
-     , newLabelName = ""
-     , selectedNote = Nothing
-     , labels = labels
-     , labelsMenu = Nothing
-     , filters =
-        { label = Nothing
-        , content = Nothing
-        }
-     }
-     -- TODO: full-sync with regards to indexedDb
-     -- , Cmd.none
-     --     -- TODO:
-     -- if hasSessionCookie then
-     --     -- Api.fullSync FullSyncResp
-     --     --
-     --   else
-     --     Cmd.none
-    )
+    { key = key
+    , seeds = seeds
+    , notes = notes
+    , newLabelName = ""
+    , selectedNote = Nothing
+    , labels = labels
+    }
 
 
 type Msg
@@ -228,7 +209,8 @@ update msg model =
                     model |> pureNoSignal
 
         ClearLabelFilter ->
-            { model | filters = { content = model.filters.content, label = Nothing } } |> pureNoSignal
+            -- TODO: send signal to clear labels filter
+            ( model, Cmd.none, Nothing )
 
         ChangeNotePinned ( uid, newPinnedVal ) ->
             { model
@@ -458,11 +440,6 @@ clickedOnSelectedNote =
     stopPropagationOn "click" (JD.succeed ( NoOp, True ))
 
 
-view : Model -> { width : Int, height : Int } -> Bool -> Html Msg
-view model windowRes labelsMenuIsOpen =
-    notesGrid model windowRes labelsMenuIsOpen
-
-
 labelsMenuWidth : Float
 labelsMenuWidth =
     277
@@ -478,8 +455,16 @@ noteCardGridGapSize =
     10
 
 
-notesGrid : Model -> { width : Int, height : Int } -> Bool -> Html Msg
-notesGrid model windowRes labelsMenuIsOpen =
+view :
+    Model
+    -> { width : Int, height : Int }
+    ->
+        { label : Maybe SyncableID
+        , content : Maybe String
+        }
+    -> Bool
+    -> Html Msg
+view model windowRes filters labelsMenuIsOpen =
     let
         scrollbarWidth : number
         scrollbarWidth =
@@ -617,7 +602,7 @@ notesGrid model windowRes labelsMenuIsOpen =
         ]
         [ col
             []
-            [ case model.filters.label of
+            [ case filters.label of
                 Just filterLabel ->
                     case listFirst (.id >> sameId filterLabel) model.labels of
                         Just l ->
@@ -658,7 +643,7 @@ notesGrid model windowRes labelsMenuIsOpen =
                                     |> List.sortWith flippedComparison
                                     |> prioritizePinned
                                     |> (\e ->
-                                            case model.filters.label of
+                                            case filters.label of
                                                 Just label ->
                                                     e |> List.filter (\l -> List.any (\j -> j == label) l.labels)
 
