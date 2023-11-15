@@ -1,6 +1,7 @@
 module Page.Home exposing (..)
 
 import Api exposing (SyncableID(..))
+import Browser.Dom exposing (getElement)
 import Browser.Events exposing (onKeyDown)
 import Browser.Navigation as Nav
 import Cmd.Extra exposing (pure)
@@ -57,10 +58,20 @@ selectedNoteHotkeys noteId string =
             NoOp
 
 
+clickedDocDecoder : JD.Decoder Msg
+clickedDocDecoder =
+    JD.map2
+        (\x y -> ClickedMouse { x = x, y = y })
+        (JD.field "clientX" JD.float)
+        (JD.field "clientY" JD.float)
+
+
 subscriptions : Model -> Sub Msg
 subscriptions model =
     Sub.batch
         [ receiveRandomValues ReceivedRandomValues
+        , Browser.Events.onClick clickedDocDecoder
+        , Browser.Events.onClick (JD.succeed DeselectNote)
         , case model.selectedNote of
             Just n ->
                 onKeyDown (JD.map (selectedNoteHotkeys n) (JD.field "key" JD.string))
@@ -133,7 +144,7 @@ type Msg
     | RemoveLabelFromNote { noteID : SyncableID, labelID : SyncableID }
     | SelectedNote SyncableID
     | DeselectNote
-    | ClickedMouse
+    | ClickedMouse { x : Float, y : Float }
     | EditNote SyncableID
     | RequestTimeForNewNoteCreation
     | CreateAndEditNote Posix
@@ -146,8 +157,23 @@ type Signal
     = OfflineQueueAction OfflineQueue.Action
 
 
+
+{-
+   Check if cursor is inside a DOM node
+-}
+
+
+cursorInNode : { x1 : Float, y1 : Float } -> { x2 : Float, y2 : Float, width : Float, height : Float } -> Bool
+cursorInNode { x1, y1 } { x2, y2, width, height } =
+    x2 <= x1 && x1 <= x2 + width && y2 <= y1 && y1 <= y2 + height
+
+
 update : Msg -> Model -> ( Model, Cmd Msg, Maybe Signal )
 update msg model =
+    let
+        fire l =
+            ( model, l, Nothing )
+    in
     case msg of
         NoOp ->
             model |> pureNoSignal
@@ -193,14 +219,6 @@ update msg model =
             ( model, Route.replaceUrl model.key (Route.EditNote id), Nothing )
 
         DeselectNote ->
-            case model.selectedNote of
-                Just _ ->
-                    { model | selectedNote = Nothing } |> pureNoSignal
-
-                Nothing ->
-                    model |> pureNoSignal
-
-        ClickedMouse ->
             case model.selectedNote of
                 Just _ ->
                     { model | selectedNote = Nothing } |> pureNoSignal
@@ -354,6 +372,43 @@ update msg model =
                     in
                     { model | notes = { noteData | labels = newNotes } :: restNotes }
                         |> pureWithSignal (OfflineQueueAction (QEditNoteLabels noteID (Just newNotes)))
+
+        ClickedMouse { x, y } ->
+            case model.selectedNote of
+                Just selectedNote ->
+                    let
+                        id =
+                            case selectedNote of
+                                DatabaseID i ->
+                                    String.fromInt i
+
+                                OfflineID i ->
+                                    i
+                    in
+                    fire
+                        (getElement ("note-" ++ id)
+                            |> Task.attempt
+                                (\res ->
+                                    case res of
+                                        Ok el ->
+                                            let
+                                                elData : { x2 : Float, y2 : Float, width : Float, height : Float }
+                                                elData =
+                                                    { x2 = el.element.x, y2 = el.element.y, width = el.element.width, height = el.element.height }
+                                            in
+                                            if cursorInNode { x1 = x, y1 = y } elData then
+                                                NoOp
+
+                                            else
+                                                DeselectNote
+
+                                        Err _ ->
+                                            NoOp
+                                )
+                        )
+
+                Nothing ->
+                    model |> pureNoSignal
 
         ReceivedRandomValues values ->
             { model | seeds = List.map Random.initialSeed values }
@@ -869,6 +924,16 @@ noteCard model ( data, order, selected ) =
 
                     else
                         []
+                   )
+            )
+         , id
+            ("note-"
+                ++ (case data.id of
+                        DatabaseID id ->
+                            String.fromInt id
+
+                        OfflineID id ->
+                            id
                    )
             )
          , if selected then
