@@ -946,17 +946,7 @@ updateHomeWithSignal topModel ( model, cmd, maybeSignal ) =
         Just signal ->
             let
                 ( labelIds, noteIds ) =
-                    (case topModel.page of
-                        Home homeModel ->
-                            ( homeModel.labels, homeModel.notes )
-
-                        EditLabels editLabelsModel ->
-                            ( editLabelsModel.labels, editLabelsModel.notes )
-
-                        EditNote editNoteModel ->
-                            ( editNoteModel.labels, editNoteModel.notes )
-                    )
-                        |> (\( l, n ) -> ( l |> List.map .id |> labelIDsSplitter |> Tuple.second, n |> List.map .id |> labelIDsSplitter |> Tuple.second ))
+                    ( model.labels |> List.map .id |> labelIDsSplitter |> Tuple.second, model.notes |> List.map .id |> labelIDsSplitter |> Tuple.second )
             in
             ( mappedModel, mappedCmd )
                 |> addToQueue
