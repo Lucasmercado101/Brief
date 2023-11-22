@@ -1298,6 +1298,7 @@ navbar page labelsAmount isLabelsMenuOpen isOnline searchBarQuery =
                     , border3 (px 2) solid black
                     , mx (px 16)
                     ]
+                , onInput OnChangedSearchBarQuery
                 , value searchBarQuery
                 , placeholder "Search"
                 ]
