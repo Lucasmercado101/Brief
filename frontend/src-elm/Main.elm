@@ -84,6 +84,7 @@ type alias LoggedInModel =
     { page : Page
     , windowRes : { width : Int, height : Int }
     , key : Nav.Key
+    , searchBarQuery : String
 
     -- Labels menu
     , newLabelName : String
@@ -130,7 +131,9 @@ type Msg
     | IsOffline
     | IsOnline
     | WindowResized { width : Int, height : Int }
+    -- TODO: remove this msg, replace with Nav.pushUrl
     | ReturnHome
+    | OnChangedSearchBarQuery String
       -- Labels menu
     | OpenLabelsMenu
     | CloseLabelsMenu
@@ -169,6 +172,7 @@ init flags url navKey =
             , isOnline = flags.online
             , windowRes = flags.windowSize
             , key = navKey
+            , searchBarQuery = ""
 
             -- Labels menu
             , newLabelName = ""
@@ -310,6 +314,7 @@ update topMsg topModel =
                                             , notes = []
                                             }
                                         )
+                                , searchBarQuery = ""
                                 , newLabelName = ""
                                 , labelsMenu = Nothing
                                 , filters =
@@ -815,6 +820,7 @@ update topMsg topModel =
                                 , newLabelName = loggedInModel.newLabelName
                                 , labelsMenu = loggedInModel.labelsMenu
                                 , filters = loggedInModel.filters
+                                , searchBarQuery = loggedInModel.searchBarQuery
                                 , runningQueueOn =
                                     if offlineQueueIsEmpty updatedOfflineQueue then
                                         Nothing
@@ -846,6 +852,10 @@ update topMsg topModel =
                         Err _ ->
                             -- TODO: error handling here
                             topModel |> pure
+
+        OnChangedSearchBarQuery newQuery ->
+            loggedInMap (\model -> { model | searchBarQuery = newQuery })
+                |> pure
 
         ReturnHome ->
             case topModel of
@@ -1084,8 +1094,8 @@ addToQueue operation notesIds labelsIds isOnline ( model, cmds ) =
 -- VIEW
 
 
-navbar : Page -> Int -> Bool -> Maybe Bool -> Html Msg
-navbar page labelsAmount isLabelsMenuOpen isOnline =
+navbar : Page -> Int -> Bool -> Maybe Bool -> String -> Html Msg
+navbar page labelsAmount isLabelsMenuOpen isOnline searchBarQuery =
     let
         btnMxn =
             Css.batch
@@ -1288,6 +1298,7 @@ navbar page labelsAmount isLabelsMenuOpen isOnline =
                     , border3 (px 2) solid black
                     , mx (px 16)
                     ]
+                , value searchBarQuery
                 , placeholder "Search"
                 ]
                 []
@@ -1442,8 +1453,8 @@ labelsMenuColumn { labels, filters, labelsMenu } =
         ]
 
 
-pageView : { a | labels : List Label, page : Page, labelsMenu : Maybe String, isOnline : Bool, runningQueueOn : Maybe b, filters : { c | label : Maybe SyncableID }, windowRes : g } -> Html Msg -> Html Msg
-pageView { labels, page, labelsMenu, isOnline, runningQueueOn, filters, windowRes } individualPageView =
+pageView : { a | labels : List Label, page : Page, labelsMenu : Maybe String, isOnline : Bool, searchBarQuery: String, runningQueueOn : Maybe b, filters : { c | label : Maybe SyncableID }, windowRes : g } -> Html Msg -> Html Msg
+pageView { labels, page, labelsMenu, isOnline, runningQueueOn, filters, searchBarQuery, windowRes } individualPageView =
     col
         [ css
             [ displayFlex
@@ -1461,6 +1472,7 @@ pageView { labels, page, labelsMenu, isOnline, runningQueueOn, filters, windowRe
              else
                 Nothing
             )
+            searchBarQuery
         , row
             [ css
                 [ displayFlex
@@ -1495,17 +1507,17 @@ view model =
             LoggedOff logInModel ->
                 Html.Styled.map (GotLogInMsg >> GotPageMsg) (LogIn.logInView logInModel)
 
-            LoggedIn { page, runningQueueOn, windowRes, isOnline, filters, labelsMenu } ->
+            LoggedIn { page, runningQueueOn, windowRes, isOnline, filters, labelsMenu, searchBarQuery } ->
                 case page of
                     Home homeModel ->
-                        pageView { labels = homeModel.labels, page = page, labelsMenu = labelsMenu, isOnline = isOnline, runningQueueOn = runningQueueOn, filters = filters, windowRes = windowRes }
+                        pageView { searchBarQuery = searchBarQuery, labels = homeModel.labels, page = page, labelsMenu = labelsMenu, isOnline = isOnline, runningQueueOn = runningQueueOn, filters = filters, windowRes = windowRes }
                             (Home.view homeModel windowRes filters (maybeToBool labelsMenu) |> Html.Styled.map (GotHomeMsg >> GotPageMsg))
 
                     EditLabels editLabelsModel ->
-                        pageView { labels = editLabelsModel.labels, page = page, labelsMenu = labelsMenu, isOnline = isOnline, runningQueueOn = runningQueueOn, filters = filters, windowRes = windowRes }
+                        pageView { searchBarQuery = searchBarQuery, labels = editLabelsModel.labels, page = page, labelsMenu = labelsMenu, isOnline = isOnline, runningQueueOn = runningQueueOn, filters = filters, windowRes = windowRes }
                             (EditLabels.view editLabelsModel |> Html.Styled.map (GotEditLabelsMsg >> GotPageMsg))
 
                     EditNote editNoteModel ->
-                        pageView { labels = editNoteModel.labels, page = page, labelsMenu = labelsMenu, isOnline = isOnline, runningQueueOn = runningQueueOn, filters = filters, windowRes = windowRes }
+                        pageView { searchBarQuery = searchBarQuery, labels = editNoteModel.labels, page = page, labelsMenu = labelsMenu, isOnline = isOnline, runningQueueOn = runningQueueOn, filters = filters, windowRes = windowRes }
                             (EditNote.view editNoteModel |> Html.Styled.map (GotEditNoteMsg >> GotPageMsg))
         ]
