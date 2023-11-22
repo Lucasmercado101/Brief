@@ -4,7 +4,7 @@ import Api exposing (Operation(..), SyncableID(..))
 import Browser exposing (Document, UrlRequest)
 import Browser.Navigation as Nav
 import Cmd.Extra exposing (pure)
-import Css exposing (alignItems, auto, backgroundColor, backgroundImage, backgroundRepeat, backgroundSize, bold, border, border3, borderBottom3, borderLeft3, borderRight3, center, color, column, contain, cursor, displayFlex, ellipsis, flexDirection, fontSize, fontWeight, fullWidth, height, hidden, hover, inherit, int, justifyContent, marginLeft, maxWidth, minWidth, noWrap, overflow, overflowY, padding, paddingLeft, paddingTop, pct, pointer, position, px, repeat, rgb, solid, spaceBetween, start, sticky, textAlign, textOverflow, top, transparent, url, whiteSpace, width)
+import Css exposing (alignItems, auto, backgroundColor, backgroundImage, backgroundRepeat, backgroundSize, bold, border, border3, borderBottom3, borderLeft3, borderRight, borderRight3, center, color, column, contain, cursor, displayFlex, ellipsis, flex, flex3, flexDirection, flexGrow, flexShrink, fontSize, fontWeight, fullWidth, height, hidden, hover, inherit, int, justifyContent, marginLeft, maxWidth, minWidth, noWrap, overflow, overflowY, padding, paddingLeft, paddingTop, pct, pointer, position, property, px, repeat, rgb, solid, spaceBetween, start, sticky, textAlign, textOverflow, top, transparent, url, whiteSpace, width)
 import CssHelpers exposing (black, col, error, mx, padX, padY, primary, publicSans, row, secondary, textColor, userSelectNone, white)
 import DataTypes exposing (Label, Note)
 import Dog exposing (dogSvg)
@@ -131,9 +131,10 @@ type Msg
     | IsOffline
     | IsOnline
     | WindowResized { width : Int, height : Int }
-    -- TODO: remove this msg, replace with Nav.pushUrl
+      -- TODO: remove this msg, replace with Nav.pushUrl
     | ReturnHome
     | OnChangedSearchBarQuery String
+    | ClearSearchBarQuery
       -- Labels menu
     | OpenLabelsMenu
     | CloseLabelsMenu
@@ -904,6 +905,10 @@ update topMsg topModel =
             loggedInMap (\model -> { model | labelsMenu = Maybe.map (\_ -> s) model.labelsMenu })
                 |> pure
 
+        ClearSearchBarQuery ->
+            loggedInMap (\model -> { model | searchBarQuery = "" })
+                |> pure
+
         SelectLabelToFilterBy id ->
             loggedInMap
                 (\model ->
@@ -1285,7 +1290,14 @@ navbar page labelsAmount isLabelsMenuOpen isOnline searchBarQuery =
                 labelsMenuBtn
             , homeBtn
             ]
-        , div [ css [ width (px 683), displayFlex, justifyContent center, alignItems center ] ]
+        , row
+            [ css
+                [ mx (px 16)
+                , border3 (px 2) solid black
+                , property "flex" "1 1 auto"
+                , maxWidth (px 683)
+                ]
+            ]
             [ input
                 [ css
                     [ width (pct 100)
@@ -1295,14 +1307,24 @@ navbar page labelsAmount isLabelsMenuOpen isOnline searchBarQuery =
                     , fontWeight (int 400)
                     , fontSize (px 16)
                     , textAlign center
-                    , border3 (px 2) solid black
-                    , mx (px 16)
+                    , borderRight (px 0)
+                    , border (px 0)
                     ]
                 , onInput OnChangedSearchBarQuery
                 , value searchBarQuery
                 , placeholder "Search"
                 ]
                 []
+            , case searchBarQuery of
+                "" ->
+                    text ""
+
+                _ ->
+                    button
+                        [ css [ displayFlex, alignItems center, cursor pointer, backgroundColor black, color white, border (px 0), borderLeft3 (px 2) solid black, hover [ color black, backgroundColor white ] ]
+                        , onClick ClearSearchBarQuery
+                        ]
+                        [ Filled.close 32 Inherit |> Svg.Styled.fromUnstyled ]
             ]
         , row [ css [ height (pct 100) ] ]
             [ changeViewBtn
@@ -1454,7 +1476,7 @@ labelsMenuColumn { labels, filters, labelsMenu } =
         ]
 
 
-pageView : { a | labels : List Label, page : Page, labelsMenu : Maybe String, isOnline : Bool, searchBarQuery: String, runningQueueOn : Maybe b, filters : { c | label : Maybe SyncableID }, windowRes : g } -> Html Msg -> Html Msg
+pageView : { a | labels : List Label, page : Page, labelsMenu : Maybe String, isOnline : Bool, searchBarQuery : String, runningQueueOn : Maybe b, filters : { c | label : Maybe SyncableID }, windowRes : g } -> Html Msg -> Html Msg
 pageView { labels, page, labelsMenu, isOnline, runningQueueOn, filters, searchBarQuery, windowRes } individualPageView =
     col
         [ css
