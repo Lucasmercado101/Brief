@@ -458,13 +458,10 @@ noteCardGridGapSize =
 view :
     Model
     -> { width : Int, height : Int }
-    ->
-        { label : Maybe SyncableID
-        , content : Maybe String
-        }
+    -> Maybe SyncableID
     -> Bool
     -> Html Msg
-view model windowRes filters labelsMenuIsOpen =
+view model windowRes filteringByLabel labelsMenuIsOpen =
     let
         scrollbarWidth : number
         scrollbarWidth =
@@ -602,7 +599,7 @@ view model windowRes filters labelsMenuIsOpen =
         ]
         [ col
             []
-            [ case filters.label of
+            [ case filteringByLabel of
                 Just filterLabel ->
                     case listFirst (.id >> sameId filterLabel) model.labels of
                         Just l ->
@@ -643,7 +640,7 @@ view model windowRes filters labelsMenuIsOpen =
                                     |> List.sortWith flippedComparison
                                     |> prioritizePinned
                                     |> (\e ->
-                                            case filters.label of
+                                            case filteringByLabel of
                                                 Just label ->
                                                     e |> List.filter (\l -> List.any (\j -> j == label) l.labels)
 

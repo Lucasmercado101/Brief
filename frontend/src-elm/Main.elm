@@ -76,22 +76,15 @@ type Page
     | EditNote EditNote.Model
 
 
-type alias LabelsColumnMenu =
-    Maybe String
-
-
 type alias LoggedInModel =
     { page : Page
     , windowRes : { width : Int, height : Int }
     , key : Nav.Key
     , searchBarQuery : String
 
-    -- Labels menu
-    , labelsMenu : LabelsColumnMenu
-    , filters :
-        { label : Maybe SyncableID
-        , content : Maybe String
-        }
+    -- Home data
+    , labelsMenu : Maybe String
+    , filteringByLabel : Maybe SyncableID
 
     -- sync stuff
     , lastSyncedAt : Posix
@@ -176,10 +169,7 @@ init flags url navKey =
 
             -- Labels menu
             , labelsMenu = Nothing
-            , filters =
-                { label = Nothing
-                , content = Nothing
-                }
+            , filteringByLabel = Nothing
 
             -- page
             , page =
@@ -315,10 +305,7 @@ update topMsg topModel =
                                         )
                                 , searchBarQuery = ""
                                 , labelsMenu = Nothing
-                                , filters =
-                                    { label = Nothing
-                                    , content = Nothing
-                                    }
+                                , filteringByLabel = Nothing
                                 , key = logInViewModel.key
                                 , offlineQueue = emptyOfflineQueue
                                 , runningQueueOn = Nothing
@@ -816,7 +803,7 @@ update topMsg topModel =
                                 , isOnline = loggedInModel.isOnline
                                 , key = loggedInModel.key
                                 , labelsMenu = loggedInModel.labelsMenu
-                                , filters = loggedInModel.filters
+                                , filteringByLabel = loggedInModel.filteringByLabel
                                 , searchBarQuery = loggedInModel.searchBarQuery
                                 , runningQueueOn =
                                     if offlineQueueIsEmpty updatedOfflineQueue then
@@ -911,7 +898,7 @@ update topMsg topModel =
                     let
                         newFilter : Maybe SyncableID
                         newFilter =
-                            case model.filters.label of
+                            case model.filteringByLabel of
                                 Nothing ->
                                     Just id
 
@@ -922,12 +909,7 @@ update topMsg topModel =
                                     else
                                         Just id
                     in
-                    { model
-                        | filters =
-                            { label = newFilter
-                            , content = model.filters.content
-                            }
-                    }
+                    { model | filteringByLabel = newFilter }
                 )
                 |> pure
 
@@ -969,12 +951,7 @@ updateHomeWithSignal topModel ( model, cmd, maybeSignal ) =
                             topModel.isOnline
 
                 Home.ClearLabelFilters ->
-                    ( { mappedModel
-                        | filters =
-                            { label = Nothing
-                            , content = mappedModel.filters.content
-                            }
-                      }
+                    ( { mappedModel | filteringByLabel = Nothing }
                     , mappedCmd
                     )
     )
@@ -1334,8 +1311,8 @@ labelsMenuWidth =
     277
 
 
-labelsMenuColumn : { labels : List Label, filters : { c | label : Maybe SyncableID }, labelsMenu : Maybe String } -> Html Msg
-labelsMenuColumn { labels, filters, labelsMenu } =
+labelsMenuColumn : { labels : List Label, filteringByLabel : Maybe SyncableID, labelsMenu : Maybe String } -> Html Msg
+labelsMenuColumn { labels, filteringByLabel, labelsMenu } =
     div
         [ css
             [ maxWidth (px labelsMenuWidth)
@@ -1425,7 +1402,7 @@ labelsMenuColumn { labels, filters, labelsMenu } =
                              , textColor inherit
                              , userSelectNone
                              ]
-                                ++ (case filters.label of
+                                ++ (case filteringByLabel of
                                         Nothing ->
                                             []
 
@@ -1472,8 +1449,8 @@ labelsMenuColumn { labels, filters, labelsMenu } =
         ]
 
 
-pageView : { a | labels : List Label, page : Page, labelsMenu : Maybe String, isOnline : Bool, searchBarQuery : String, runningQueueOn : Maybe b, filters : { c | label : Maybe SyncableID }, windowRes : g } -> Html Msg -> Html Msg
-pageView { labels, page, labelsMenu, isOnline, runningQueueOn, filters, searchBarQuery, windowRes } individualPageView =
+pageView : { a | labels : List Label, page : Page, labelsMenu : Maybe String, isOnline : Bool, searchBarQuery : String, runningQueueOn : Maybe b, filteringByLabel : Maybe SyncableID, windowRes : g } -> Html Msg -> Html Msg
+pageView { labels, page, labelsMenu, isOnline, runningQueueOn, filteringByLabel, searchBarQuery, windowRes } individualPageView =
     col
         [ css
             [ displayFlex
@@ -1500,7 +1477,7 @@ pageView { labels, page, labelsMenu, isOnline, runningQueueOn, filters, searchBa
                 ]
             ]
             [ if maybeToBool labelsMenu then
-                labelsMenuColumn { labels = labels, filters = filters, labelsMenu = labelsMenu }
+                labelsMenuColumn { labels = labels, filteringByLabel = filteringByLabel, labelsMenu = labelsMenu }
 
               else
                 text ""
@@ -1526,17 +1503,17 @@ view model =
             LoggedOff logInModel ->
                 Html.Styled.map (GotLogInMsg >> GotPageMsg) (LogIn.logInView logInModel)
 
-            LoggedIn { page, runningQueueOn, windowRes, isOnline, filters, labelsMenu, searchBarQuery } ->
+            LoggedIn { page, runningQueueOn, windowRes, isOnline, filteringByLabel, labelsMenu, searchBarQuery } ->
                 case page of
                     Home homeModel ->
-                        pageView { searchBarQuery = searchBarQuery, labels = homeModel.labels, page = page, labelsMenu = labelsMenu, isOnline = isOnline, runningQueueOn = runningQueueOn, filters = filters, windowRes = windowRes }
-                            (Home.view homeModel windowRes filters (maybeToBool labelsMenu) |> Html.Styled.map (GotHomeMsg >> GotPageMsg))
+                        pageView { searchBarQuery = searchBarQuery, labels = homeModel.labels, page = page, labelsMenu = labelsMenu, isOnline = isOnline, runningQueueOn = runningQueueOn, filteringByLabel = filteringByLabel, windowRes = windowRes }
+                            (Home.view homeModel windowRes filteringByLabel (maybeToBool labelsMenu) |> Html.Styled.map (GotHomeMsg >> GotPageMsg))
 
                     EditLabels editLabelsModel ->
-                        pageView { searchBarQuery = searchBarQuery, labels = editLabelsModel.labels, page = page, labelsMenu = labelsMenu, isOnline = isOnline, runningQueueOn = runningQueueOn, filters = filters, windowRes = windowRes }
+                        pageView { searchBarQuery = searchBarQuery, labels = editLabelsModel.labels, page = page, labelsMenu = labelsMenu, isOnline = isOnline, runningQueueOn = runningQueueOn, filteringByLabel = filteringByLabel, windowRes = windowRes }
                             (EditLabels.view editLabelsModel |> Html.Styled.map (GotEditLabelsMsg >> GotPageMsg))
 
                     EditNote editNoteModel ->
-                        pageView { searchBarQuery = searchBarQuery, labels = editNoteModel.labels, page = page, labelsMenu = labelsMenu, isOnline = isOnline, runningQueueOn = runningQueueOn, filters = filters, windowRes = windowRes }
+                        pageView { searchBarQuery = searchBarQuery, labels = editNoteModel.labels, page = page, labelsMenu = labelsMenu, isOnline = isOnline, runningQueueOn = runningQueueOn, filteringByLabel = filteringByLabel, windowRes = windowRes }
                             (EditNote.view editNoteModel |> Html.Styled.map (GotEditNoteMsg >> GotPageMsg))
         ]
