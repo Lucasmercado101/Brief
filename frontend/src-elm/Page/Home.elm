@@ -93,6 +93,7 @@ type alias LabelsColumnMenu =
 type alias Model =
     { newLabelName : String
     , selectedNote : Maybe SyncableID
+    , searchQuery : String
 
     -- global data
     , key : Nav.Key
@@ -112,6 +113,7 @@ init :
 init { key, seeds, labels, notes } =
     { key = key
     , seeds = seeds
+    , searchQuery = ""
     , notes = notes
     , newLabelName = ""
     , selectedNote = Nothing
@@ -647,6 +649,30 @@ view model windowRes filteringByLabel labelsMenuIsOpen =
                                                 Nothing ->
                                                     e
                                        )
+                                    |> (\e ->
+                                            case model.searchQuery of
+                                                "" ->
+                                                    e
+
+                                                query ->
+                                                    e
+                                                        |> List.filter
+                                                            (\l ->
+                                                                let
+                                                                    includesTitle =
+                                                                        case l.title of
+                                                                            Nothing ->
+                                                                                False
+
+                                                                            Just title ->
+                                                                                String.contains (String.toLower query) (String.toLower title)
+
+                                                                    includesContent =
+                                                                        String.contains (String.toLower query) (String.toLower l.content)
+                                                                in
+                                                                includesTitle || includesContent
+                                                            )
+                                       )
                                     |> List.indexedMap
                                         (\i e ->
                                             ( e
@@ -660,15 +686,6 @@ view model windowRes filteringByLabel labelsMenuIsOpen =
                                             )
                                         )
                                 )
-                             -- TODO: for when multiple can be selected
-                             -- |> List.map
-                             --     (\e ->
-                             --         case List.any (sameId e.id) model.selectedNotes of
-                             --             True ->
-                             --                 ( e, True )
-                             --             False ->
-                             --                 ( e, False )
-                             --     )
                             )
                         ]
             ]

@@ -224,6 +224,18 @@ update topMsg topModel =
 
                 LoggedOff _ ->
                     topModel
+
+        homePageMap : (Home.Model -> Home.Model) -> Page -> Page
+        homePageMap fn page =
+            case page of
+                Home homeModel ->
+                    Home (fn homeModel)
+
+                EditLabels editLabelsModel ->
+                    page
+
+                EditNote editNoteModel ->
+                    page
     in
     case topMsg of
         IsOffline ->
@@ -838,7 +850,16 @@ update topMsg topModel =
                             topModel |> pure
 
         OnChangedSearchBarQuery newQuery ->
-            loggedInMap (\model -> { model | searchBarQuery = newQuery })
+            loggedInMap
+                (\model ->
+                    { model
+                        | searchBarQuery = newQuery
+                        , page =
+                            homePageMap
+                                (\home -> { home | searchQuery = newQuery })
+                                model.page
+                    }
+                )
                 |> pure
 
         ReturnHome ->
