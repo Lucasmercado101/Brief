@@ -87,7 +87,6 @@ type alias LoggedInModel =
     , searchBarQuery : String
 
     -- Labels menu
-    , newLabelName : String
     , labelsMenu : LabelsColumnMenu
     , filters :
         { label : Maybe SyncableID
@@ -176,7 +175,6 @@ init flags url navKey =
             , searchBarQuery = ""
 
             -- Labels menu
-            , newLabelName = ""
             , labelsMenu = Nothing
             , filters =
                 { label = Nothing
@@ -316,7 +314,6 @@ update topMsg topModel =
                                             }
                                         )
                                 , searchBarQuery = ""
-                                , newLabelName = ""
                                 , labelsMenu = Nothing
                                 , filters =
                                     { label = Nothing
@@ -818,7 +815,6 @@ update topMsg topModel =
                                 , offlineQueue = emptyOfflineQueue
                                 , isOnline = loggedInModel.isOnline
                                 , key = loggedInModel.key
-                                , newLabelName = loggedInModel.newLabelName
                                 , labelsMenu = loggedInModel.labelsMenu
                                 , filters = loggedInModel.filters
                                 , searchBarQuery = loggedInModel.searchBarQuery
