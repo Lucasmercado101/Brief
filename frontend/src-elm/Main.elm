@@ -910,7 +910,16 @@ update topMsg topModel =
                 |> pure
 
         ClearSearchBarQuery ->
-            loggedInMap (\model -> { model | searchBarQuery = "" })
+            loggedInMap
+                (\model ->
+                    { model
+                        | searchBarQuery = ""
+                        , page =
+                            homePageMap
+                                (\home -> { home | searchQuery = "" })
+                                model.page
+                    }
+                )
                 |> pure
 
         SelectLabelToFilterBy id ->
